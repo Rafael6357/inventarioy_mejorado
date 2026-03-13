@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #cda434;
+  --color-primary-hover: #e0b44a;
+  --color-bg: #121212;
+  --color-surface: #1E1E1E;
+  --color-surface-hover: #2a2a2a;
+  --color-text: #e0e0e0;
+  --color-text-secondary: #aaaaaa;
+  --color-border: #333333;
+  --color-success: #22c55e;
+  --color-danger: #ef4444;
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+  
+  body {
+    @apply bg-bg text-text antialiased min-h-screen relative;
+  }
+
+  /* Global background gradient and noise for the entire app */
+  body::before {
+    content: "";
+    @apply fixed inset-0 pointer-events-none z-[-1];
+    background: radial-gradient(circle at 50% 0%, rgba(205, 164, 52, 0.05) 0%, transparent 70%);
+  }
+
+  body::after {
+    content: "";
+    @apply fixed inset-0 pointer-events-none z-[-2] opacity-[0.15] mix-blend-overlay;
+    background-image: url("https://grainy-gradients.vercel.app/noise.svg");
+  }
+}
+
+@layer utilities {
+  .glow-primary {
+    box-shadow: 0 0 20px -5px rgba(205, 164, 52, 0.3);
+  }
+  .glow-primary-hover:hover {
+    box-shadow: 0 0 30px -5px rgba(205, 164, 52, 0.4);
+    border-color: rgba(205, 164, 52, 0.5);
+  }
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary-hover;
+  }
+}
