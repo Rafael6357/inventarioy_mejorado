@@ -5,6 +5,7 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
 import { PackagePlus, ArrowRightLeft, Settings2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const DEFAULT_CATEGORIES = [
   "Bebidas y Refrescos",
@@ -25,12 +26,14 @@ export default function InventoryView() {
   const { user } = useAuthStore();
   const { products, addProduct, addMovement } = useDatabaseStore();
   
+  const activeProducts = products.filter(p => p.isActive !== false);
+
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isCustomCategory, setIsCustomCategory] = useState(false);
   const [customCategory, setCustomCategory] = useState('');
 
   // Get unique categories from existing products and combine with defaults
-  const existingCategories = Array.from(new Set(products.map(p => p.category).filter(Boolean)));
+  const existingCategories = Array.from(new Set(activeProducts.map(p => p.category).filter(Boolean)));
   const allCategories = Array.from(new Set([...DEFAULT_CATEGORIES, ...existingCategories])).sort();
 
   // Form states for New Product
@@ -80,7 +83,7 @@ export default function InventoryView() {
       eoq: 0, rop: 0, lead_time: 0, order_cost: 0, holding_cost: 0,
     });
     setIsCustomCategory(false);
-    alert('Producto agregado exitosamente');
+    toast.success('Producto agregado exitosamente');
   };
 
   const handleAddMovement = (e: React.FormEvent) => {
@@ -106,7 +109,7 @@ export default function InventoryView() {
       cost: 0,
       reason: '',
     });
-    alert('Movimiento registrado exitosamente');
+    toast.success('Movimiento registrado exitosamente');
   };
 
   return (
@@ -120,7 +123,7 @@ export default function InventoryView() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Panel Izquierdo - Alta de Producto */}
-        <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(205,164,52,0.15)]">
+        <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(255,193,7,0.15)]">
           <div className="mb-6 flex items-center gap-3 border-b border-border/50 pb-4">
             <div className="rounded-lg bg-primary/10 p-2 text-primary drop-shadow-[0_0_8px_rgba(205,164,52,0.5)]">
               <PackagePlus className="h-5 w-5" />
@@ -140,7 +143,7 @@ export default function InventoryView() {
                   <select
                     id="category"
                     required
-                    className="flex h-10 w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="flex h-10 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                     value={newProduct.category}
                     onChange={(e) => {
                       if (e.target.value === 'custom') {
@@ -182,7 +185,7 @@ export default function InventoryView() {
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="quantity">Cantidad Inicial *</Label>
                 <Input id="quantity" type="number" min="0" step="0.01" required value={newProduct.quantity} onChange={e => setNewProduct({...newProduct, quantity: Number(e.target.value)})} />
@@ -202,10 +205,6 @@ export default function InventoryView() {
                   <option value="L">Litros (L)</option>
                   <option value="ml">Mililitros (ml)</option>
                 </select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="price">Precio Venta *</Label>
-                <Input id="price" type="number" min="0" step="0.01" required value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: Number(e.target.value)})} />
               </div>
             </div>
 
@@ -235,15 +234,24 @@ export default function InventoryView() {
               />
             </div>
 
-            <div className="flex items-center gap-2 pt-2">
-              <input 
-                type="checkbox" 
-                id="is_individual" 
-                className="h-4 w-4 rounded border-border bg-bg text-primary focus:ring-primary"
-                checked={newProduct.is_individual}
-                onChange={e => setNewProduct({...newProduct, is_individual: e.target.checked})}
-              />
-              <Label htmlFor="is_individual" className="cursor-pointer">¿Se vende individualmente?</Label>
+            <div className="space-y-4 pt-2 border-t border-border/50">
+              <div className="flex items-center gap-2">
+                <input 
+                  type="checkbox" 
+                  id="is_individual" 
+                  className="h-4 w-4 rounded border-border bg-bg text-primary focus:ring-primary"
+                  checked={newProduct.is_individual}
+                  onChange={e => setNewProduct({...newProduct, is_individual: e.target.checked})}
+                />
+                <Label htmlFor="is_individual" className="cursor-pointer">¿Se vende individualmente?</Label>
+              </div>
+              
+              {newProduct.is_individual && (
+                <div className="space-y-2 sm:w-1/2">
+                  <Label htmlFor="price">Precio de Venta *</Label>
+                  <Input id="price" type="number" min="0" step="0.01" required value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: Number(e.target.value)})} />
+                </div>
+              )}
             </div>
 
             {/* Advanced Parameters Toggle */}
@@ -326,7 +334,7 @@ export default function InventoryView() {
                 }}
               >
                 <option value="">Seleccione un producto...</option>
-                {products.map(p => (
+                {activeProducts.map(p => (
                   <option key={p.id} value={p.id}>{p.name} (Stock: {p.quantity} {p.unit})</option>
                 ))}
               </select>

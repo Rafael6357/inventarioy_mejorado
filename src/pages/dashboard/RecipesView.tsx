@@ -5,11 +5,14 @@ import { ChefHat, Plus, Minus, Trash2, Search, UtensilsCrossed, AlertCircle } fr
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
+import { toast } from 'sonner';
 
 export default function RecipesView() {
   const { user } = useAuthStore();
   const { products, recipes, addRecipe, deleteRecipe } = useDatabaseStore();
   
+  const activeProducts = products.filter(p => p.isActive !== false);
+
   const [searchTerm, setSearchTerm] = useState('');
   
   // Recipe Form State
@@ -63,7 +66,7 @@ export default function RecipesView() {
     e.preventDefault();
     if (!user) return;
     if (ingredients.length === 0) {
-      alert('La receta debe tener al menos un ingrediente.');
+      toast.error('La receta debe tener al menos un ingrediente.');
       return;
     }
 
@@ -78,7 +81,7 @@ export default function RecipesView() {
     setRecipeName('');
     setSellingPrice(0);
     setIngredients([]);
-    alert('Receta creada exitosamente');
+    toast.success('Receta creada exitosamente');
   };
 
   const filteredRecipes = recipes.filter(r => 
@@ -90,7 +93,7 @@ export default function RecipesView() {
       <div>
         <h1 className="text-2xl font-bold text-text">Recetas y Escandallos</h1>
         <p className="text-sm text-text-secondary">
-          Crea platillos compuestos para descontar inventario automáticamente
+          Crea platillos compuestos para descontar de tránsito automáticamente
         </p>
       </div>
 
@@ -136,7 +139,7 @@ export default function RecipesView() {
               </div>
               
               <select 
-                className="w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 onChange={e => {
                   handleAddIngredient(e.target.value);
                   e.target.value = ''; // Reset select after adding
@@ -144,7 +147,7 @@ export default function RecipesView() {
                 defaultValue=""
               >
                 <option value="" disabled>+ Agregar ingrediente...</option>
-                {products.map(p => (
+                {activeProducts.map(p => (
                   <option key={p.id} value={p.id}>{p.name} ({p.unit})</option>
                 ))}
               </select>
@@ -258,6 +261,7 @@ export default function RecipesView() {
                       onClick={() => {
                         if(window.confirm('¿Seguro que deseas eliminar esta receta?')) {
                           deleteRecipe(recipe.id);
+                          toast.success('Receta eliminada exitosamente');
                         }
                       }}
                       className="absolute right-4 top-4 text-text-secondary hover:text-danger transition-colors"

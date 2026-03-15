@@ -4,6 +4,7 @@ import { Settings, Save, Building2, User, Mail, Shield, CreditCard } from 'lucid
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
+import { toast } from 'sonner';
 
 export default function SettingsView() {
   const { user, login } = useAuthStore();
@@ -26,7 +27,7 @@ export default function SettingsView() {
       businessName: formData.businessName,
     });
     
-    alert('Configuración guardada exitosamente');
+    toast.success('Configuración guardada exitosamente');
   };
 
   return (
@@ -41,7 +42,7 @@ export default function SettingsView() {
       <div className="grid gap-6 md:grid-cols-3">
         {/* Left Column - Navigation/Info */}
         <div className="space-y-6 md:col-span-1">
-          <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(205,164,52,0.15)]">
+          <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(255,193,7,0.15)]">
             <h3 className="font-semibold text-text mb-4 flex items-center gap-2">
               <Shield className="h-4 w-4 text-primary drop-shadow-[0_0_5px_rgba(205,164,52,0.8)]" />
               Estado de la Cuenta

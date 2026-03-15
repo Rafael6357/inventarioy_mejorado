@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Box, Sparkles } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { useAuthStore } from '../store/authStore';
+import { toast } from 'sonner';
 
 export default function Register() {
   const [name, setName] = useState('');
@@ -43,26 +44,27 @@ export default function Register() {
     };
 
     login(mockUser);
+    toast.success('Cuenta creada exitosamente');
     navigate('/dashboard');
   };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-transparent px-4 py-12">
-      <div className="w-full max-w-md space-y-8 rounded-2xl border border-border/50 bg-surface/80 backdrop-blur-xl p-8 shadow-[0_0_40px_-10px_rgba(205,164,52,0.15)]">
+      <div className="w-full max-w-md space-y-8 rounded-2xl border border-border/50 bg-surface/80 backdrop-blur-xl p-8 shadow-[0_0_40px_-10px_rgba(255,193,7,0.15)]">
         <div className="flex flex-col items-center text-center">
-          <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 shadow-[inset_0_0_15px_rgba(205,164,52,0.1)]">
-            <Box className="h-6 w-6 text-primary drop-shadow-[0_0_8px_rgba(205,164,52,0.5)]" />
+          <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 shadow-[inset_0_0_15px_rgba(255,193,7,0.1)]">
+            <Box className="h-6 w-6 text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]" />
           </div>
-          <h2 className="text-2xl font-bold text-text text-gradient">Crea tu cuenta</h2>
-          <div className="mt-2 inline-flex items-center rounded-full border border-primary/50 bg-primary/10 px-3 py-1 text-xs font-medium text-primary shadow-[0_0_15px_rgba(205,164,52,0.2)]">
-            <Sparkles className="mr-2 h-3 w-3 drop-shadow-[0_0_5px_rgba(205,164,52,0.8)]" />
+          <h2 className="text-2xl font-bold text-text text-gradient hero-glow">Crea tu cuenta</h2>
+          <div className="mt-2 inline-flex items-center rounded-full border border-primary/50 bg-primary/10 px-3 py-1 text-xs font-medium text-primary shadow-[0_0_15px_rgba(255,193,7,0.2)]">
+            <Sparkles className="mr-2 h-3 w-3 drop-shadow-[0_0_5px_rgba(255,193,7,0.8)]" />
             Empieza con 30 días gratis
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-6">
           {error && (
-            <div className="rounded-md bg-danger/10 p-3 text-sm text-danger">
+            <div className="rounded-xl bg-danger/10 p-3 text-sm text-danger">
               {error}
             </div>
           )}
@@ -78,7 +80,7 @@ export default function Register() {
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text ring-offset-bg placeholder:text-text-secondary transition-all duration-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary focus-visible:shadow-[0_0_15px_-3px_rgba(205,164,52,0.3)]"
+                className="flex h-10 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-text ring-offset-bg placeholder:text-text-secondary transition-all duration-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary focus-visible:shadow-[0_0_15px_-3px_rgba(255,193,7,0.3)]"
                 placeholder="Juan Pérez"
               />
             </div>
@@ -92,7 +94,7 @@ export default function Register() {
                 required
                 value={businessName}
                 onChange={(e) => setBusinessName(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text ring-offset-bg placeholder:text-text-secondary transition-all duration-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary focus-visible:shadow-[0_0_15px_-3px_rgba(205,164,52,0.3)]"
+                className="flex h-10 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-text ring-offset-bg placeholder:text-text-secondary transition-all duration-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary focus-visible:shadow-[0_0_15px_-3px_rgba(255,193,7,0.3)]"
                 placeholder="Mi Empresa S.A."
               />
             </div>
@@ -106,7 +108,7 @@ export default function Register() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text ring-offset-bg placeholder:text-text-secondary transition-all duration-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary focus-visible:shadow-[0_0_15px_-3px_rgba(205,164,52,0.3)]"
+                className="flex h-10 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-text ring-offset-bg placeholder:text-text-secondary transition-all duration-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary focus-visible:shadow-[0_0_15px_-3px_rgba(255,193,7,0.3)]"
                 placeholder="tu@gmail.com"
               />
             </div>
@@ -120,7 +122,7 @@ export default function Register() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text ring-offset-bg placeholder:text-text-secondary transition-all duration-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary focus-visible:shadow-[0_0_15px_-3px_rgba(205,164,52,0.3)]"
+                className="flex h-10 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-text ring-offset-bg placeholder:text-text-secondary transition-all duration-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary focus-visible:shadow-[0_0_15px_-3px_rgba(255,193,7,0.3)]"
                 placeholder="••••••••"
               />
             </div>

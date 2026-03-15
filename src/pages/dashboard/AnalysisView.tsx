@@ -4,11 +4,13 @@ import { TrendingUp, DollarSign, Package, AlertTriangle, ArrowUpRight, ArrowDown
 
 export default function AnalysisView() {
   const { products, sales, movements } = useDatabaseStore();
+  
+  const activeProducts = products.filter(p => p.isActive !== false);
 
   // 1. KPI Calculations
   const totalInventoryValue = useMemo(() => {
-    return products.reduce((sum, p) => sum + (p.quantity * p.cost), 0);
-  }, [products]);
+    return activeProducts.reduce((sum, p) => sum + (p.quantity * p.cost), 0);
+  }, [activeProducts]);
 
   const totalSalesRevenue = useMemo(() => {
     return sales.reduce((sum, s) => sum + s.totalAmount, 0);
@@ -27,7 +29,7 @@ export default function AnalysisView() {
   const abcAnalysis = useMemo(() => {
     if (totalInventoryValue === 0) return [];
 
-    const productsWithValue = products.map(p => ({
+    const productsWithValue = activeProducts.map(p => ({
       ...p,
       totalValue: p.quantity * p.cost
     })).sort((a, b) => b.totalValue - a.totalValue);
@@ -43,10 +45,10 @@ export default function AnalysisView() {
       
       return { ...p, classification, cumulativePercentage };
     });
-  }, [products, totalInventoryValue]);
+  }, [activeProducts, totalInventoryValue]);
 
   // 3. Low Stock Alerts
-  const lowStockProducts = products.filter(p => p.quantity <= p.stock_min);
+  const lowStockProducts = activeProducts.filter(p => p.quantity <= p.stock_min);
 
   return (
     <div className="space-y-6">
@@ -59,7 +61,7 @@ export default function AnalysisView() {
 
       {/* KPI Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(205,164,52,0.15)]">
+        <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(255,193,7,0.15)]">
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium text-text-secondary">Valor del Inventario</p>
             <div className="rounded-lg bg-primary/10 p-2 text-primary drop-shadow-[0_0_8px_rgba(205,164,52,0.5)]">
@@ -123,7 +125,7 @@ export default function AnalysisView() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-text">
+            <table className="w-full text-left text-sm text-text [&_tr]:divide-x [&_tr]:divide-border/50">
               <thead className="border-b border-border bg-bg/50 text-xs uppercase text-text-secondary">
                 <tr>
                   <th className="px-4 py-3 font-medium">Clase</th>

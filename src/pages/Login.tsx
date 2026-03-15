@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Box } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { useAuthStore } from '../store/authStore';
+import { toast } from 'sonner';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -41,17 +42,18 @@ export default function Login() {
     };
 
     login(mockUser);
+    toast.success('Sesión iniciada correctamente');
     navigate('/dashboard');
   };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-transparent px-4">
-      <div className="w-full max-w-md space-y-8 rounded-2xl border border-border/50 bg-surface/80 backdrop-blur-xl p-8 shadow-[0_0_40px_-10px_rgba(205,164,52,0.15)]">
+      <div className="w-full max-w-md space-y-8 rounded-2xl border border-border/50 bg-surface/80 backdrop-blur-xl p-8 shadow-[0_0_40px_-10px_rgba(255,193,7,0.15)]">
         <div className="flex flex-col items-center text-center">
-          <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 shadow-[inset_0_0_15px_rgba(205,164,52,0.1)]">
-            <Box className="h-6 w-6 text-primary drop-shadow-[0_0_8px_rgba(205,164,52,0.5)]" />
+          <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 shadow-[inset_0_0_15px_rgba(255,193,7,0.1)]">
+            <Box className="h-6 w-6 text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]" />
           </div>
-          <h2 className="text-2xl font-bold text-text text-gradient">Bienvenido de nuevo</h2>
+          <h2 className="text-2xl font-bold text-text text-gradient hero-glow">Bienvenido de nuevo</h2>
           <p className="mt-2 text-sm text-text-secondary">
             Ingresa a tu cuenta para gestionar tu inventario
           </p>
@@ -59,7 +61,7 @@ export default function Login() {
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-6">
           {error && (
-            <div className="rounded-md bg-danger/10 p-3 text-sm text-danger">
+            <div className="rounded-xl bg-danger/10 p-3 text-sm text-danger">
               {error}
             </div>
           )}
@@ -75,7 +77,7 @@ export default function Login() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text ring-offset-bg placeholder:text-text-secondary transition-all duration-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary focus-visible:shadow-[0_0_15px_-3px_rgba(205,164,52,0.3)]"
+                className="flex h-10 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-text ring-offset-bg placeholder:text-text-secondary transition-all duration-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary focus-visible:shadow-[0_0_15px_-3px_rgba(255,193,7,0.3)]"
                 placeholder="tu@gmail.com"
               />
             </div>
@@ -89,7 +91,7 @@ export default function Login() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text ring-offset-bg placeholder:text-text-secondary transition-all duration-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary focus-visible:shadow-[0_0_15px_-3px_rgba(205,164,52,0.3)]"
+                className="flex h-10 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-text ring-offset-bg placeholder:text-text-secondary transition-all duration-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary focus-visible:shadow-[0_0_15px_-3px_rgba(255,193,7,0.3)]"
                 placeholder="••••••••"
               />
             </div>

@@ -7,6 +7,8 @@ import { Label } from '../../components/ui/label';
 export default function FilteredCenterView() {
   const { products } = useDatabaseStore();
   
+  const activeProducts = products.filter(p => p.isActive !== false);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [stockFilter, setStockFilter] = useState('ALL'); // ALL, LOW, NORMAL, OVER
@@ -15,13 +17,13 @@ export default function FilteredCenterView() {
 
   // Extract unique categories
   const categories = useMemo(() => {
-    const cats = new Set(products.map(p => p.category));
+    const cats = new Set(activeProducts.map(p => p.category));
     return Array.from(cats).sort();
-  }, [products]);
+  }, [activeProducts]);
 
   // Apply filters and sorting
   const filteredAndSortedProducts = useMemo(() => {
-    let result = [...products];
+    let result = [...activeProducts];
 
     // 1. Search Filter
     if (searchTerm) {
@@ -70,7 +72,7 @@ export default function FilteredCenterView() {
     });
 
     return result;
-  }, [products, searchTerm, categoryFilter, stockFilter, sortBy, sortOrder]);
+  }, [activeProducts, searchTerm, categoryFilter, stockFilter, sortBy, sortOrder]);
 
   const toggleSort = (field: string) => {
     if (sortBy === field) {
@@ -114,7 +116,7 @@ export default function FilteredCenterView() {
           <div className="space-y-1.5">
             <Label className="text-xs text-text-secondary">Categoría</Label>
             <select 
-              className="w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary h-10"
+              className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary h-10"
               value={categoryFilter}
               onChange={e => setCategoryFilter(e.target.value)}
             >
@@ -151,7 +153,7 @@ export default function FilteredCenterView() {
       {/* Results Table */}
       <div className="rounded-xl border border-border bg-surface shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-text">
+          <table className="w-full text-left text-sm text-text [&_tr]:divide-x [&_tr]:divide-border/50">
             <thead className="border-b border-border bg-bg/50 text-xs uppercase text-text-secondary">
               <tr>
                 <th className="px-4 py-3 font-medium cursor-pointer hover:bg-surface-hover transition-colors" onClick={() => toggleSort('name')}>

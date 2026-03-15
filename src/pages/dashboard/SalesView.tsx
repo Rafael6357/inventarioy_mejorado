@@ -1,19 +1,23 @@
 import React, { useState } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
 import { useAuthStore } from '../../store/authStore';
-import { Plus, Minus, Trash2, ShoppingCart, CreditCard, Search } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingCart, CreditCard, Search, X } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
+import { toast } from 'sonner';
 
 export default function SalesView() {
   const { user } = useAuthStore();
   const { products, recipes, employees, addSale } = useDatabaseStore();
   
+  const activeProducts = products.filter(p => p.isActive !== false);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [saleType, setSaleType] = useState<'SALON' | 'DOMICILIO'>('SALON');
   const [employeeId, setEmployeeId] = useState('');
   const [discount, setDiscount] = useState(0);
   const [notes, setNotes] = useState('');
+  const [showPreview, setShowPreview] = useState(false);
   
   const [cart, setCart] = useState<{
     productId: string;
@@ -23,11 +27,19 @@ export default function SalesView() {
     cost: number;
     unit: string;
     isRecipe?: boolean;
+    recipeSnapshot?: {
+      name: string;
+      ingredients: {
+        productId: string;
+        quantity: number;
+        cost: number;
+      }[];
+    };
   }[]>([]);
 
   // Combine products and recipes for the catalog
   const catalogItems = [
-    ...products.map(p => ({ ...p, isRecipe: false })),
+    ...activeProducts.filter(p => p.is_individual).map(p => ({ ...p, isRecipe: false })),
     ...recipes.map(r => {
       // Calculate cost of recipe
       const cost = r.ingredients.reduce((sum, ing) => {
@@ -42,7 +54,18 @@ export default function SalesView() {
         cost,
         unit: 'porción',
         quantity: 999, // Recipes don't have direct stock, it depends on ingredients
-        isRecipe: true
+        isRecipe: true,
+        recipeSnapshot: {
+          name: r.name,
+          ingredients: r.ingredients.map(ing => {
+            const product = products.find(p => p.id === ing.productId);
+            return {
+              productId: ing.productId,
+              quantity: ing.quantity,
+              cost: product?.cost || 0
+            };
+          })
+        }
       };
     })
   ];
@@ -69,7 +92,8 @@ export default function SalesView() {
         price: item.price,
         cost: item.cost,
         unit: item.unit,
-        isRecipe: item.isRecipe
+        isRecipe: item.isRecipe,
+        recipeSnapshot: item.recipeSnapshot
       }];
     });
   };
@@ -94,9 +118,14 @@ export default function SalesView() {
   const handleCheckout = () => {
     if (!user) return;
     if (cart.length === 0) {
-      alert('El carrito está vacío');
+      toast.error('El carrito está vacío');
       return;
     }
+    setShowPreview(true);
+  };
+
+  const confirmSale = () => {
+    if (!user) return;
 
     addSale({
       businessId: user.businessName,
@@ -106,7 +135,9 @@ export default function SalesView() {
         quantity: item.quantity,
         unitCost: item.cost,
         sellingPrice: item.price,
-        subtotal: item.price * item.quantity
+        subtotal: item.price * item.quantity,
+        isRecipe: item.isRecipe,
+        recipeSnapshot: item.recipeSnapshot
       })),
       totalAmount: total,
       date: new Date().toISOString(),
@@ -119,13 +150,17 @@ export default function SalesView() {
     setCart([]);
     setDiscount(0);
     setNotes('');
-    alert('Venta registrada exitosamente');
+    setShowPreview(false);
+    toast.success('Venta registrada exitosamente');
   };
+
+  const selectedEmployee = employees.find(e => e.id === employeeId);
+  const sellerName = selectedEmployee ? selectedEmployee.name : '(Yo)';
 
   return (
     <div className="flex h-[calc(100vh-8rem)] flex-col gap-6 lg:flex-row">
       {/* Panel Izquierdo - Catálogo de Productos */}
-      <div className="flex flex-1 flex-col rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(205,164,52,0.15)]">
+      <div className="flex flex-1 flex-col rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(255,193,7,0.15)]">
         <div className="border-b border-border/50 p-4">
           <h2 className="text-lg font-semibold text-text mb-4">Punto de Venta</h2>
           <div className="relative flex items-center">
@@ -177,7 +212,7 @@ export default function SalesView() {
           </h2>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto p-4 animate-scrollbar-pulse">
           {cart.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center text-text-secondary">
               <ShoppingCart className="mb-4 h-12 w-12 opacity-20" />
@@ -195,7 +230,7 @@ export default function SalesView() {
                   <div className="flex items-center gap-2">
                     <button 
                       onClick={() => updateQuantity(item.productId, -1)}
-                      className="rounded-md bg-surface-hover p-1 text-text hover:bg-border transition-colors"
+                      className="rounded-xl bg-surface-hover p-1 text-text hover:bg-border transition-colors"
                     >
                       <Minus className="h-4 w-4" />
                     </button>
@@ -284,6 +319,74 @@ export default function SalesView() {
           </Button>
         </div>
       </div>
+
+      {/* Checkout Preview Modal */}
+      {showPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-border/50 bg-surface p-6 shadow-2xl">
+            <div className="mb-6 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-text">Resumen de Venta</h2>
+              <button 
+                onClick={() => setShowPreview(false)}
+                className="rounded-full p-2 text-text-secondary hover:bg-surface-hover hover:text-text transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mb-6 max-h-[40vh] overflow-y-auto pr-2 space-y-3">
+              {cart.map(item => (
+                <div key={item.productId} className="flex justify-between text-sm border-b border-border/50 pb-2">
+                  <div className="flex gap-2 text-text">
+                    <span className="font-mono text-primary">{item.quantity}x</span>
+                    <span>{item.name}</span>
+                  </div>
+                  <span className="font-mono text-text-secondary">${(item.price * item.quantity).toFixed(2)}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-3 rounded-xl bg-bg/50 p-4 mb-6">
+              <div className="flex justify-between text-sm">
+                <span className="text-text-secondary">Subtotal:</span>
+                <span className="font-mono text-text">${subtotal.toFixed(2)}</span>
+              </div>
+              {discount > 0 && (
+                <div className="flex justify-between text-sm text-danger">
+                  <span>Descuento:</span>
+                  <span className="font-mono">-${discount.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-lg font-bold border-t border-border/50 pt-2">
+                <span className="text-text">Total a Cobrar:</span>
+                <span className="font-mono text-primary">${total.toFixed(2)}</span>
+              </div>
+            </div>
+
+            <div className="mb-6 text-sm text-text-secondary bg-surface-hover p-3 rounded-lg">
+              <p><span className="font-medium text-text">Vendedor:</span> {sellerName}</p>
+              <p><span className="font-medium text-text">Tipo:</span> {saleType === 'SALON' ? 'En Salón' : 'A Domicilio'}</p>
+            </div>
+
+            <div className="flex gap-3">
+              <Button 
+                variant="outline" 
+                className="flex-1"
+                onClick={() => setShowPreview(false)}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                className="flex-1 gap-2"
+                onClick={confirmSale}
+              >
+                <CreditCard className="h-4 w-4" />
+                Confirmar Venta
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

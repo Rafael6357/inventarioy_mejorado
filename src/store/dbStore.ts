@@ -16,6 +16,7 @@ export interface Product {
   expiration_date?: string;
   description?: string;
   is_individual: boolean;
+  isActive?: boolean;
   eoq?: number;
   rop?: number;
   lead_time?: number;
@@ -51,6 +52,15 @@ export interface Sale {
     unitCost: number;
     sellingPrice: number;
     subtotal: number;
+    isRecipe?: boolean;
+    recipeSnapshot?: {
+      name: string;
+      ingredients: {
+        productId: string;
+        quantity: number;
+        cost: number;
+      }[];
+    };
   }[];
   totalAmount: number;
   date: string;
@@ -109,6 +119,8 @@ interface DatabaseState {
   addEmployee: (employee: Omit<Employee, 'id' | 'createdAt'>) => void;
   updateEmployee: (id: string, updates: Partial<Employee>) => void;
   deleteEmployee: (id: string) => void;
+  
+  recalculateStock: () => void;
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
@@ -126,6 +138,7 @@ export const useDatabaseStore = create<DatabaseState>()(
         products: [...state.products, {
           ...product,
           id: generateId(),
+          isActive: true,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         }]
@@ -138,15 +151,56 @@ export const useDatabaseStore = create<DatabaseState>()(
       })),
       
       deleteProduct: (id) => set((state) => ({
-        products: state.products.filter(p => p.id !== id)
+        products: state.products.map(p => 
+          p.id === id ? { ...p, isActive: false, updatedAt: new Date().toISOString() } : p
+        )
       })),
 
       addMovement: (movement) => set((state) => {
-        // Also update product stock
+        // Calculate anomaly if it's a SALIDA or MERMA
+        let status = movement.status || 'NORMAL';
+        
+        if ((movement.type === 'SALIDA' || movement.type === 'MERMA') && status === 'NORMAL') {
+          // Find previous outputs for this product
+          const previousOutputs = state.movements.filter(
+            m => m.productId === movement.productId && (m.type === 'SALIDA' || m.type === 'MERMA')
+          );
+          
+          if (previousOutputs.length > 0) {
+            const totalOutput = previousOutputs.reduce((sum, m) => sum + m.quantity, 0);
+            const averageOutput = totalOutput / previousOutputs.length;
+            
+            if (movement.quantity > averageOutput * 1.5) {
+              status = 'ANOMALIA';
+            }
+          }
+        }
+
+        // Also update product stock and weighted average cost
         const products = state.products.map(p => {
           if (p.id === movement.productId) {
-            const qty = movement.type === 'ENTRADA' ? movement.quantity : -movement.quantity;
-            return { ...p, quantity: p.quantity + qty, updatedAt: new Date().toISOString() };
+            let newQuantity = p.quantity;
+            let newCost = p.cost;
+
+            if (movement.type === 'ENTRADA') {
+              const currentTotalValue = p.quantity * p.cost;
+              const newTotalValue = movement.quantity * movement.cost;
+              newQuantity = p.quantity + movement.quantity;
+              
+              // Calculate weighted average cost
+              if (newQuantity > 0) {
+                newCost = (currentTotalValue + newTotalValue) / newQuantity;
+              }
+            } else {
+              newQuantity = p.quantity - movement.quantity;
+            }
+
+            return { 
+              ...p, 
+              quantity: newQuantity, 
+              cost: newCost,
+              updatedAt: new Date().toISOString() 
+            };
           }
           return p;
         });
@@ -155,6 +209,7 @@ export const useDatabaseStore = create<DatabaseState>()(
           products,
           movements: [...state.movements, {
             ...movement,
+            status,
             id: generateId(),
             createdAt: new Date().toISOString(),
           }]
@@ -173,17 +228,48 @@ export const useDatabaseStore = create<DatabaseState>()(
       })),
 
       addSale: (sale) => set((state) => {
-        // Update product stock for each item
         const products = [...state.products];
+        const newMovements: Movement[] = [];
+        const saleDate = sale.date || new Date().toISOString();
+
         sale.items.forEach(item => {
           // Check if the item is a product
           const pIndex = products.findIndex(p => p.id === item.productId);
           if (pIndex >= 0) {
+            const product = products[pIndex];
             products[pIndex] = {
-              ...products[pIndex],
-              quantity: products[pIndex].quantity - item.quantity,
+              ...product,
+              quantity: product.quantity - item.quantity,
               updatedAt: new Date().toISOString()
             };
+            
+            // Calculate anomaly
+            let status: 'NORMAL' | 'ANOMALIA' | 'JUSTIFICADO' = 'NORMAL';
+            const previousOutputs = state.movements.filter(
+              m => m.productId === product.id && (m.type === 'SALIDA' || m.type === 'MERMA')
+            );
+            if (previousOutputs.length > 0) {
+              const totalOutput = previousOutputs.reduce((sum, m) => sum + m.quantity, 0);
+              const averageOutput = totalOutput / previousOutputs.length;
+              if (item.quantity > averageOutput * 1.5) {
+                status = 'ANOMALIA';
+              }
+            }
+
+            newMovements.push({
+              id: generateId(),
+              businessId: sale.businessId,
+              type: 'SALIDA',
+              productId: product.id,
+              quantity: item.quantity,
+              unit: product.unit,
+              date: saleDate,
+              cost: product.cost,
+              reason: `Venta ${sale.saleType === 'DOMICILIO' ? 'a domicilio' : 'en salón'}`,
+              status,
+              createdAt: new Date().toISOString(),
+            });
+
           } else {
             // Check if the item is a recipe
             const recipe = state.recipes.find(r => r.id === item.productId);
@@ -192,11 +278,40 @@ export const useDatabaseStore = create<DatabaseState>()(
               recipe.ingredients.forEach(ing => {
                 const ingIndex = products.findIndex(p => p.id === ing.productId);
                 if (ingIndex >= 0) {
+                  const product = products[ingIndex];
+                  const totalQty = ing.quantity * item.quantity;
                   products[ingIndex] = {
-                    ...products[ingIndex],
-                    quantity: products[ingIndex].quantity - (ing.quantity * item.quantity),
+                    ...product,
+                    quantity: product.quantity - totalQty,
                     updatedAt: new Date().toISOString()
                   };
+                  
+                  // Calculate anomaly
+                  let status: 'NORMAL' | 'ANOMALIA' | 'JUSTIFICADO' = 'NORMAL';
+                  const previousOutputs = state.movements.filter(
+                    m => m.productId === product.id && (m.type === 'SALIDA' || m.type === 'MERMA')
+                  );
+                  if (previousOutputs.length > 0) {
+                    const totalOutput = previousOutputs.reduce((sum, m) => sum + m.quantity, 0);
+                    const averageOutput = totalOutput / previousOutputs.length;
+                    if (totalQty > averageOutput * 1.5) {
+                      status = 'ANOMALIA';
+                    }
+                  }
+
+                  newMovements.push({
+                    id: generateId(),
+                    businessId: sale.businessId,
+                    type: 'SALIDA',
+                    productId: product.id,
+                    quantity: totalQty,
+                    unit: product.unit,
+                    date: saleDate,
+                    cost: product.cost,
+                    reason: `Venta de receta: ${recipe.name}`,
+                    status,
+                    createdAt: new Date().toISOString(),
+                  });
                 }
               });
             }
@@ -205,6 +320,7 @@ export const useDatabaseStore = create<DatabaseState>()(
 
         return {
           products,
+          movements: [...state.movements, ...newMovements],
           sales: [...state.sales, {
             ...sale,
             id: generateId(),
@@ -244,6 +360,25 @@ export const useDatabaseStore = create<DatabaseState>()(
       deleteEmployee: (id) => set((state) => ({
         employees: state.employees.filter(e => e.id !== id)
       })),
+
+      recalculateStock: () => set((state) => {
+        const products = state.products.map(product => {
+          const productMovements = state.movements.filter(m => m.productId === product.id);
+          const calculatedQuantity = productMovements.reduce((total, m) => {
+            if (m.type === 'ENTRADA') return total + m.quantity;
+            if (m.type === 'SALIDA' || m.type === 'MERMA') return total - m.quantity;
+            return total;
+          }, 0);
+          
+          return {
+            ...product,
+            quantity: calculatedQuantity,
+            updatedAt: new Date().toISOString()
+          };
+        });
+
+        return { products };
+      }),
     }),
     {
       name: 'inventarioy-db',

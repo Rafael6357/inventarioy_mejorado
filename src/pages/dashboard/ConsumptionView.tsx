@@ -53,9 +53,8 @@ export default function ConsumptionView() {
           consumptionMap.set(product.id, existing);
         } else {
           // Is it a recipe?
-          const recipe = recipes.find(r => r.id === item.productId);
-          if (recipe) {
-            recipe.ingredients.forEach(ing => {
+          if (item.isRecipe && item.recipeSnapshot) {
+            item.recipeSnapshot.ingredients.forEach(ing => {
               const ingProduct = products.find(p => p.id === ing.productId);
               if (ingProduct) {
                 const existing = consumptionMap.get(ingProduct.id) || {
@@ -70,19 +69,52 @@ export default function ConsumptionView() {
                 const consumedQty = ing.quantity * item.quantity;
                 existing.recipeQty += consumedQty;
                 existing.totalQty += consumedQty;
-                existing.totalCost += (ingProduct.cost * consumedQty);
+                existing.totalCost += (ing.cost * consumedQty);
                 
                 // Track which recipe caused this consumption
-                const recipeEntry = existing.recipes.find(r => r.recipeName === recipe.name);
+                const recipeEntry = existing.recipes.find(r => r.recipeName === item.recipeSnapshot!.name);
                 if (recipeEntry) {
                   recipeEntry.qty += consumedQty;
                 } else {
-                  existing.recipes.push({ recipeName: recipe.name, qty: consumedQty });
+                  existing.recipes.push({ recipeName: item.recipeSnapshot!.name, qty: consumedQty });
                 }
                 
                 consumptionMap.set(ingProduct.id, existing);
               }
             });
+          } else {
+            // Fallback for legacy sales without snapshot
+            const recipe = recipes.find(r => r.id === item.productId);
+            if (recipe) {
+              recipe.ingredients.forEach(ing => {
+                const ingProduct = products.find(p => p.id === ing.productId);
+                if (ingProduct) {
+                  const existing = consumptionMap.get(ingProduct.id) || {
+                    product: ingProduct,
+                    directQty: 0,
+                    recipeQty: 0,
+                    totalQty: 0,
+                    totalCost: 0,
+                    recipes: []
+                  };
+                  
+                  const consumedQty = ing.quantity * item.quantity;
+                  existing.recipeQty += consumedQty;
+                  existing.totalQty += consumedQty;
+                  existing.totalCost += (ingProduct.cost * consumedQty);
+                  
+                  // Track which recipe caused this consumption
+                  const recipeEntry = existing.recipes.find(r => r.recipeName === recipe.name);
+                  if (recipeEntry) {
+                    recipeEntry.qty += consumedQty;
+                  } else {
+                    existing.recipes.push({ recipeName: recipe.name, qty: consumedQty });
+                  }
+                  
+                  consumptionMap.set(ingProduct.id, existing);
+                }
+              });
+            }
           }
         }
       });
@@ -157,7 +189,7 @@ export default function ConsumptionView() {
         </div>
         
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-text">
+          <table className="w-full text-left text-sm text-text [&_tr]:divide-x [&_tr]:divide-border/50">
             <thead className="bg-bg/50 text-xs uppercase text-text-secondary">
               <tr>
                 <th className="px-6 py-4 font-medium">Ingrediente</th>

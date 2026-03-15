@@ -120,7 +120,7 @@ export default function PaymentsView() {
 
       {/* Stats Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-4 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(205,164,52,0.15)]">
+        <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-4 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(255,193,7,0.15)]">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-primary/10 p-2 text-primary drop-shadow-[0_0_8px_rgba(205,164,52,0.5)]">
               <ShieldCheck className="h-5 w-5" />
@@ -181,7 +181,7 @@ export default function PaymentsView() {
         </div>
         
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-text">
+          <table className="w-full text-left text-sm text-text [&_tr]:divide-x [&_tr]:divide-border/50">
             <thead className="border-b border-border bg-bg/50 text-xs uppercase text-text-secondary">
               <tr>
                 <th className="px-4 py-3 font-medium">Negocio / Usuario</th>

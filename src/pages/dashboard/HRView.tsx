@@ -5,6 +5,7 @@ import { Users, UserPlus, Trash2, Mail, Phone, Briefcase, DollarSign } from 'luc
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
+import { toast } from 'sonner';
 
 export default function HRView() {
   const { user } = useAuthStore();
@@ -34,7 +35,7 @@ export default function HRView() {
       phone: '',
       email: '',
     });
-    alert('Empleado agregado exitosamente');
+    toast.success('Empleado agregado exitosamente');
   };
 
   return (
@@ -138,6 +139,7 @@ export default function HRView() {
                     onClick={() => {
                       if(window.confirm('¿Seguro que deseas eliminar este empleado?')) {
                         deleteEmployee(employee.id);
+                        toast.success('Empleado eliminado exitosamente');
                       }
                     }}
                     className="absolute right-4 top-4 text-text-secondary hover:text-danger transition-colors"

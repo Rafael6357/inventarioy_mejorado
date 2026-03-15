@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { 
   Box, 
@@ -17,12 +17,15 @@ import {
   CreditCard,
   LogOut,
   Menu,
-  X
+  X,
+  History,
+  ChevronRight
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import StockView from './dashboard/StockView';
 import InventoryView from './dashboard/InventoryView';
 import TransitView from './dashboard/TransitView';
+import MovementsView from './dashboard/MovementsView';
 import SalesView from './dashboard/SalesView';
 import HRView from './dashboard/HRView';
 import RecipesView from './dashboard/RecipesView';
@@ -46,9 +49,31 @@ const PlaceholderView = ({ title }: { title: string }) => (
 
 export default function Dashboard() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+  const sidebarTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
+
+  const handleSidebarMouseEnter = () => {
+    setIsSidebarVisible(true);
+    if (sidebarTimeoutRef.current) {
+      clearTimeout(sidebarTimeoutRef.current);
+    }
+  };
+
+  const handleSidebarMouseLeave = () => {
+    sidebarTimeoutRef.current = setTimeout(() => {
+      setIsSidebarVisible(false);
+    }, 3000);
+  };
+
+  useEffect(() => {
+    handleSidebarMouseLeave();
+    return () => {
+      if (sidebarTimeoutRef.current) clearTimeout(sidebarTimeoutRef.current);
+    };
+  }, []);
 
   if (!user) {
     return <Navigate to="/login" replace />;
@@ -57,7 +82,8 @@ export default function Dashboard() {
   const navigation = [
     { name: 'Stock Actual', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Inventario', href: '/dashboard/inventory', icon: Package },
-    { name: 'Tránsitos', href: '/dashboard/transit', icon: ArrowRightLeft },
+    { name: 'Movimientos', href: '/dashboard/movements', icon: History },
+    { name: 'Tránsito', href: '/dashboard/transit', icon: ArrowRightLeft },
     { name: 'Ventas', href: '/dashboard/sales', icon: ShoppingCart },
     { name: 'RRHH', href: '/dashboard/hr', icon: Users },
     { name: 'Recetas', href: '/dashboard/recipes', icon: ChefHat },
@@ -87,18 +113,38 @@ export default function Dashboard() {
         />
       )}
 
+      {/* Desktop hover trigger area */}
+      <div 
+        className="fixed inset-y-0 left-0 w-4 z-40 hidden lg:flex items-center justify-center group"
+        onMouseEnter={handleSidebarMouseEnter}
+      >
+        {!isSidebarVisible && (
+          <div className="absolute left-0 w-6 h-12 bg-surface/80 border border-border/50 border-l-0 rounded-r-xl flex items-center justify-center shadow-[0_0_10px_rgba(255,193,7,0.2)] transition-all group-hover:w-8 group-hover:bg-surface cursor-pointer">
+            <ChevronRight className="h-4 w-4 text-primary animate-pulse" />
+          </div>
+        )}
+      </div>
+
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 transform border-r border-border/50 bg-surface/80 backdrop-blur-xl transition-transform duration-200 ease-in-out lg:static lg:translate-x-0 ${
-          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+        onMouseEnter={handleSidebarMouseEnter}
+        onMouseLeave={handleSidebarMouseLeave}
+        className={`fixed inset-y-0 left-0 z-50 w-64 transform border-r border-border/50 bg-surface/80 backdrop-blur-xl transition-transform duration-300 ease-in-out ${
+          isMobileMenuOpen || isSidebarVisible ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <div className="flex h-16 items-center justify-between px-4 border-b border-border/50">
           <div className="flex items-center gap-2">
-            <Box className="h-6 w-6 text-primary drop-shadow-[0_0_8px_rgba(205,164,52,0.5)]" />
-            <span className="text-xl font-bold text-text text-gradient">InventarioY</span>
+            <Box className="h-6 w-6 text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]" />
+            <span className="text-xl font-bold text-text text-gradient hero-glow">InventarioY</span>
           </div>
-          <button onClick={() => setIsMobileMenuOpen(false)} className="lg:hidden text-text-secondary">
+          <button 
+            onClick={() => {
+              setIsMobileMenuOpen(false);
+              setIsSidebarVisible(false);
+            }} 
+            className="text-danger/80 hover:text-danger transition-colors"
+          >
             <X className="h-6 w-6" />
           </button>
         </div>
@@ -114,11 +160,11 @@ export default function Dashboard() {
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-300 ${
                     isActive
-                      ? 'bg-gradient-to-r from-primary/20 to-transparent text-primary border-l-2 border-primary shadow-[inset_0_0_20px_rgba(205,164,52,0.05)]'
+                      ? 'bg-gradient-to-r from-primary/20 to-transparent text-primary border-l-2 border-primary shadow-[inset_0_0_20px_rgba(255,193,7,0.05)]'
                       : 'text-text-secondary hover:bg-surface-hover hover:text-text'
                   }`}
                 >
-                  <item.icon className={`h-5 w-5 ${isActive ? 'text-primary drop-shadow-[0_0_8px_rgba(205,164,52,0.5)]' : 'text-text-secondary'}`} />
+                  <item.icon className={`h-5 w-5 ${isActive ? 'text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]' : 'text-text-secondary'}`} />
                   {item.name}
                 </Link>
               );
@@ -148,8 +194,8 @@ export default function Dashboard() {
       <div className="flex flex-1 flex-col overflow-hidden bg-transparent">
         <header className="flex h-16 items-center justify-between border-b border-border/50 bg-surface/80 backdrop-blur-xl px-4 lg:hidden">
           <div className="flex items-center gap-2">
-            <Box className="h-6 w-6 text-primary drop-shadow-[0_0_8px_rgba(205,164,52,0.5)]" />
-            <span className="text-xl font-bold text-text text-gradient">InventarioY</span>
+            <Box className="h-6 w-6 text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]" />
+            <span className="text-xl font-bold text-text text-gradient hero-glow">InventarioY</span>
           </div>
           <button
             onClick={() => setIsMobileMenuOpen(true)}
@@ -163,6 +209,7 @@ export default function Dashboard() {
           <Routes>
             <Route path="/" element={<StockView />} />
             <Route path="/inventory" element={<InventoryView />} />
+            <Route path="/movements" element={<MovementsView />} />
             <Route path="/transit" element={<TransitView />} />
             <Route path="/sales" element={<SalesView />} />
             <Route path="/hr" element={<HRView />} />

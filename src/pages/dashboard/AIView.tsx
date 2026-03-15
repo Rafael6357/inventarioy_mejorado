@@ -11,6 +11,8 @@ export default function AIView() {
   const { user } = useAuthStore();
   const { products, sales, movements, employees } = useDatabaseStore();
   
+  const activeProducts = products.filter(p => p.isActive !== false);
+
   const [messages, setMessages] = useState<{role: 'user'|'model', text: string}[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -45,9 +47,9 @@ export default function AIView() {
       const systemInstruction = `Eres un asistente de IA experto en gestión de inventarios y negocios para la aplicación "InventarioY".
 El usuario actual es ${user?.name} y su negocio es "${user?.businessName}".
 Aquí tienes un resumen de sus datos actuales en tiempo real:
-- Total de productos en inventario: ${products.length}
-- Productos con stock bajo (crítico): ${products.filter(p => p.quantity <= p.stock_min).map(p => p.name).join(', ') || 'Ninguno'}
-- Valor total del inventario: $${products.reduce((sum, p) => sum + (p.quantity * p.cost), 0).toFixed(2)}
+- Total de productos en inventario: ${activeProducts.length}
+- Productos con stock bajo (crítico): ${activeProducts.filter(p => p.quantity <= p.stock_min).map(p => p.name).join(', ') || 'Ninguno'}
+- Valor total del inventario: $${activeProducts.reduce((sum, p) => sum + (p.quantity * p.cost), 0).toFixed(2)}
 - Total de ventas registradas: ${sales.length}
 - Ingresos totales históricos: $${sales.reduce((sum, s) => sum + s.totalAmount, 0).toFixed(2)}
 - Empleados registrados: ${employees.length}
@@ -73,7 +75,7 @@ Responde de manera concisa, profesional, amigable y formatea tus respuestas usan
         text: 'Error al inicializar el asistente. Por favor verifica la conexión.'
       }]);
     }
-  }, [user, products, sales, employees]);
+  }, [user, activeProducts, sales, employees]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,7 +101,7 @@ Responde de manera concisa, profesional, amigable y formatea tus respuestas usan
     <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4">
       <div>
         <h1 className="text-2xl font-bold text-text flex items-center gap-2">
-          <Sparkles className="h-6 w-6 text-primary drop-shadow-[0_0_8px_rgba(205,164,52,0.5)]" />
+          <Sparkles className="h-6 w-6 text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]" />
           <span className="text-gradient">Asistente IA</span>
         </h1>
         <p className="text-sm text-text-secondary">

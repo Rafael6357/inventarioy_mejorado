@@ -9,8 +9,8 @@ export default function Landing() {
       <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-bg/80 backdrop-blur-xl supports-[backdrop-filter]:bg-bg/60 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-2">
-            <Box className="h-6 w-6 text-primary drop-shadow-[0_0_8px_rgba(205,164,52,0.5)]" />
-            <span className="text-xl font-bold tracking-tight text-text text-gradient">InventarioY</span>
+            <Box className="h-6 w-6 text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]" />
+            <span className="text-xl font-bold tracking-tight text-text text-gradient hero-glow">InventarioY</span>
           </div>
           <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-text-secondary">
             <a href="#features" className="hover:text-primary transition-colors">Características</a>
@@ -36,12 +36,12 @@ export default function Landing() {
           
           <div className="container relative mx-auto px-4 text-center">
             <div className="mx-auto max-w-3xl space-y-8">
-              <div className="inline-flex items-center rounded-full border border-primary/50 bg-primary/10 px-3 py-1 text-sm font-medium text-primary shadow-[0_0_15px_rgba(205,164,52,0.2)]">
-                <Sparkles className="mr-2 h-4 w-4 drop-shadow-[0_0_5px_rgba(205,164,52,0.8)]" />
+              <div className="inline-flex items-center rounded-full border border-primary/50 bg-primary/10 px-3 py-1 text-sm font-medium text-primary shadow-[0_0_15px_rgba(255,193,7,0.2)]">
+                <Sparkles className="mr-2 h-4 w-4 drop-shadow-[0_0_5px_rgba(255,193,7,0.8)]" />
                 30 Días de Prueba Gratis
               </div>
               <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
-                Gestiona tu inventario <span className="text-gradient drop-shadow-[0_0_15px_rgba(205,164,52,0.3)]">inteligente y fácil</span>
+                Gestiona tu inventario <span className="text-gradient drop-shadow-[0_0_15px_rgba(255,193,7,0.3)] hero-glow">inteligente y fácil</span>
               </h1>
               <p className="mx-auto max-w-2xl text-lg text-text-secondary sm:text-xl">
                 La solución integral para tu negocio con IA integrada. Controla tu stock, ventas, recetas y personal en un solo lugar.
@@ -93,7 +93,7 @@ export default function Landing() {
                   icon: Sparkles,
                 },
               ].map((feature, i) => (
-                <div key={i} className="relative overflow-hidden rounded-2xl border border-border bg-surface p-8 transition-all hover:border-primary/50 hover:shadow-[0_0_30px_-10px_rgba(205,164,52,0.3)]">
+                <div key={i} className="relative overflow-hidden rounded-2xl border border-border bg-surface p-8 transition-all hover:border-primary/50 hover:shadow-[0_0_30px_-10px_rgba(255,193,7,0.3)]">
                   <div className="mb-6 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
                     <feature.icon className="h-6 w-6" />
                   </div>
@@ -210,7 +210,7 @@ export default function Landing() {
               <div className="grid gap-6 sm:grid-cols-2">
                 <div className="space-y-2">
                   <label htmlFor="name" className="text-sm font-medium text-text-secondary">Nombre</label>
-                  <input type="text" id="name" name="name" required className="w-full rounded-md border border-border bg-bg px-3 py-2 text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" />
+                  <input type="text" id="name" name="name" required className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" />
                 </div>
                 <div className="space-y-2">
                   <label htmlFor="email" className="text-sm font-medium text-text-secondary">Email</label>

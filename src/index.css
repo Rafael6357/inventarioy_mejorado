@@ -1,16 +1,19 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #cda434;
-  --color-primary-hover: #e0b44a;
-  --color-bg: #121212;
-  --color-surface: #1E1E1E;
-  --color-surface-hover: #2a2a2a;
-  --color-text: #e0e0e0;
-  --color-text-secondary: #aaaaaa;
-  --color-border: #333333;
+  --color-primary: #FFC107;
+  --color-primary-hover: #FFD54F;
+  --color-bg: #000000;
+  --color-surface: #050505;
+  --color-surface-hover: #111111;
+  --color-text: #FFFFFF;
+  --color-text-secondary: #A1A1AA;
+  --color-border: #1A1A1A;
   --color-success: #22c55e;
   --color-danger: #ef4444;
+  
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer base {
@@ -19,32 +22,82 @@
   }
   
   body {
-    @apply bg-bg text-text antialiased min-h-screen relative;
+    @apply bg-bg text-text antialiased min-h-screen relative font-sans;
+  }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #000000;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #333333;
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #FFC107;
+  }
+
+  /* Animated Scrollbar for Cart */
+  @keyframes scrollbarPulse {
+    0% { background-color: rgba(255, 193, 7, 0.2); }
+    50% { background-color: rgba(255, 193, 7, 0.6); }
+    100% { background-color: rgba(255, 193, 7, 0.2); }
+  }
+  .animate-scrollbar-pulse::-webkit-scrollbar-thumb {
+    animation: scrollbarPulse 2s infinite;
+    background-color: rgba(255, 193, 7, 0.4);
   }
 
   /* Global background gradient and noise for the entire app */
   body::before {
     content: "";
     @apply fixed inset-0 pointer-events-none z-[-1];
-    background: radial-gradient(circle at 50% 0%, rgba(205, 164, 52, 0.05) 0%, transparent 70%);
+    background: radial-gradient(circle at top right, rgba(255, 193, 7, 0.08) 0%, transparent 70%);
   }
 
   body::after {
     content: "";
-    @apply fixed inset-0 pointer-events-none z-[-2] opacity-[0.15] mix-blend-overlay;
+    @apply fixed inset-0 pointer-events-none z-[-2] opacity-[0.1] mix-blend-overlay;
     background-image: url("https://grainy-gradients.vercel.app/noise.svg");
   }
 }
 
 @layer utilities {
   .glow-primary {
-    box-shadow: 0 0 20px -5px rgba(205, 164, 52, 0.3);
+    box-shadow: 0 0 20px -5px rgba(255, 193, 7, 0.3);
   }
   .glow-primary-hover:hover {
-    box-shadow: 0 0 30px -5px rgba(205, 164, 52, 0.4);
-    border-color: rgba(205, 164, 52, 0.5);
+    box-shadow: 0 0 30px -5px rgba(255, 193, 7, 0.4);
+    border-color: rgba(255, 193, 7, 0.5);
   }
   .text-gradient {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary-hover;
+  }
+  
+  /* New Premium Classes */
+  .cta-button-glow {
+    box-shadow: 0 0 25px -5px rgba(255, 193, 7, 0.5);
+    transition: all 0.3s ease;
+  }
+  .cta-button-glow:hover {
+    box-shadow: 0 0 35px -5px rgba(255, 193, 7, 0.7);
+    transform: translateY(-1px);
+  }
+  
+  .hero-glow {
+    animation: glow-pulse 3s infinite alternate;
+  }
+}
+
+@keyframes glow-pulse {
+  0% {
+    text-shadow: 0 0 10px rgba(255, 193, 7, 0.2);
+  }
+  100% {
+    text-shadow: 0 0 20px rgba(255, 193, 7, 0.5);
   }
 }

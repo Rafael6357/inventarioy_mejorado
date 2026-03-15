@@ -17,7 +17,8 @@ export default defineConfig(({mode}) => {
     },
     server: {
       hmr: {
-        overlay: false,
+        protocol: 'wss',
+        clientPort: 443,
       },
       watch: null
     },
