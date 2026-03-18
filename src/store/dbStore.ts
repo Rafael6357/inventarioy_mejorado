@@ -1,10 +1,10 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { supabase } from '../lib/supabase';
+import { useAuthStore } from './authStore';
 
-// --- Types ---
 export interface Product {
   id: string;
-  businessId: string;
+  user_id: string;
   name: string;
   category: string;
   quantity: number;
@@ -16,21 +16,21 @@ export interface Product {
   expiration_date?: string;
   description?: string;
   is_individual: boolean;
-  isActive?: boolean;
+  is_active: boolean;
   eoq?: number;
   rop?: number;
   lead_time?: number;
   order_cost?: number;
   holding_cost?: number;
-  createdAt: string;
-  updatedAt: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Movement {
   id: string;
-  businessId: string;
+  user_id: string;
+  product_id: string;
   type: 'ENTRADA' | 'SALIDA' | 'MERMA';
-  productId: string;
   quantity: number;
   unit: string;
   date: string;
@@ -38,350 +38,496 @@ export interface Movement {
   reason?: string;
   status: 'NORMAL' | 'ANOMALIA' | 'JUSTIFICADO';
   justification?: string;
-  justificationDate?: string;
-  createdAt: string;
+  justification_date?: string;
+  created_at: string;
 }
 
 export interface Sale {
   id: string;
-  businessId: string;
-  employeeId: string;
+  user_id: string;
+  employee_id?: string;
   items: {
-    productId: string;
+    product_id: string;
     quantity: number;
-    unitCost: number;
-    sellingPrice: number;
+    unit_cost: number;
+    selling_price: number;
     subtotal: number;
-    isRecipe?: boolean;
-    recipeSnapshot?: {
+    is_recipe?: boolean;
+    recipe_snapshot?: {
       name: string;
       ingredients: {
-        productId: string;
+        product_id: string;
         quantity: number;
         cost: number;
       }[];
     };
   }[];
-  totalAmount: number;
+  total_amount: number;
   date: string;
-  saleType: 'SALON' | 'DOMICILIO';
+  sale_type: 'SALON' | 'DOMICILIO';
   notes?: string;
   discount: number;
-  createdAt: string;
+  created_at: string;
 }
 
 export interface Recipe {
   id: string;
-  businessId: string;
+  user_id: string;
   name: string;
-  sellingPrice: number;
+  selling_price: number;
   ingredients: {
-    productId: string;
+    product_id: string;
     quantity: number;
     unit: string;
   }[];
-  createdAt: string;
+  created_at: string;
 }
 
 export interface Employee {
   id: string;
-  businessId: string;
+  user_id: string;
   name: string;
   role: string;
   salary: number;
   phone?: string;
   email?: string;
-  createdAt: string;
+  created_at: string;
 }
 
-// --- Store ---
+export interface Category {
+  id: string;
+  user_id: string;
+  name: string;
+  created_at: string;
+}
+
 interface DatabaseState {
   products: Product[];
   movements: Movement[];
   sales: Sale[];
   recipes: Recipe[];
   employees: Employee[];
+  categories: Category[];
+  isLoading: boolean;
+
+  fetchAll: () => Promise<void>;
+  addProduct: (product: Omit<Product, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  updateProduct: (id: string, updates: Partial<Product>) => Promise<void>;
+  deleteProduct: (id: string) => Promise<void>;
   
-  // Actions
-  addProduct: (product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => void;
-  updateProduct: (id: string, updates: Partial<Product>) => void;
-  deleteProduct: (id: string) => void;
+  addMovement: (movement: Omit<Movement, 'id' | 'user_id' | 'created_at'>) => Promise<void>;
+  justifyMovement: (id: string, justification: string) => Promise<void>;
   
-  addMovement: (movement: Omit<Movement, 'id' | 'createdAt'>) => void;
-  justifyMovement: (id: string, justification: string) => void;
+  addSale: (sale: Omit<Sale, 'id' | 'user_id' | 'created_at'>) => Promise<void>;
   
-  addSale: (sale: Omit<Sale, 'id' | 'createdAt'>) => void;
+  addRecipe: (recipe: Omit<Recipe, 'id' | 'user_id' | 'created_at'>) => Promise<void>;
+  updateRecipe: (id: string, updates: Partial<Recipe>) => Promise<void>;
+  deleteRecipe: (id: string) => Promise<void>;
   
-  addRecipe: (recipe: Omit<Recipe, 'id' | 'createdAt'>) => void;
-  updateRecipe: (id: string, updates: Partial<Recipe>) => void;
-  deleteRecipe: (id: string) => void;
-  
-  addEmployee: (employee: Omit<Employee, 'id' | 'createdAt'>) => void;
-  updateEmployee: (id: string, updates: Partial<Employee>) => void;
-  deleteEmployee: (id: string) => void;
-  
-  recalculateStock: () => void;
+  addEmployee: (employee: Omit<Employee, 'id' | 'user_id' | 'created_at'>) => Promise<void>;
+  updateEmployee: (id: string, updates: Partial<Employee>) => Promise<void>;
+  deleteEmployee: (id: string) => Promise<void>;
+
+  addCategory: (name: string) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
+
+  recalculateStock: () => Promise<void>;
 }
 
-const generateId = () => Math.random().toString(36).substring(2, 9);
+export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
+  products: [],
+  movements: [],
+  sales: [],
+  recipes: [],
+  employees: [],
+  categories: [],
+  isLoading: true,
 
-export const useDatabaseStore = create<DatabaseState>()(
-  persist(
-    (set) => ({
-      products: [],
-      movements: [],
-      sales: [],
-      recipes: [],
-      employees: [],
+  fetchAll: async () => {
+    const user = useAuthStore.getState().user;
+    if (!user) {
+      set({ products: [], movements: [], sales: [], recipes: [], employees: [], categories: [], isLoading: false });
+      return;
+    }
 
-      addProduct: (product) => set((state) => ({
-        products: [...state.products, {
-          ...product,
-          id: generateId(),
-          isActive: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        }]
-      })),
+    set({ isLoading: true });
+
+    const [productsRes, movementsRes, salesRes, recipesRes, employeesRes, categoriesRes] = await Promise.all([
+      supabase.from('products').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+      supabase.from('movements').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+      supabase.from('sales').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+      supabase.from('recipes').select('*, recipe_ingredients(*)').eq('user_id', user.id).order('created_at', { ascending: false }),
+      supabase.from('employees').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+      supabase.from('categories').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+    ]);
+
+    const recipes = recipesRes.data?.map(r => ({
+      ...r,
+      ingredients: r.recipe_ingredients || [],
+    })) || [];
+
+    set({
+      products: productsRes.data || [],
+      movements: movementsRes.data || [],
+      sales: salesRes.data || [],
+      recipes,
+      employees: employeesRes.data || [],
+      categories: categoriesRes.data || [],
+      isLoading: false,
+    });
+  },
+
+  addProduct: async (product) => {
+    const user = useAuthStore.getState().user;
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('products')
+      .insert({ ...product, user_id: user.id })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error adding product:', error);
+      return;
+    }
+
+    set((state) => ({ products: [data, ...state.products] }));
+  },
+
+  updateProduct: async (id, updates) => {
+    const { error } = await supabase
+      .from('products')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error updating product:', error);
+      return;
+    }
+
+    set((state) => ({
+      products: state.products.map(p => p.id === id ? { ...p, ...updates, updated_at: new Date().toISOString() } : p),
+    }));
+  },
+
+  deleteProduct: async (id) => {
+    const { error } = await supabase
+      .from('products')
+      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting product:', error);
+      return;
+    }
+
+    set((state) => ({
+      products: state.products.map(p => p.id === id ? { ...p, is_active: false } : p),
+    }));
+  },
+
+  addMovement: async (movement) => {
+    const user = useAuthStore.getState().user;
+    if (!user) return;
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    let status = movement.status || 'NORMAL';
+    
+    if ((movement.type === 'SALIDA' || movement.type === 'MERMA') && status === 'NORMAL') {
+      const previousOutputs = get().movements.filter(
+        m => m.product_id === movement.product_id && (m.type === 'SALIDA' || m.type === 'MERMA')
+      );
       
-      updateProduct: (id, updates) => set((state) => ({
-        products: state.products.map(p => 
-          p.id === id ? { ...p, ...updates, updatedAt: new Date().toISOString() } : p
-        )
-      })),
-      
-      deleteProduct: (id) => set((state) => ({
-        products: state.products.map(p => 
-          p.id === id ? { ...p, isActive: false, updatedAt: new Date().toISOString() } : p
-        )
-      })),
-
-      addMovement: (movement) => set((state) => {
-        // Calculate anomaly if it's a SALIDA or MERMA
-        let status = movement.status || 'NORMAL';
+      if (previousOutputs.length > 0) {
+        const totalOutput = previousOutputs.reduce((sum, m) => sum + Number(m.quantity), 0);
+        const averageOutput = totalOutput / previousOutputs.length;
         
-        if ((movement.type === 'SALIDA' || movement.type === 'MERMA') && status === 'NORMAL') {
-          // Find previous outputs for this product
-          const previousOutputs = state.movements.filter(
-            m => m.productId === movement.productId && (m.type === 'SALIDA' || m.type === 'MERMA')
-          );
-          
-          if (previousOutputs.length > 0) {
-            const totalOutput = previousOutputs.reduce((sum, m) => sum + m.quantity, 0);
-            const averageOutput = totalOutput / previousOutputs.length;
-            
-            if (movement.quantity > averageOutput * 1.5) {
-              status = 'ANOMALIA';
-            }
+        if (Number(movement.quantity) > averageOutput * 1.5) {
+          status = 'ANOMALIA';
+        }
+      }
+    }
+
+    const { data: newMovement, error: movementError } = await supabase
+      .from('movements')
+      .insert({ ...movement, user_id: user.id, status })
+      .select()
+      .single();
+
+    if (movementError) {
+      console.error('Error adding movement:', movementError);
+      return;
+    }
+
+    const product = get().products.find(p => p.id === movement.product_id);
+    if (!product) return;
+
+    let newQuantity = Number(product.quantity);
+    let newCost = Number(product.cost);
+
+    if (movement.type === 'ENTRADA') {
+      const currentTotalValue = Number(product.quantity) * Number(product.cost);
+      const newTotalValue = Number(movement.quantity) * Number(movement.cost);
+      newQuantity = Number(product.quantity) + Number(movement.quantity);
+      
+      if (newQuantity > 0) {
+        newCost = (currentTotalValue + newTotalValue) / newQuantity;
+      }
+    } else {
+      newQuantity = Number(product.quantity) - Number(movement.quantity);
+    }
+
+    await get().updateProduct(movement.product_id, { quantity: newQuantity, cost: newCost });
+
+    set((state) => ({ movements: [newMovement, ...state.movements] }));
+  },
+
+  justifyMovement: async (id, justification) => {
+    const { error } = await supabase
+      .from('movements')
+      .update({ 
+        status: 'JUSTIFICADO', 
+        justification, 
+        justification_date: new Date().toISOString() 
+      })
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error justifying movement:', error);
+      return;
+    }
+
+    set((state) => ({
+      movements: state.movements.map(m =>
+        m.id === id ? { ...m, status: 'JUSTIFICADO', justification, justification_date: new Date().toISOString() } : m
+      ),
+    }));
+  },
+
+  addSale: async (sale) => {
+    const user = useAuthStore.getState().user;
+    if (!user) return;
+
+    const { data: newSale, error: saleError } = await supabase
+      .from('sales')
+      .insert({ 
+        user_id: user.id, 
+        employee_id: sale.employee_id,
+        total_amount: sale.total_amount,
+        date: sale.date,
+        sale_type: sale.sale_type,
+        notes: sale.notes,
+        discount: sale.discount,
+      })
+      .select()
+      .single();
+
+    if (saleError) {
+      console.error('Error adding sale:', saleError);
+      return;
+    }
+
+    const saleItems = sale.items.map(item => ({
+      sale_id: newSale.id,
+      product_id: item.product_id,
+      quantity: item.quantity,
+      unit_cost: item.unit_cost,
+      selling_price: item.selling_price,
+      subtotal: item.subtotal,
+      is_recipe: item.is_recipe || false,
+      recipe_snapshot: item.recipe_snapshot,
+    }));
+
+    await supabase.from('sale_items').insert(saleItems);
+
+    for (const item of sale.items) {
+      const product = get().products.find(p => p.id === item.product_id);
+      
+      if (product && !item.is_recipe) {
+        await get().addMovement({
+          product_id: product.id,
+          type: 'SALIDA',
+          quantity: item.quantity,
+          unit: product.unit,
+          date: sale.date,
+          cost: product.cost,
+          reason: `Venta ${sale.sale_type === 'DOMICILIO' ? 'a domicilio' : 'en salón'}`,
+          status: 'NORMAL',
+        });
+      } else if (item.is_recipe && item.recipe_snapshot) {
+        for (const ing of item.recipe_snapshot.ingredients) {
+          const ingProduct = get().products.find(p => p.id === ing.product_id);
+          if (ingProduct) {
+            await get().addMovement({
+              product_id: ing.product_id,
+              type: 'SALIDA',
+              quantity: ing.quantity * item.quantity,
+              unit: ingProduct.unit,
+              date: sale.date,
+              cost: ingProduct.cost,
+              reason: `Venta de receta: ${item.recipe_snapshot?.name}`,
+              status: 'NORMAL',
+            });
           }
         }
-
-        // Also update product stock and weighted average cost
-        const products = state.products.map(p => {
-          if (p.id === movement.productId) {
-            let newQuantity = p.quantity;
-            let newCost = p.cost;
-
-            if (movement.type === 'ENTRADA') {
-              const currentTotalValue = p.quantity * p.cost;
-              const newTotalValue = movement.quantity * movement.cost;
-              newQuantity = p.quantity + movement.quantity;
-              
-              // Calculate weighted average cost
-              if (newQuantity > 0) {
-                newCost = (currentTotalValue + newTotalValue) / newQuantity;
-              }
-            } else {
-              newQuantity = p.quantity - movement.quantity;
-            }
-
-            return { 
-              ...p, 
-              quantity: newQuantity, 
-              cost: newCost,
-              updatedAt: new Date().toISOString() 
-            };
-          }
-          return p;
-        });
-
-        return {
-          products,
-          movements: [...state.movements, {
-            ...movement,
-            status,
-            id: generateId(),
-            createdAt: new Date().toISOString(),
-          }]
-        };
-      }),
-
-      justifyMovement: (id, justification) => set((state) => ({
-        movements: state.movements.map(m =>
-          m.id === id ? {
-            ...m,
-            status: 'JUSTIFICADO',
-            justification,
-            justificationDate: new Date().toISOString()
-          } : m
-        )
-      })),
-
-      addSale: (sale) => set((state) => {
-        const products = [...state.products];
-        const newMovements: Movement[] = [];
-        const saleDate = sale.date || new Date().toISOString();
-
-        sale.items.forEach(item => {
-          // Check if the item is a product
-          const pIndex = products.findIndex(p => p.id === item.productId);
-          if (pIndex >= 0) {
-            const product = products[pIndex];
-            products[pIndex] = {
-              ...product,
-              quantity: product.quantity - item.quantity,
-              updatedAt: new Date().toISOString()
-            };
-            
-            // Calculate anomaly
-            let status: 'NORMAL' | 'ANOMALIA' | 'JUSTIFICADO' = 'NORMAL';
-            const previousOutputs = state.movements.filter(
-              m => m.productId === product.id && (m.type === 'SALIDA' || m.type === 'MERMA')
-            );
-            if (previousOutputs.length > 0) {
-              const totalOutput = previousOutputs.reduce((sum, m) => sum + m.quantity, 0);
-              const averageOutput = totalOutput / previousOutputs.length;
-              if (item.quantity > averageOutput * 1.5) {
-                status = 'ANOMALIA';
-              }
-            }
-
-            newMovements.push({
-              id: generateId(),
-              businessId: sale.businessId,
-              type: 'SALIDA',
-              productId: product.id,
-              quantity: item.quantity,
-              unit: product.unit,
-              date: saleDate,
-              cost: product.cost,
-              reason: `Venta ${sale.saleType === 'DOMICILIO' ? 'a domicilio' : 'en salón'}`,
-              status,
-              createdAt: new Date().toISOString(),
-            });
-
-          } else {
-            // Check if the item is a recipe
-            const recipe = state.recipes.find(r => r.id === item.productId);
-            if (recipe) {
-              // Subtract stock for each ingredient
-              recipe.ingredients.forEach(ing => {
-                const ingIndex = products.findIndex(p => p.id === ing.productId);
-                if (ingIndex >= 0) {
-                  const product = products[ingIndex];
-                  const totalQty = ing.quantity * item.quantity;
-                  products[ingIndex] = {
-                    ...product,
-                    quantity: product.quantity - totalQty,
-                    updatedAt: new Date().toISOString()
-                  };
-                  
-                  // Calculate anomaly
-                  let status: 'NORMAL' | 'ANOMALIA' | 'JUSTIFICADO' = 'NORMAL';
-                  const previousOutputs = state.movements.filter(
-                    m => m.productId === product.id && (m.type === 'SALIDA' || m.type === 'MERMA')
-                  );
-                  if (previousOutputs.length > 0) {
-                    const totalOutput = previousOutputs.reduce((sum, m) => sum + m.quantity, 0);
-                    const averageOutput = totalOutput / previousOutputs.length;
-                    if (totalQty > averageOutput * 1.5) {
-                      status = 'ANOMALIA';
-                    }
-                  }
-
-                  newMovements.push({
-                    id: generateId(),
-                    businessId: sale.businessId,
-                    type: 'SALIDA',
-                    productId: product.id,
-                    quantity: totalQty,
-                    unit: product.unit,
-                    date: saleDate,
-                    cost: product.cost,
-                    reason: `Venta de receta: ${recipe.name}`,
-                    status,
-                    createdAt: new Date().toISOString(),
-                  });
-                }
-              });
-            }
-          }
-        });
-
-        return {
-          products,
-          movements: [...state.movements, ...newMovements],
-          sales: [...state.sales, {
-            ...sale,
-            id: generateId(),
-            createdAt: new Date().toISOString(),
-          }]
-        };
-      }),
-
-      addRecipe: (recipe) => set((state) => ({
-        recipes: [...state.recipes, {
-          ...recipe,
-          id: generateId(),
-          createdAt: new Date().toISOString(),
-        }]
-      })),
-
-      updateRecipe: (id, updates) => set((state) => ({
-        recipes: state.recipes.map(r => r.id === id ? { ...r, ...updates } : r)
-      })),
-
-      deleteRecipe: (id) => set((state) => ({
-        recipes: state.recipes.filter(r => r.id !== id)
-      })),
-
-      addEmployee: (employee) => set((state) => ({
-        employees: [...state.employees, {
-          ...employee,
-          id: generateId(),
-          createdAt: new Date().toISOString(),
-        }]
-      })),
-
-      updateEmployee: (id, updates) => set((state) => ({
-        employees: state.employees.map(e => e.id === id ? { ...e, ...updates } : e)
-      })),
-
-      deleteEmployee: (id) => set((state) => ({
-        employees: state.employees.filter(e => e.id !== id)
-      })),
-
-      recalculateStock: () => set((state) => {
-        const products = state.products.map(product => {
-          const productMovements = state.movements.filter(m => m.productId === product.id);
-          const calculatedQuantity = productMovements.reduce((total, m) => {
-            if (m.type === 'ENTRADA') return total + m.quantity;
-            if (m.type === 'SALIDA' || m.type === 'MERMA') return total - m.quantity;
-            return total;
-          }, 0);
-          
-          return {
-            ...product,
-            quantity: calculatedQuantity,
-            updatedAt: new Date().toISOString()
-          };
-        });
-
-        return { products };
-      }),
-    }),
-    {
-      name: 'inventarioy-db',
+      }
     }
-  )
-);
+
+    set((state) => ({ sales: [newSale, ...state.sales] }));
+  },
+
+  addRecipe: async (recipe) => {
+    const user = useAuthStore.getState().user;
+    if (!user) return;
+
+    const { data: newRecipe, error } = await supabase
+      .from('recipes')
+      .insert({ 
+        user_id: user.id, 
+        name: recipe.name, 
+        selling_price: recipe.selling_price 
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error adding recipe:', error);
+      return;
+    }
+
+    if (recipe.ingredients.length > 0) {
+      const ingredients = recipe.ingredients.map(ing => ({
+        recipe_id: newRecipe.id,
+        product_id: ing.product_id,
+        quantity: ing.quantity,
+        unit: ing.unit,
+      }));
+
+      await supabase.from('recipe_ingredients').insert(ingredients);
+    }
+
+    set((state) => ({ 
+      recipes: [{ ...newRecipe, ingredients: recipe.ingredients }, ...state.recipes] 
+    }));
+  },
+
+  updateRecipe: async (id, updates) => {
+    const { error } = await supabase
+      .from('recipes')
+      .update({ name: updates.name, selling_price: updates.selling_price })
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error updating recipe:', error);
+      return;
+    }
+
+    if (updates.ingredients) {
+      await supabase.from('recipe_ingredients').delete().eq('recipe_id', id);
+      
+      if (updates.ingredients.length > 0) {
+        const ingredients = updates.ingredients.map(ing => ({
+          recipe_id: id,
+          product_id: ing.product_id,
+          quantity: ing.quantity,
+          unit: ing.unit,
+        }));
+        await supabase.from('recipe_ingredients').insert(ingredients);
+      }
+    }
+
+    set((state) => ({
+      recipes: state.recipes.map(r => r.id === id ? { ...r, ...updates } : r),
+    }));
+  },
+
+  deleteRecipe: async (id) => {
+    await supabase.from('recipe_ingredients').delete().eq('recipe_id', id);
+    const { error } = await supabase.from('recipes').delete().eq('id', id);
+
+    if (error) {
+      console.error('Error deleting recipe:', error);
+      return;
+    }
+
+    set((state) => ({ recipes: state.recipes.filter(r => r.id !== id) }));
+  },
+
+  addEmployee: async (employee) => {
+    const user = useAuthStore.getState().user;
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('employees')
+      .insert({ ...employee, user_id: user.id })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error adding employee:', error);
+      return;
+    }
+
+    set((state) => ({ employees: [data, ...state.employees] }));
+  },
+
+  updateEmployee: async (id, updates) => {
+    const { error } = await supabase.from('employees').update(updates).eq('id', id);
+
+    if (error) {
+      console.error('Error updating employee:', error);
+      return;
+    }
+
+    set((state) => ({
+      employees: state.employees.map(e => e.id === id ? { ...e, ...updates } : e),
+    }));
+  },
+
+  deleteEmployee: async (id) => {
+    const { error } = await supabase.from('employees').delete().eq('id', id);
+
+    if (error) {
+      console.error('Error deleting employee:', error);
+      return;
+    }
+
+    set((state) => ({ employees: state.employees.filter(e => e.id !== id) }));
+  },
+
+  addCategory: async (name) => {
+    const user = useAuthStore.getState().user;
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('categories')
+      .insert({ user_id: user.id, name })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error adding category:', error);
+      return;
+    }
+
+    set((state) => ({ categories: [data, ...state.categories] }));
+  },
+
+  deleteCategory: async (id) => {
+    const { error } = await supabase.from('categories').delete().eq('id', id);
+
+    if (error) {
+      console.error('Error deleting category:', error);
+      return;
+    }
+
+    set((state) => ({ categories: state.categories.filter(c => c.id !== id) }));
+  },
+
+  recalculateStock: async () => {
+    await get().fetchAll();
+  },
+}));

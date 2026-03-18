@@ -7,7 +7,7 @@ import { Label } from '../../components/ui/label';
 export default function FilteredCenterView() {
   const { products } = useDatabaseStore();
   
-  const activeProducts = products.filter(p => p.isActive !== false);
+  const activeProducts = products.filter(p => p.is_active !== false);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');

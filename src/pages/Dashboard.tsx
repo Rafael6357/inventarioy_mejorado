@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { 
-  Box, 
   LayoutDashboard, 
   Package, 
   ArrowRightLeft, 
@@ -22,6 +21,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import { useDatabaseStore } from '../store/dbStore';
 import StockView from './dashboard/StockView';
 import InventoryView from './dashboard/InventoryView';
 import TransitView from './dashboard/TransitView';
@@ -37,15 +37,7 @@ import AIView from './dashboard/AIView';
 import SettingsView from './dashboard/SettingsView';
 import PaymentsView from './dashboard/PaymentsView';
 
-// Placeholder views
-const PlaceholderView = ({ title }: { title: string }) => (
-  <div className="flex h-full items-center justify-center p-8">
-    <div className="text-center">
-      <h2 className="text-2xl font-bold text-text">{title}</h2>
-      <p className="mt-2 text-text-secondary">Módulo en construcción</p>
-    </div>
-  </div>
-);
+const LOGO_URL = 'https://ybymcbwnjcgdoqrosqdw.supabase.co/storage/v1/object/sign/inventarioy/logo%20inventarioy.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV84ZTZjYWMzMS1iNWE4LTRkNGEtODgyNy0wOGY3YTQ5NDc3NDYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJpbnZlbnRhcmlveS9sb2dvIGludmVudGFyaW95LnBuZyIsImlhdCI6MTc3Mzg1NDk4NCwiZXhwIjo0ODk1OTE4OTg0fQ.-m90y0pHg8aOvasddLctgzgSbK5MQp3qCWarh2BEDLg';
 
 export default function Dashboard() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -53,7 +45,18 @@ export default function Dashboard() {
   const sidebarTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useAuthStore();
+  const { user, logout, isLoading: authLoading, initialize } = useAuthStore();
+  const { fetchAll, isLoading: dbLoading } = useDatabaseStore();
+
+  useEffect(() => {
+    initialize();
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      fetchAll();
+    }
+  }, [user]);
 
   const handleSidebarMouseEnter = () => {
     setIsSidebarVisible(true);
@@ -74,6 +77,19 @@ export default function Dashboard() {
       if (sidebarTimeoutRef.current) clearTimeout(sidebarTimeoutRef.current);
     };
   }, []);
+
+  if (authLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-bg">
+        <div className="text-center">
+          <div className="h-12 w-12 mx-auto mb-4 rounded-xl bg-primary/10 flex items-center justify-center">
+            <img src={LOGO_URL} alt="Logo" className="h-8 w-8 object-contain" />
+          </div>
+          <p className="text-text-secondary">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!user) {
     return <Navigate to="/login" replace />;
@@ -99,13 +115,12 @@ export default function Dashboard() {
     navigation.push({ name: 'Gestión de Pagos', href: '/dashboard/payments', icon: CreditCard });
   }
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
   };
 
   return (
     <div className="flex h-screen overflow-hidden bg-bg">
-      {/* Mobile sidebar backdrop */}
       {isMobileMenuOpen && (
         <div 
           className="fixed inset-0 z-40 bg-black/50 lg:hidden"
@@ -113,7 +128,6 @@ export default function Dashboard() {
         />
       )}
 
-      {/* Desktop hover trigger area */}
       <div 
         className="fixed inset-y-0 left-0 w-4 z-40 hidden lg:flex items-center justify-center group"
         onMouseEnter={handleSidebarMouseEnter}
@@ -125,7 +139,6 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Sidebar */}
       <aside
         onMouseEnter={handleSidebarMouseEnter}
         onMouseLeave={handleSidebarMouseLeave}
@@ -135,7 +148,7 @@ export default function Dashboard() {
       >
         <div className="flex h-16 items-center justify-between px-4 border-b border-border/50">
           <div className="flex items-center gap-2">
-            <Box className="h-6 w-6 text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]" />
+            <img src={LOGO_URL} alt="Logo" className="h-8 w-8 object-contain drop-shadow-[0_0_8px_rgba(255,193,7,0.3)]" />
             <span className="text-xl font-bold text-text text-gradient hero-glow">InventarioY</span>
           </div>
           <button 
@@ -190,11 +203,10 @@ export default function Dashboard() {
         </div>
       </aside>
 
-      {/* Main content */}
       <div className="flex flex-1 flex-col overflow-hidden bg-transparent">
         <header className="flex h-16 items-center justify-between border-b border-border/50 bg-surface/80 backdrop-blur-xl px-4 lg:hidden">
           <div className="flex items-center gap-2">
-            <Box className="h-6 w-6 text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]" />
+            <img src={LOGO_URL} alt="Logo" className="h-8 w-8 object-contain drop-shadow-[0_0_8px_rgba(255,193,7,0.3)]" />
             <span className="text-xl font-bold text-text text-gradient hero-glow">InventarioY</span>
           </div>
           <button

@@ -10,7 +10,7 @@ export default function SalesView() {
   const { user } = useAuthStore();
   const { products, recipes, employees, addSale } = useDatabaseStore();
   
-  const activeProducts = products.filter(p => p.isActive !== false);
+  const activeProducts = products.filter(p => p.is_active !== false);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [saleType, setSaleType] = useState<'SALON' | 'DOMICILIO'>('SALON');
@@ -20,17 +20,17 @@ export default function SalesView() {
   const [showPreview, setShowPreview] = useState(false);
   
   const [cart, setCart] = useState<{
-    productId: string;
+    product_id: string;
     name: string;
     quantity: number;
     price: number;
     cost: number;
     unit: string;
-    isRecipe?: boolean;
-    recipeSnapshot?: {
+    is_recipe?: boolean;
+    recipe_snapshot?: {
       name: string;
       ingredients: {
-        productId: string;
+        product_id: string;
         quantity: number;
         cost: number;
       }[];
@@ -39,28 +39,28 @@ export default function SalesView() {
 
   // Combine products and recipes for the catalog
   const catalogItems = [
-    ...activeProducts.filter(p => p.is_individual).map(p => ({ ...p, isRecipe: false })),
+    ...activeProducts.filter(p => p.is_individual).map(p => ({ ...p, is_recipe: false })),
     ...recipes.map(r => {
       // Calculate cost of recipe
       const cost = r.ingredients.reduce((sum, ing) => {
-        const product = products.find(p => p.id === ing.productId);
+        const product = products.find(p => p.id === ing.product_id);
         return sum + ((product?.cost || 0) * ing.quantity);
       }, 0);
       return {
         id: r.id,
         name: r.name,
         category: 'Recetas',
-        price: r.sellingPrice,
+        price: r.selling_price,
         cost,
         unit: 'porción',
         quantity: 999, // Recipes don't have direct stock, it depends on ingredients
-        isRecipe: true,
-        recipeSnapshot: {
+        is_recipe: true,
+        recipe_snapshot: {
           name: r.name,
           ingredients: r.ingredients.map(ing => {
-            const product = products.find(p => p.id === ing.productId);
+            const product = products.find(p => p.id === ing.product_id);
             return {
-              productId: ing.productId,
+              product_id: ing.product_id,
               quantity: ing.quantity,
               cost: product?.cost || 0
             };
@@ -77,30 +77,30 @@ export default function SalesView() {
 
   const addToCart = (item: any) => {
     setCart(current => {
-      const existing = current.find(c => c.productId === item.id);
+      const existing = current.find(c => c.product_id === item.id);
       if (existing) {
         return current.map(c => 
-          c.productId === item.id 
+          c.product_id === item.id 
             ? { ...c, quantity: c.quantity + 1 }
             : c
         );
       }
       return [...current, {
-        productId: item.id,
+        product_id: item.id,
         name: item.name,
         quantity: 1,
         price: item.price,
         cost: item.cost,
         unit: item.unit,
-        isRecipe: item.isRecipe,
-        recipeSnapshot: item.recipeSnapshot
+        is_recipe: item.is_recipe,
+        recipe_snapshot: item.recipe_snapshot
       }];
     });
   };
 
-  const updateQuantity = (productId: string, delta: number) => {
+  const updateQuantity = (product_id: string, delta: number) => {
     setCart(current => current.map(item => {
-      if (item.productId === productId) {
+      if (item.product_id === product_id) {
         const newQty = Math.max(0.1, item.quantity + delta);
         return { ...item, quantity: newQty };
       }
@@ -108,8 +108,8 @@ export default function SalesView() {
     }));
   };
 
-  const removeFromCart = (productId: string) => {
-    setCart(current => current.filter(item => item.productId !== productId));
+  const removeFromCart = (product_id: string) => {
+    setCart(current => current.filter(item => item.product_id !== product_id));
   };
 
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -128,20 +128,19 @@ export default function SalesView() {
     if (!user) return;
 
     addSale({
-      businessId: user.businessName,
-      employeeId: employeeId || user.id, // Fallback to current user if no employee selected
+      employee_id: employeeId || user.id, // Fallback to current user if no employee selected
       items: cart.map(item => ({
-        productId: item.productId,
+        product_id: item.product_id,
         quantity: item.quantity,
-        unitCost: item.cost,
-        sellingPrice: item.price,
+        unit_cost: item.cost,
+        selling_price: item.price,
         subtotal: item.price * item.quantity,
-        isRecipe: item.isRecipe,
-        recipeSnapshot: item.recipeSnapshot
+        is_recipe: item.is_recipe,
+        recipe_snapshot: item.recipe_snapshot
       })),
-      totalAmount: total,
+      total_amount: total,
       date: new Date().toISOString(),
-      saleType,
+      sale_type: saleType,
       notes,
       discount
     });
@@ -190,7 +189,7 @@ export default function SalesView() {
                   ${product.price.toFixed(2)}
                 </p>
                 <p className="mt-1 text-xs text-text-secondary">
-                  {product.isRecipe ? 'Receta' : `Stock: ${product.quantity} ${product.unit}`}
+                  {product.is_recipe ? 'Receta' : `Stock: ${product.quantity} ${product.unit}`}
                 </p>
               </button>
             ))}
@@ -221,7 +220,7 @@ export default function SalesView() {
           ) : (
             <div className="space-y-4">
               {cart.map(item => (
-                <div key={item.productId} className="flex items-center justify-between gap-4 rounded-lg border border-border bg-bg p-3">
+                <div key={item.product_id} className="flex items-center justify-between gap-4 rounded-lg border border-border bg-bg p-3">
                   <div className="flex-1 min-w-0">
                     <h4 className="font-medium text-text truncate text-sm">{item.name}</h4>
                     <p className="font-mono text-xs text-primary">${item.price.toFixed(2)}</p>
@@ -229,14 +228,14 @@ export default function SalesView() {
                   
                   <div className="flex items-center gap-2">
                     <button 
-                      onClick={() => updateQuantity(item.productId, -1)}
+                      onClick={() => updateQuantity(item.product_id, -1)}
                       className="rounded-xl bg-surface-hover p-1 text-text hover:bg-border transition-colors"
                     >
                       <Minus className="h-4 w-4" />
                     </button>
                     <span className="w-8 text-center font-mono text-sm">{item.quantity}</span>
                     <button 
-                      onClick={() => updateQuantity(item.productId, 1)}
+                      onClick={() => updateQuantity(item.product_id, 1)}
                       className="rounded-md bg-surface-hover p-1 text-text hover:bg-border transition-colors"
                     >
                       <Plus className="h-4 w-4" />
@@ -248,7 +247,7 @@ export default function SalesView() {
                   </div>
                   
                   <button 
-                    onClick={() => removeFromCart(item.productId)}
+                    onClick={() => removeFromCart(item.product_id)}
                     className="text-text-secondary hover:text-danger transition-colors p-1"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -336,7 +335,7 @@ export default function SalesView() {
 
             <div className="mb-6 max-h-[40vh] overflow-y-auto pr-2 space-y-3">
               {cart.map(item => (
-                <div key={item.productId} className="flex justify-between text-sm border-b border-border/50 pb-2">
+                <div key={item.product_id} className="flex justify-between text-sm border-b border-border/50 pb-2">
                   <div className="flex gap-2 text-text">
                     <span className="font-mono text-primary">{item.quantity}x</span>
                     <span>{item.name}</span>

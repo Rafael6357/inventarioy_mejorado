@@ -36,7 +36,7 @@ export default function ConsumptionView() {
     dailySales.forEach(sale => {
       sale.items.forEach(item => {
         // Is it a direct product?
-        const product = products.find(p => p.id === item.productId);
+        const product = products.find(p => p.id === item.product_id);
         if (product) {
           const existing = consumptionMap.get(product.id) || {
             product,
@@ -53,9 +53,9 @@ export default function ConsumptionView() {
           consumptionMap.set(product.id, existing);
         } else {
           // Is it a recipe?
-          if (item.isRecipe && item.recipeSnapshot) {
-            item.recipeSnapshot.ingredients.forEach(ing => {
-              const ingProduct = products.find(p => p.id === ing.productId);
+          if (item.is_recipe && item.recipe_snapshot) {
+            item.recipe_snapshot.ingredients.forEach(ing => {
+              const ingProduct = products.find(p => p.id === ing.product_id);
               if (ingProduct) {
                 const existing = consumptionMap.get(ingProduct.id) || {
                   product: ingProduct,
@@ -72,11 +72,11 @@ export default function ConsumptionView() {
                 existing.totalCost += (ing.cost * consumedQty);
                 
                 // Track which recipe caused this consumption
-                const recipeEntry = existing.recipes.find(r => r.recipeName === item.recipeSnapshot!.name);
+                  const recipeEntry = existing.recipes.find(r => r.recipeName === item.recipe_snapshot!.name);
                 if (recipeEntry) {
                   recipeEntry.qty += consumedQty;
                 } else {
-                  existing.recipes.push({ recipeName: item.recipeSnapshot!.name, qty: consumedQty });
+                  existing.recipes.push({ recipeName: item.recipe_snapshot!.name, qty: consumedQty });
                 }
                 
                 consumptionMap.set(ingProduct.id, existing);
@@ -84,10 +84,10 @@ export default function ConsumptionView() {
             });
           } else {
             // Fallback for legacy sales without snapshot
-            const recipe = recipes.find(r => r.id === item.productId);
+            const recipe = recipes.find(r => r.id === item.product_id);
             if (recipe) {
               recipe.ingredients.forEach(ing => {
-                const ingProduct = products.find(p => p.id === ing.productId);
+                const ingProduct = products.find(p => p.id === ing.product_id);
                 if (ingProduct) {
                   const existing = consumptionMap.get(ingProduct.id) || {
                     product: ingProduct,

@@ -25,7 +25,6 @@ export default function HRView() {
 
     addEmployee({
       ...newEmployee,
-      businessId: user.businessName,
     });
 
     setNewEmployee({

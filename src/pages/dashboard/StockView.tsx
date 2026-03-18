@@ -17,14 +17,14 @@ export default function StockView() {
   const deleteProduct = useDatabaseStore((state) => state.deleteProduct);
 
   const activeProducts = useMemo(() => {
-    return products.filter(p => p.isActive !== false);
+    return products.filter(p => p.is_active !== false);
   }, [products]);
 
   const lastMovementDates = useMemo(() => {
     const dates: Record<string, string> = {};
     movements.forEach(m => {
-      if (!dates[m.productId] || new Date(m.date) > new Date(dates[m.productId])) {
-        dates[m.productId] = m.date;
+      if (!dates[m.product_id] || new Date(m.date) > new Date(dates[m.product_id])) {
+        dates[m.product_id] = m.date;
       }
     });
     return dates;
@@ -64,7 +64,7 @@ export default function StockView() {
   };
 
   const totalInventoryValue = useMemo(() => {
-    return filteredProducts.reduce((total, product) => total + (product.quantity * product.cost), 0);
+    return filteredProducts.reduce((total, product) => total + (Number(product.quantity) * Number(product.cost)), 0);
   }, [filteredProducts]);
 
   return (
@@ -164,8 +164,8 @@ export default function StockView() {
                 </tr>
               ) : (
                 filteredProducts.map((product) => {
-                  const isOutOfStock = product.quantity <= 0;
-                  const isLowStock = product.quantity <= product.stock_min && !isOutOfStock;
+                  const isOutOfStock = Number(product.quantity) <= 0;
+                  const isLowStock = Number(product.quantity) <= Number(product.stock_min) && !isOutOfStock;
                   const lastUpdate = lastMovementDates[product.id];
                   
                   return (
@@ -192,10 +192,10 @@ export default function StockView() {
                         {product.quantity}
                       </td>
                       <td className="px-4 py-3 text-right font-mono">
-                        ${product.cost.toFixed(2)}
+                        ${Number(product.cost).toFixed(2)}
                       </td>
                       <td className="px-4 py-3 text-right font-mono font-medium text-primary">
-                        ${(product.quantity * product.cost).toFixed(2)}
+                        ${(Number(product.quantity) * Number(product.cost)).toFixed(2)}
                       </td>
                       <td className="px-4 py-3 text-text-secondary">
                         {product.unit}
@@ -224,7 +224,6 @@ export default function StockView() {
         </div>
       </div>
 
-      {/* Delete Confirmation Modal */}
       {productToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl border border-border/50 bg-surface p-6 shadow-2xl">

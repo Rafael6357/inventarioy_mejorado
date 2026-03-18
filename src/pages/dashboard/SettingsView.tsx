@@ -1,33 +1,43 @@
 import React, { useState } from 'react';
 import { useAuthStore } from '../../store/authStore';
-import { Settings, Save, Building2, User, Mail, Shield, CreditCard } from 'lucide-react';
+import { Settings, Save, Building2, User, Shield } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
+import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
 
 export default function SettingsView() {
-  const { user, login } = useAuthStore();
+  const { user, fetchUser } = useAuthStore();
   
   const [formData, setFormData] = useState({
     name: user?.name || '',
     businessName: user?.businessName || '',
-    email: user?.email || '',
   });
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
     
-    // In a real app, this would make an API call.
-    // Here we just update the local store.
-    login({
-      ...user,
-      name: formData.name,
-      businessName: formData.businessName,
-    });
+    setIsSaving(true);
     
-    toast.success('Configuración guardada exitosamente');
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        name: formData.name,
+        business_name: formData.businessName,
+      })
+      .eq('id', user.id);
+
+    if (error) {
+      toast.error('Error al guardar: ' + error.message);
+    } else {
+      await fetchUser();
+      toast.success('Configuración guardada exitosamente');
+    }
+    
+    setIsSaving(false);
   };
 
   return (
@@ -40,7 +50,6 @@ export default function SettingsView() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
-        {/* Left Column - Navigation/Info */}
         <div className="space-y-6 md:col-span-1">
           <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(255,193,7,0.15)]">
             <h3 className="font-semibold text-text mb-4 flex items-center gap-2">
@@ -70,9 +79,8 @@ export default function SettingsView() {
           </div>
         </div>
 
-        {/* Right Column - Forms */}
         <div className="space-y-6 md:col-span-2">
-          <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(205,164,52,0.15)]">
+          <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(255,193,7,0.15)]">
             <h2 className="text-lg font-semibold text-text mb-6 flex items-center gap-2">
               <User className="h-5 w-5 text-primary drop-shadow-[0_0_5px_rgba(205,164,52,0.8)]" />
               Perfil del Usuario
@@ -94,7 +102,7 @@ export default function SettingsView() {
                   <Input 
                     id="email" 
                     type="email"
-                    value={formData.email}
+                    value={user?.email || ''}
                     disabled
                     className="bg-bg/50 text-text-secondary cursor-not-allowed"
                   />
@@ -116,9 +124,9 @@ export default function SettingsView() {
               </div>
 
               <div className="pt-4 flex justify-end">
-                <Button type="submit" className="gap-2">
+                <Button type="submit" className="gap-2" disabled={isSaving}>
                   <Save className="h-4 w-4" />
-                  Guardar Cambios
+                  {isSaving ? 'Guardando...' : 'Guardar Cambios'}
                 </Button>
               </div>
             </form>

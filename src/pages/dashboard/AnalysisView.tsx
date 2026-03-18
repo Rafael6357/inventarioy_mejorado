@@ -5,7 +5,7 @@ import { TrendingUp, DollarSign, Package, AlertTriangle, ArrowUpRight, ArrowDown
 export default function AnalysisView() {
   const { products, sales, movements } = useDatabaseStore();
   
-  const activeProducts = products.filter(p => p.isActive !== false);
+  const activeProducts = products.filter(p => p.is_active !== false);
 
   // 1. KPI Calculations
   const totalInventoryValue = useMemo(() => {
@@ -13,12 +13,12 @@ export default function AnalysisView() {
   }, [activeProducts]);
 
   const totalSalesRevenue = useMemo(() => {
-    return sales.reduce((sum, s) => sum + s.totalAmount, 0);
+    return sales.reduce((sum, s) => sum + s.total_amount, 0);
   }, [sales]);
 
   const totalCostOfGoodsSold = useMemo(() => {
     return sales.reduce((sum, s) => {
-      return sum + s.items.reduce((itemSum, item) => itemSum + (item.quantity * item.unitCost), 0);
+      return sum + s.items.reduce((itemSum, item) => itemSum + (item.quantity * item.unit_cost), 0);
     }, 0);
   }, [sales]);
 

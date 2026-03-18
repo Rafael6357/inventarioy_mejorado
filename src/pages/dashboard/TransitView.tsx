@@ -20,18 +20,18 @@ export default function TransitView() {
     .filter(m => m.type === 'SALIDA')
     .filter(m => !m.reason?.startsWith('Venta')) // Solo salidas manuales desde Inventario
     .filter(m => 
-      getProductName(m.productId).toLowerCase().includes(searchTerm.toLowerCase()) ||
+      getProductName(m.product_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
       m.reason?.toLowerCase().includes(searchTerm.toLowerCase())
     )
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   const anomalyMovements = movements
     .filter(m => m.status === 'ANOMALIA' || m.status === 'JUSTIFICADO')
     .filter(m => 
-      getProductName(m.productId).toLowerCase().includes(searchTerm.toLowerCase()) ||
+      getProductName(m.product_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
       m.type.toLowerCase().includes(searchTerm.toLowerCase())
     )
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   const handleJustify = (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,7 +121,7 @@ export default function TransitView() {
                       <td className="px-4 py-3 whitespace-nowrap text-text-secondary">
                         {new Date(movement.date).toLocaleString()}
                       </td>
-                      <td className="px-4 py-3 font-medium">{getProductName(movement.productId)}</td>
+                      <td className="px-4 py-3 font-medium">{getProductName(movement.product_id)}</td>
                       <td className="px-4 py-3 text-right font-mono text-primary">
                         {movement.quantity} {movement.unit}
                       </td>
@@ -159,7 +159,7 @@ export default function TransitView() {
                         <td className="px-4 py-3 whitespace-nowrap text-text-secondary">
                           {new Date(movement.date).toLocaleString()}
                         </td>
-                        <td className="px-4 py-3 font-medium">{getProductName(movement.productId)}</td>
+                      <td className="px-4 py-3 font-medium">{getProductName(movement.product_id)}</td>
                         <td className="px-4 py-3 text-right font-mono">
                           {movement.type === 'ENTRADA' ? '+' : '-'}{movement.quantity} {movement.unit}
                         </td>
@@ -170,7 +170,7 @@ export default function TransitView() {
                               Anomalía
                             </span>
                           ) : isJustified ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-1 text-xs font-medium text-success" title={movement.justification}>
+                            <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-1 text-xs font-medium text-success" title={movement.justification_date}>
                               <CheckCircle2 className="h-3 w-3" />
                               Justificado
                             </span>

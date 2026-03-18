@@ -11,7 +11,7 @@ export default function AIView() {
   const { user } = useAuthStore();
   const { products, sales, movements, employees } = useDatabaseStore();
   
-  const activeProducts = products.filter(p => p.isActive !== false);
+  const activeProducts = products.filter(p => p.is_active !== false);
 
   const [messages, setMessages] = useState<{role: 'user'|'model', text: string}[]>([]);
   const [input, setInput] = useState('');
@@ -51,7 +51,7 @@ Aquí tienes un resumen de sus datos actuales en tiempo real:
 - Productos con stock bajo (crítico): ${activeProducts.filter(p => p.quantity <= p.stock_min).map(p => p.name).join(', ') || 'Ninguno'}
 - Valor total del inventario: $${activeProducts.reduce((sum, p) => sum + (p.quantity * p.cost), 0).toFixed(2)}
 - Total de ventas registradas: ${sales.length}
-- Ingresos totales históricos: $${sales.reduce((sum, s) => sum + s.totalAmount, 0).toFixed(2)}
+- Ingresos totales históricos: $${sales.reduce((sum, s) => sum + s.total_amount, 0).toFixed(2)}
 - Empleados registrados: ${employees.length}
 
 Tu objetivo es ayudar al usuario a analizar estos datos, darle consejos de negocio, sugerirle cuándo reabastecer, y responder cualquier duda sobre su inventario.

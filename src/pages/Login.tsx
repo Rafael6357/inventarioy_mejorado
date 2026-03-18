@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Box } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
@@ -9,49 +8,48 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const login = useAuthStore((state) => state.login);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setIsLoading(true);
 
     if (!email.endsWith('@gmail.com')) {
       setError('Solo se permiten correos @gmail.com');
+      setIsLoading(false);
       return;
     }
 
     if (password.length < 6) {
       setError('La contraseña debe tener al menos 6 caracteres');
+      setIsLoading(false);
       return;
     }
 
-    // Mock authentication
-    const mockUser = {
-      id: '1',
-      email,
-      name: email.split('@')[0],
-      businessName: 'Mi Negocio',
-      role: (email === 'nikko6357@gmail.com' ? 'admin' : 'user') as 'admin' | 'user',
-      createdAt: new Date().toISOString(),
-      subscription: {
-        status: 'trialing' as const,
-        trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        validUntil: null,
-      },
-    };
+    const result = await login(email, password);
+    setIsLoading(false);
 
-    login(mockUser);
-    toast.success('Sesión iniciada correctamente');
-    navigate('/dashboard');
+    if (result.success) {
+      toast.success('Sesión iniciada correctamente');
+      navigate('/dashboard');
+    } else {
+      setError(result.error || 'Error al iniciar sesión');
+    }
   };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-transparent px-4">
       <div className="w-full max-w-md space-y-8 rounded-2xl border border-border/50 bg-surface/80 backdrop-blur-xl p-8 shadow-[0_0_40px_-10px_rgba(255,193,7,0.15)]">
         <div className="flex flex-col items-center text-center">
-          <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 shadow-[inset_0_0_15px_rgba(255,193,7,0.1)]">
-            <Box className="h-6 w-6 text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]" />
+          <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-xl bg-primary/5 shadow-[inset_0_0_15px_rgba(255,193,7,0.1)]">
+            <img 
+              src="https://ybymcbwnjcgdoqrosqdw.supabase.co/storage/v1/object/sign/inventarioy/logo%20inventarioy.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV84ZTZjYWMzMS1iNWE4LTRkNGEtODgyNy0wOGY3YTQ5NDc3NDYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJpbnZlbnRhcmlveS9sb2dvIGludmVudGFyaW95LnBuZyIsImlhdCI6MTc3Mzg1NDk4NCwiZXhwIjo0ODk1OTE4OTg0fQ.-m90y0pHg8aOvasddLctgzgSbK5MQp3qCWarh2BEDLg" 
+              alt="Logo" 
+              className="h-10 w-10 object-contain drop-shadow-[0_0_8px_rgba(255,193,7,0.3)]" 
+            />
           </div>
           <h2 className="text-2xl font-bold text-text text-gradient hero-glow">Bienvenido de nuevo</h2>
           <p className="mt-2 text-sm text-text-secondary">
@@ -97,8 +95,8 @@ export default function Login() {
             </div>
           </div>
 
-          <Button type="submit" className="w-full">
-            Iniciar Sesión
+          <Button type="submit" className="w-full" disabled={isLoading}>
+            {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
           </Button>
         </form>
 

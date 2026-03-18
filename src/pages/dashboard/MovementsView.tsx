@@ -37,11 +37,11 @@ export default function MovementsView() {
     const sortedAllMovements = [...movements].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     
     const movementsWithBal = sortedAllMovements.map(m => {
-      const balanceAfter = productBalances[m.productId] || 0;
+      const balanceAfter = productBalances[m.product_id] || 0;
       
       // Calculate balance before this movement to use for the next older movement
       const qty = m.type === 'ENTRADA' ? m.quantity : -m.quantity;
-      productBalances[m.productId] = balanceAfter - qty;
+      productBalances[m.product_id] = balanceAfter - qty;
       
       return {
         ...m,
@@ -52,7 +52,7 @@ export default function MovementsView() {
     return movementsWithBal
       .filter(m => {
         const isNotSale = !m.reason?.startsWith('Venta');
-        const matchesSearch = getProductName(m.productId).toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesSearch = getProductName(m.product_id).toLowerCase().includes(searchTerm.toLowerCase());
         const matchesType = typeFilter === 'ALL' || m.type === typeFilter;
         
         let matchesDate = true;
@@ -166,7 +166,7 @@ export default function MovementsView() {
                       <td className="px-4 py-3 whitespace-nowrap text-text-secondary">
                         {new Date(movement.date).toLocaleString()}
                       </td>
-                      <td className="px-4 py-3 font-medium">{getProductName(movement.productId)}</td>
+                      <td className="px-4 py-3 font-medium">{getProductName(movement.product_id)}</td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${
                           isEntrada ? 'bg-success/10 text-success' :

@@ -15,7 +15,7 @@ export default function ChartsView() {
   const salesOverTime = useMemo(() => {
     const grouped = sales.reduce((acc, sale) => {
       const date = new Date(sale.date).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' });
-      acc[date] = (acc[date] || 0) + sale.totalAmount;
+      acc[date] = (acc[date] || 0) + sale.total_amount;
       return acc;
     }, {} as Record<string, number>);
 
@@ -27,7 +27,7 @@ export default function ChartsView() {
   // 2. Top Selling Products (Bar Chart)
   const topProducts = useMemo(() => {
     const productSales = sales.flatMap(s => s.items).reduce((acc, item) => {
-      const product = products.find(p => p.id === item.productId);
+      const product = products.find(p => p.id === item.product_id);
       const name = product ? product.name : 'Desconocido';
       acc[name] = (acc[name] || 0) + item.quantity;
       return acc;

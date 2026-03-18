@@ -2,14 +2,15 @@ import { Box, ShoppingCart, ChefHat, Sparkles, ChevronDown, CheckCircle2 } from 
 import { Link } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 
+const LOGO_URL = 'https://ybymcbwnjcgdoqrosqdw.supabase.co/storage/v1/object/sign/inventarioy/logo%20inventarioy.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV84ZTZjYWMzMS1iNWE4LTRkNGEtODgyNy0wOGY3YTQ5NDc3NDYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJpbnZlbnRhcmlveS9sb2dvIGludmVudGFyaW95LnBuZyIsImlhdCI6MTc3Mzg1NDk4NCwiZXhwIjo0ODk1OTE4OTg0fQ.-m90y0pHg8aOvasddLctgzgSbK5MQp3qCWarh2BEDLg';
+
 export default function Landing() {
   return (
     <div className="min-h-screen bg-bg text-text selection:bg-primary/30">
-      {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-bg/80 backdrop-blur-xl supports-[backdrop-filter]:bg-bg/60 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-2">
-            <Box className="h-6 w-6 text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]" />
+            <img src={LOGO_URL} alt="Logo" className="h-8 w-8 object-contain drop-shadow-[0_0_8px_rgba(255,193,7,0.3)]" />
             <span className="text-xl font-bold tracking-tight text-text text-gradient hero-glow">InventarioY</span>
           </div>
           <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-text-secondary">
@@ -29,7 +30,6 @@ export default function Landing() {
       </header>
 
       <main className="flex-1">
-        {/* Hero Section */}
         <section className="relative overflow-hidden py-24 lg:py-32">
           <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay"></div>
           <div className="absolute inset-0 bg-gradient-to-b from-primary/10 via-bg to-bg"></div>
@@ -62,7 +62,6 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* Features Section */}
         <section id="features" className="py-24 bg-surface/30">
           <div className="container mx-auto px-4">
             <div className="text-center mb-16">
@@ -105,7 +104,6 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* Pricing Section */}
         <section id="pricing" className="py-24">
           <div className="container mx-auto px-4">
             <div className="text-center mb-16">
@@ -148,7 +146,6 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* FAQ Section */}
         <section id="faq" className="py-24 bg-surface/30">
           <div className="container mx-auto px-4 max-w-3xl">
             <div className="text-center mb-16">
@@ -198,7 +195,6 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* Contact Section */}
         <section id="contact" className="py-24">
           <div className="container mx-auto px-4 max-w-xl">
             <div className="text-center mb-12">
@@ -235,11 +231,10 @@ export default function Landing() {
         </section>
       </main>
 
-      {/* Footer */}
       <footer className="border-t border-border bg-surface py-12">
         <div className="container mx-auto px-4 text-center text-text-secondary">
           <div className="flex items-center justify-center gap-2 mb-6">
-            <Box className="h-6 w-6 text-primary" />
+            <img src={LOGO_URL} alt="Logo" className="h-8 w-8 object-contain" />
             <span className="text-xl font-bold text-text">InventarioY</span>
           </div>
           <div className="flex justify-center gap-6 mb-8 text-sm">

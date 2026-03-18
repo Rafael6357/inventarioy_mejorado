@@ -26,17 +26,15 @@ export default function InventoryView() {
   const { user } = useAuthStore();
   const { products, addProduct, addMovement } = useDatabaseStore();
   
-  const activeProducts = products.filter(p => p.isActive !== false);
+  const activeProducts = products.filter(p => p.is_active !== false);
 
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isCustomCategory, setIsCustomCategory] = useState(false);
   const [customCategory, setCustomCategory] = useState('');
 
-  // Get unique categories from existing products and combine with defaults
   const existingCategories = Array.from(new Set(activeProducts.map(p => p.category).filter(Boolean)));
   const allCategories = Array.from(new Set([...DEFAULT_CATEGORIES, ...existingCategories])).sort();
 
-  // Form states for New Product
   const [newProduct, setNewProduct] = useState({
     name: '',
     category: '',
@@ -56,27 +54,26 @@ export default function InventoryView() {
     holding_cost: 0,
   });
 
-  // Form states for Movement
   const [movement, setMovement] = useState({
     type: 'ENTRADA' as 'ENTRADA' | 'SALIDA' | 'MERMA',
-    productId: '',
+    product_id: '',
     quantity: 0,
     unit: 'unidades',
-    date: new Date().toISOString().split('T')[0],
+    date: new Date().toISOString(),
     cost: 0,
     reason: '',
+    status: 'NORMAL' as 'NORMAL' | 'ANOMALIA' | 'JUSTIFICADO',
   });
 
-  const handleAddProduct = (e: React.FormEvent) => {
+  const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
     
-    addProduct({
+    await addProduct({
       ...newProduct,
-      businessId: user.businessName, // Mock using businessName as ID for now
+      is_active: true,
     });
     
-    // Reset form
     setNewProduct({
       name: '', category: '', unit: 'unidades', quantity: 0, price: 0, cost: 0,
       stock_min: 0, stock_max: 0, expiration_date: '', description: '', is_individual: false,
@@ -86,28 +83,29 @@ export default function InventoryView() {
     toast.success('Producto agregado exitosamente');
   };
 
-  const handleAddMovement = (e: React.FormEvent) => {
+  const handleAddMovement = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !movement.productId) return;
+    if (!user || !movement.product_id) return;
 
-    // Basic Anomaly Detection logic (simplified for now)
-    // In a real app, this would calculate average demand over time
-    const product = products.find(p => p.id === movement.productId);
-    const isAnomaly = movement.type === 'SALIDA' && product && movement.quantity > (product.quantity * 0.5); // Example rule
+    const product = products.find(p => p.id === movement.product_id);
+    const isAnomaly = movement.type === 'SALIDA' && product && movement.quantity > (Number(product.quantity) * 0.5);
 
-    addMovement({
+    await addMovement({
       ...movement,
-      businessId: user.businessName,
+      quantity: Number(movement.quantity),
+      cost: Number(movement.cost) || (product ? Number(product.cost) : 0),
       status: isAnomaly ? 'ANOMALIA' : 'NORMAL',
     });
 
-    // Reset form
     setMovement({
-      ...movement,
-      productId: '',
+      type: 'ENTRADA',
+      product_id: '',
       quantity: 0,
+      unit: 'unidades',
+      date: new Date().toISOString(),
       cost: 0,
       reason: '',
+      status: 'NORMAL',
     });
     toast.success('Movimiento registrado exitosamente');
   };
@@ -122,7 +120,6 @@ export default function InventoryView() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Panel Izquierdo - Alta de Producto */}
         <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(255,193,7,0.15)]">
           <div className="mb-6 flex items-center gap-3 border-b border-border/50 pb-4">
             <div className="rounded-lg bg-primary/10 p-2 text-primary drop-shadow-[0_0_8px_rgba(205,164,52,0.5)]">
@@ -254,7 +251,6 @@ export default function InventoryView() {
               )}
             </div>
 
-            {/* Advanced Parameters Toggle */}
             <div className="pt-4">
               <button 
                 type="button" 
@@ -293,7 +289,6 @@ export default function InventoryView() {
           </form>
         </div>
 
-        {/* Panel Derecho - Movimiento */}
         <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(205,164,52,0.15)]">
           <div className="mb-6 flex items-center gap-3 border-b border-border/50 pb-4">
             <div className="rounded-lg bg-primary/10 p-2 text-primary drop-shadow-[0_0_8px_rgba(205,164,52,0.5)]">
@@ -323,12 +318,12 @@ export default function InventoryView() {
                 id="mov_product" 
                 required
                 className="flex h-10 w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                value={movement.productId}
+                value={movement.product_id}
                 onChange={e => {
                   const prod = products.find(p => p.id === e.target.value);
                   setMovement({
                     ...movement, 
-                    productId: e.target.value,
+                    product_id: e.target.value,
                     unit: prod ? prod.unit : 'unidades'
                   });
                 }}
@@ -352,7 +347,7 @@ export default function InventoryView() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="mov_date">Fecha *</Label>
-                <Input id="mov_date" type="date" required value={movement.date} onChange={e => setMovement({...movement, date: e.target.value})} />
+                <Input id="mov_date" type="datetime-local" required value={movement.date.slice(0, 16)} onChange={e => setMovement({...movement, date: e.target.value})} />
               </div>
             </div>
 
