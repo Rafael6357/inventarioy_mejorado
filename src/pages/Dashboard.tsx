@@ -18,7 +18,8 @@ import {
   Menu,
   X,
   History,
-  ChevronRight
+  ChevronRight,
+  Box
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useDatabaseStore } from '../store/dbStore';
@@ -36,8 +37,6 @@ import FilteredCenterView from './dashboard/FilteredCenterView';
 import AIView from './dashboard/AIView';
 import SettingsView from './dashboard/SettingsView';
 import PaymentsView from './dashboard/PaymentsView';
-
-const LOGO_URL = 'https://ybymcbwnjcgdoqrosqdw.supabase.co/storage/v1/object/sign/inventarioy/logo%20inventarioy.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV84ZTZjYWMzMS1iNWE4LTRkNGEtODgyNy0wOGY3YTQ5NDc3NDYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJpbnZlbnRhcmlveS9sb2dvIGludmVudGFyaW95LnBuZyIsImlhdCI6MTc3Mzg1NDk4NCwiZXhwIjo0ODk1OTE4OTg0fQ.-m90y0pHg8aOvasddLctgzgSbK5MQp3qCWarh2BEDLg';
 
 export default function Dashboard() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -83,7 +82,7 @@ export default function Dashboard() {
       <div className="flex h-screen items-center justify-center bg-bg">
         <div className="text-center">
           <div className="h-12 w-12 mx-auto mb-4 rounded-xl bg-primary/10 flex items-center justify-center">
-            <img src={LOGO_URL} alt="Logo" className="h-8 w-8 object-contain" />
+            <Box className="h-6 w-6 text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]" />
           </div>
           <p className="text-text-secondary">Cargando...</p>
         </div>
@@ -148,7 +147,7 @@ export default function Dashboard() {
       >
         <div className="flex h-16 items-center justify-between px-4 border-b border-border/50">
           <div className="flex items-center gap-2">
-            <img src={LOGO_URL} alt="Logo" className="h-8 w-8 object-contain drop-shadow-[0_0_8px_rgba(255,193,7,0.3)]" />
+            <Box className="h-6 w-6 text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]" />
             <span className="text-xl font-bold text-text text-gradient hero-glow">InventarioY</span>
           </div>
           <button 
@@ -206,7 +205,7 @@ export default function Dashboard() {
       <div className="flex flex-1 flex-col overflow-hidden bg-transparent">
         <header className="flex h-16 items-center justify-between border-b border-border/50 bg-surface/80 backdrop-blur-xl px-4 lg:hidden">
           <div className="flex items-center gap-2">
-            <img src={LOGO_URL} alt="Logo" className="h-8 w-8 object-contain drop-shadow-[0_0_8px_rgba(255,193,7,0.3)]" />
+            <Box className="h-6 w-6 text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]" />
             <span className="text-xl font-bold text-text text-gradient hero-glow">InventarioY</span>
           </div>
           <button
