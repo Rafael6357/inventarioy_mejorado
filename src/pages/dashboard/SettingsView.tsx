@@ -31,7 +31,15 @@ export default function SettingsView() {
       .eq('id', user.id);
 
     if (error) {
-      toast.error('Error al guardar: ' + error.message);
+      let errorMessage = 'Error al guardar la configuración';
+      if (error.message.includes('row-level security')) {
+        errorMessage = 'No tienes permisos para modificar estos datos';
+      } else if (error.message.includes('duplicate')) {
+        errorMessage = 'Ya existe un registro con estos datos';
+      } else if (error.message.includes('network') || error.message.includes('fetch')) {
+        errorMessage = 'Error de conexión. Verifica tu internet';
+      }
+      toast.error(errorMessage);
     } else {
       await fetchUser();
       toast.success('Configuración guardada exitosamente');
