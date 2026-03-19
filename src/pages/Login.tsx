@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Box } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
@@ -45,8 +44,11 @@ export default function Login() {
     <div className="flex min-h-screen items-center justify-center bg-transparent px-4">
       <div className="w-full max-w-md space-y-8 rounded-2xl border border-border/50 bg-surface/80 backdrop-blur-xl p-8 shadow-[0_0_40px_-10px_rgba(255,193,7,0.15)]">
         <div className="flex flex-col items-center text-center">
-          <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 shadow-[inset_0_0_15px_rgba(255,193,7,0.1)]">
-            <Box className="h-6 w-6 text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]" />
+          <div className="mb-4">
+            <span className="text-2xl font-bold text-gradient hero-glow">
+              <span className="text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]">Inventario</span>
+              <span className="drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]">Y</span>
+            </span>
           </div>
           <h2 className="text-2xl font-bold text-text text-gradient hero-glow">Bienvenido de nuevo</h2>
           <p className="mt-2 text-sm text-text-secondary">

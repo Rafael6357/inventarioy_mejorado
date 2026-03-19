@@ -1,4 +1,4 @@
-import { Box, ShoppingCart, ChefHat, Sparkles, ChevronDown, CheckCircle2 } from 'lucide-react';
+import { Package, ShoppingCart, ChefHat, Sparkles, ChevronDown, CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 
@@ -8,8 +8,10 @@ export default function Landing() {
       <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-bg/80 backdrop-blur-xl supports-[backdrop-filter]:bg-bg/60 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-2">
-            <Box className="h-6 w-6 text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]" />
-            <span className="text-xl font-bold tracking-tight text-text text-gradient hero-glow">InventarioY</span>
+            <span className="text-xl font-bold tracking-tight">
+              <span className="text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]">Inventario</span>
+              <span className="drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]">Y</span>
+            </span>
           </div>
           <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-text-secondary">
             <a href="#features" className="hover:text-primary transition-colors">Características</a>
@@ -72,7 +74,7 @@ export default function Landing() {
                 {
                   title: "Gestión de Inventario",
                   description: "Control preciso de stock, alertas de mínimo y máximo, y seguimiento de mermas.",
-                  icon: Box,
+                  icon: Package,
                 },
                 {
                   title: "Control de Ventas",
@@ -232,8 +234,10 @@ export default function Landing() {
       <footer className="border-t border-border bg-surface py-12">
         <div className="container mx-auto px-4 text-center text-text-secondary">
           <div className="flex items-center justify-center gap-2 mb-6">
-            <Box className="h-6 w-6 text-primary" />
-            <span className="text-xl font-bold text-text">InventarioY</span>
+            <span className="text-xl font-bold">
+              <span className="text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]">Inventario</span>
+              <span className="drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]">Y</span>
+            </span>
           </div>
           <div className="flex justify-center gap-6 mb-8 text-sm">
             <a href="#" className="hover:text-primary transition-colors">Términos y Condiciones</a>

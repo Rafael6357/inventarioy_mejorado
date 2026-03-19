@@ -18,8 +18,7 @@ import {
   Menu,
   X,
   History,
-  ChevronRight,
-  Box
+  ChevronRight
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useDatabaseStore } from '../store/dbStore';
@@ -81,10 +80,11 @@ export default function Dashboard() {
     return (
       <div className="flex h-screen items-center justify-center bg-bg">
         <div className="text-center">
-          <div className="h-12 w-12 mx-auto mb-4 rounded-xl bg-primary/10 flex items-center justify-center">
-            <Box className="h-6 w-6 text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]" />
-          </div>
-          <p className="text-text-secondary">Cargando...</p>
+          <p className="text-xl font-bold">
+            <span className="text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]">Inventario</span>
+            <span className="drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]">Y</span>
+          </p>
+          <p className="text-text-secondary mt-2">Cargando...</p>
         </div>
       </div>
     );
@@ -147,8 +147,10 @@ export default function Dashboard() {
       >
         <div className="flex h-16 items-center justify-between px-4 border-b border-border/50">
           <div className="flex items-center gap-2">
-            <Box className="h-6 w-6 text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]" />
-            <span className="text-xl font-bold text-text text-gradient hero-glow">InventarioY</span>
+            <span className="text-xl font-bold text-text text-gradient hero-glow">
+              <span className="text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]">Inventario</span>
+              <span className="drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]">Y</span>
+            </span>
           </div>
           <button 
             onClick={() => {
@@ -205,8 +207,10 @@ export default function Dashboard() {
       <div className="flex flex-1 flex-col overflow-hidden bg-transparent">
         <header className="flex h-16 items-center justify-between border-b border-border/50 bg-surface/80 backdrop-blur-xl px-4 lg:hidden">
           <div className="flex items-center gap-2">
-            <Box className="h-6 w-6 text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]" />
-            <span className="text-xl font-bold text-text text-gradient hero-glow">InventarioY</span>
+            <span className="text-xl font-bold text-text text-gradient hero-glow">
+              <span className="text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]">Inventario</span>
+              <span className="drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]">Y</span>
+            </span>
           </div>
           <button
             onClick={() => setIsMobileMenuOpen(true)}
