@@ -177,7 +177,6 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       });
 
-      await get().fetchUser();
       return { success: true };
     }
 

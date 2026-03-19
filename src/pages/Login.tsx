@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
+import InventarioYLogo from '../components/InventarioYLogo';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -44,13 +45,10 @@ export default function Login() {
     <div className="flex min-h-screen items-center justify-center bg-transparent px-4">
       <div className="w-full max-w-md space-y-8 rounded-2xl border border-border/50 bg-surface/80 backdrop-blur-xl p-8 shadow-[0_0_40px_-10px_rgba(255,193,7,0.15)]">
         <div className="flex flex-col items-center text-center">
-          <div className="mb-4">
-            <span className="text-2xl font-bold text-gradient hero-glow">
-              <span className="text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]">Inventario</span>
-              <span className="drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]">Y</span>
-            </span>
+          <div className="mb-6">
+            <InventarioYLogo size="xl" />
           </div>
-          <h2 className="text-2xl font-bold text-text text-gradient hero-glow">Bienvenido de nuevo</h2>
+          <h2 className="text-2xl font-bold text-text">Bienvenido de nuevo</h2>
           <p className="mt-2 text-sm text-text-secondary">
             Ingresa a tu cuenta para gestionar tu inventario
           </p>

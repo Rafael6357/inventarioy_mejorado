@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Sparkles } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
+import InventarioYLogo from '../components/InventarioYLogo';
 
 export default function Register() {
   const [name, setName] = useState('');
@@ -12,7 +13,6 @@ export default function Register() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const navigate = useNavigate();
   const register = useAuthStore((state) => state.register);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -36,8 +36,7 @@ export default function Register() {
     setIsLoading(false);
 
     if (result.success) {
-      toast.success('Cuenta creada exitosamente');
-      navigate('/dashboard');
+      toast.success('Revisa tu correo electrónico para confirmar tu cuenta antes de iniciar sesión');
     } else {
       setError(result.error || 'Error al registrar');
     }
@@ -48,10 +47,7 @@ export default function Register() {
       <div className="w-full max-w-md space-y-8 rounded-2xl border border-border/50 bg-surface/80 backdrop-blur-xl p-8 shadow-[0_0_40px_-10px_rgba(255,193,7,0.15)]">
         <div className="flex flex-col items-center text-center">
           <div className="mb-4">
-            <span className="text-2xl font-bold text-gradient hero-glow">
-              <span className="text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]">Inventario</span>
-              <span className="drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]">Y</span>
-            </span>
+            <InventarioYLogo size="lg" />
           </div>
           <h2 className="text-2xl font-bold text-text text-gradient hero-glow">Crea tu cuenta</h2>
           <div className="mt-2 inline-flex items-center rounded-full border border-primary/50 bg-primary/10 px-3 py-1 text-xs font-medium text-primary shadow-[0_0_15px_rgba(255,193,7,0.2)]">
