@@ -63,7 +63,7 @@ Responde de manera concisa, profesional, amigable y formatea tus respuestas usan
       role: 'assistant',
       text: `¡Hola, ${user?.name || 'Usuario'}! Soy tu asistente de inventario con IA. He analizado los datos de **${user?.businessName || 'tu negocio'}** y estoy listo para ayudarte. ¿Qué te gustaría saber sobre tu negocio hoy?`
     }]);
-  }, [user, activeProducts, sales, employees]);
+  }, [user?.id]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
