@@ -1,20 +1,21 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# InventarioY - Sistema de Gestión de Inventario
 
-# Run and deploy your AI Studio app
+Sistema de gestión de inventario para restaurantes con las siguientes funcionalidades:
 
-This contains everything you need to run your app locally.
+- **Stock Actual**: Control de inventario en tiempo real
+- **Inventario**: Gestión de productos y movimientos
+- **Movimientos (Kárdex)**: Historial completo de entradas y salidas
+- **Tráfico**: Seguimiento de productos en tránsito
+- **Ventas**: Punto de venta con soporte para recetas
+- **Cierres de Caja**: Control diario de ventas
+- **Recetas**: Gestión de recetas con ingredients
+- **Análisis**: Reportes y estadísticas
 
-View your app in AI Studio: https://ai.studio/apps/43053f72-52d8-4fd1-99fc-9599cfeaf894
+## Tech Stack
+- Next.js
+- Supabase (Backend as a Service)
+- TypeScript
+- Tailwind CSS
 
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Deployment
+Desplegado en Vercel: https://inventarioy.vercel.app
