@@ -19,3 +19,6 @@ Sistema de gestión de inventario para restaurantes con las siguientes funcional
 
 ## Deployment
 Desplegado en Vercel: https://inventarioy.vercel.app
+
+## Variables de Entorno
+Las variables de entorno están configuradas en Vercel para producción.
