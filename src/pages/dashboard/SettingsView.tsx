@@ -19,6 +19,14 @@ export default function SettingsView() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+    if (!formData.name.trim()) {
+      toast.error('El nombre no puede estar vacío');
+      return;
+    }
+    if (formData.businessName && formData.businessName.trim().length > 100) {
+      toast.error('El nombre del negocio es demasiado largo (máx. 100 caracteres)');
+      return;
+    }
     
     setIsSaving(true);
     
@@ -102,6 +110,7 @@ export default function SettingsView() {
                     id="name" 
                     value={formData.name}
                     onChange={e => setFormData({...formData, name: e.target.value})}
+                    maxLength={100}
                     required
                   />
                 </div>
@@ -127,6 +136,7 @@ export default function SettingsView() {
                   id="businessName" 
                   value={formData.businessName}
                   onChange={e => setFormData({...formData, businessName: e.target.value})}
+                  maxLength={100}
                   required
                 />
               </div>

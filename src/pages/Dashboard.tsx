@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Link, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -18,10 +18,12 @@ import {
   Menu,
   X,
   History,
-  ChevronRight
+  ChevronRight,
+  DollarSign
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useDatabaseStore } from '../store/dbStore';
+import InventarioYLogo from '../components/InventarioYLogo';
 import StockView from './dashboard/StockView';
 import InventoryView from './dashboard/InventoryView';
 import TransitView from './dashboard/TransitView';
@@ -36,6 +38,7 @@ import FilteredCenterView from './dashboard/FilteredCenterView';
 import AIView from './dashboard/AIView';
 import SettingsView from './dashboard/SettingsView';
 import PaymentsView from './dashboard/PaymentsView';
+import DailyClosingsView from './dashboard/DailyClosingsView';
 
 export default function Dashboard() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -46,14 +49,46 @@ export default function Dashboard() {
   const { user, logout, isLoading: authLoading, initialize } = useAuthStore();
   const { fetchAll, isLoading: dbLoading } = useDatabaseStore();
 
+  const baseNav = useMemo(() => [
+    // INVENTARIO
+    { name: 'Stock Actual', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Inventario', href: '/dashboard/inventory', icon: Package },
+    { name: 'Movimientos', href: '/dashboard/movements', icon: History },
+    { name: 'Tránsito', href: '/dashboard/transit', icon: ArrowRightLeft },
+    // VENTAS
+    { name: 'Ventas', href: '/dashboard/sales', icon: ShoppingCart },
+    { name: 'Cierres de Caja', href: '/dashboard/closings', icon: DollarSign },
+    // PRODUCCIÓN
+    { name: 'Recetas', href: '/dashboard/recipes', icon: ChefHat },
+    { name: 'Consumo', href: '/dashboard/consumption', icon: TrendingUp },
+    // ANÁLISIS
+    { name: 'Análisis', href: '/dashboard/analysis', icon: BarChart3 },
+    { name: 'Gráficos', href: '/dashboard/charts', icon: PieChart },
+    { name: 'Centro Filtrado', href: '/dashboard/filtered', icon: Filter },
+    { name: 'Asistente IA', href: '/dashboard/ai', icon: Sparkles },
+    // RRHH
+    { name: 'RRHH', href: '/dashboard/hr', icon: Users },
+    // CONFIGURACIÓN
+    { name: 'Configuración', href: '/dashboard/settings', icon: Settings },
+  ], []);
+
+  const navigation = useMemo(() => {
+    if (user?.role === 'admin') {
+      return [...baseNav, { name: 'Gestión de Pagos', href: '/dashboard/payments', icon: CreditCard }];
+    }
+    return baseNav;
+  }, [user?.role, baseNav]);
+
   useEffect(() => {
     initialize();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (user) {
       fetchAll();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const handleSidebarMouseEnter = () => {
@@ -66,7 +101,7 @@ export default function Dashboard() {
   const handleSidebarMouseLeave = () => {
     sidebarTimeoutRef.current = setTimeout(() => {
       setIsSidebarVisible(false);
-    }, 3000);
+    }, 1500);
   };
 
   useEffect(() => {
@@ -80,11 +115,8 @@ export default function Dashboard() {
     return (
       <div className="flex h-screen items-center justify-center bg-bg">
         <div className="text-center">
-          <p className="text-xl font-bold">
-            <span className="text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]">Inventario</span>
-            <span className="drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]">Y</span>
-          </p>
-          <p className="text-text-secondary mt-2">Cargando...</p>
+          <div className="mb-2"><InventarioYLogo size="xl" /></div>
+          <p className="text-text-secondary">Cargando...</p>
         </div>
       </div>
     );
@@ -94,28 +126,9 @@ export default function Dashboard() {
     return <Navigate to="/login" replace />;
   }
 
-  const navigation = [
-    { name: 'Stock Actual', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Inventario', href: '/dashboard/inventory', icon: Package },
-    { name: 'Movimientos', href: '/dashboard/movements', icon: History },
-    { name: 'Tránsito', href: '/dashboard/transit', icon: ArrowRightLeft },
-    { name: 'Ventas', href: '/dashboard/sales', icon: ShoppingCart },
-    { name: 'RRHH', href: '/dashboard/hr', icon: Users },
-    { name: 'Recetas', href: '/dashboard/recipes', icon: ChefHat },
-    { name: 'Consumo', href: '/dashboard/consumption', icon: TrendingUp },
-    { name: 'Análisis', href: '/dashboard/analysis', icon: BarChart3 },
-    { name: 'Gráficos', href: '/dashboard/charts', icon: PieChart },
-    { name: 'Centro Filtrado', href: '/dashboard/filtered', icon: Filter },
-    { name: 'Asistente IA', href: '/dashboard/ai', icon: Sparkles },
-    { name: 'Configuración', href: '/dashboard/settings', icon: Settings },
-  ];
-
-  if (user.role === 'admin') {
-    navigation.push({ name: 'Gestión de Pagos', href: '/dashboard/payments', icon: CreditCard });
-  }
-
   const handleLogout = async () => {
     await logout();
+    navigate('/');
   };
 
   return (
@@ -147,10 +160,7 @@ export default function Dashboard() {
       >
         <div className="flex h-16 items-center justify-between px-4 border-b border-border/50">
           <div className="flex items-center gap-2">
-            <span className="text-xl font-bold text-text text-gradient hero-glow">
-              <span className="text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]">Inventario</span>
-              <span className="drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]">Y</span>
-            </span>
+            <InventarioYLogo size="lg" />
           </div>
           <button 
             onClick={() => {
@@ -174,7 +184,7 @@ export default function Dashboard() {
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-300 ${
                     isActive
-                      ? 'bg-gradient-to-r from-primary/20 to-transparent text-primary border-l-2 border-primary shadow-[inset_0_0_20px_rgba(255,193,7,0.05)]'
+                      ? 'bg-gradient-to-r from-primary/20 to-transparent border-l-2 border-primary shadow-[inset_0_0_20px_rgba(255,193,7,0.05)]'
                       : 'text-text-secondary hover:bg-surface-hover hover:text-text'
                   }`}
                 >
@@ -207,10 +217,7 @@ export default function Dashboard() {
       <div className="flex flex-1 flex-col overflow-hidden bg-transparent">
         <header className="flex h-16 items-center justify-between border-b border-border/50 bg-surface/80 backdrop-blur-xl px-4 lg:hidden">
           <div className="flex items-center gap-2">
-            <span className="text-xl font-bold text-text text-gradient hero-glow">
-              <span className="text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]">Inventario</span>
-              <span className="drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]">Y</span>
-            </span>
+            <InventarioYLogo size="lg" />
           </div>
           <button
             onClick={() => setIsMobileMenuOpen(true)}
@@ -227,6 +234,7 @@ export default function Dashboard() {
             <Route path="/movements" element={<MovementsView />} />
             <Route path="/transit" element={<TransitView />} />
             <Route path="/sales" element={<SalesView />} />
+            <Route path="/closings" element={<DailyClosingsView />} />
             <Route path="/hr" element={<HRView />} />
             <Route path="/recipes" element={<RecipesView />} />
             <Route path="/consumption" element={<ConsumptionView />} />

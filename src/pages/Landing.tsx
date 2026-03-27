@@ -1,17 +1,45 @@
-import { Package, ShoppingCart, ChefHat, Sparkles, ChevronDown, CheckCircle2 } from 'lucide-react';
+import { Package, ShoppingCart, ChefHat, Sparkles, ChevronDown, CheckCircle2, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
+import InventarioYLogo from '../components/InventarioYLogo';
 
 export default function Landing() {
+  const [contactLoading, setContactLoading] = useState(false);
+
+  const handleContactSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setContactLoading(true);
+    const form = e.currentTarget;
+    const data = new FormData(form);
+
+    try {
+      const response = await fetch('https://formspree.io/f/mqedqlev', {
+        method: 'POST',
+        body: data,
+        headers: { Accept: 'application/json' }
+      });
+
+      if (response.ok) {
+        toast.success('Mensaje enviado. Te responderemos pronto.');
+        form.reset();
+      } else {
+        toast.error('Error al enviar el mensaje. Intenta de nuevo.');
+      }
+    } catch {
+      toast.error('Error de conexión. Verifica tu internet.');
+    } finally {
+      setContactLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-bg text-text selection:bg-primary/30">
       <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-bg/80 backdrop-blur-xl supports-[backdrop-filter]:bg-bg/60 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-2">
-            <span className="text-xl font-bold tracking-tight">
-              <span className="text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]">Inventario</span>
-              <span className="drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]">Y</span>
-            </span>
+            <InventarioYLogo size="lg" />
           </div>
           <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-text-secondary">
             <a href="#features" className="hover:text-primary transition-colors">Características</a>
@@ -31,7 +59,7 @@ export default function Landing() {
 
       <main className="flex-1">
         <section className="relative overflow-hidden py-24 lg:py-32">
-          <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay"></div>
+          <div className="absolute inset-0 opacity-20 mix-blend-overlay" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noise\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.8\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noise)\'/%3E%3C/svg%3E")', backgroundRepeat: 'repeat', backgroundSize: '128px 128px' }}></div>
           <div className="absolute inset-0 bg-gradient-to-b from-primary/10 via-bg to-bg"></div>
           
           <div className="container relative mx-auto px-4 text-center">
@@ -156,11 +184,7 @@ export default function Landing() {
               {[
                 {
                   q: "¿Cómo funciona la prueba gratis?",
-                  a: "Al registrarte, obtienes automáticamente 30 días de acceso completo a todas las funciones del Plan Profesional. No se requiere tarjeta de crédito."
-                },
-                {
-                  q: "¿Puedo cancelar mi suscripción en cualquier momento?",
-                  a: "Sí, puedes cancelar tu suscripción cuando lo desees sin penalizaciones ni cargos adicionales."
+                  a: "Al registrarte, obtienes automáticamente 30 días de acceso completo a todas las funciones del Plan Profesional."
                 },
                 {
                   q: "¿Mis datos están seguros?",
@@ -202,7 +226,7 @@ export default function Landing() {
               <p className="text-text-secondary">¿Tienes alguna duda? Escríbenos y te responderemos lo antes posible.</p>
             </div>
             
-            <form action="https://formspree.io/f/mqedqlev" method="POST" className="space-y-6 rounded-2xl border border-border bg-surface p-8">
+            <form onSubmit={handleContactSubmit} className="space-y-6 rounded-2xl border border-border bg-surface p-8">
               <div className="grid gap-6 sm:grid-cols-2">
                 <div className="space-y-2">
                   <label htmlFor="name" className="text-sm font-medium text-text-secondary">Nombre</label>
@@ -225,7 +249,16 @@ export default function Landing() {
                 <label htmlFor="message" className="text-sm font-medium text-text-secondary">Mensaje</label>
                 <textarea id="message" name="message" rows={4} required className="w-full rounded-md border border-border bg-bg px-3 py-2 text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"></textarea>
               </div>
-              <Button type="submit" className="w-full h-12 text-base">Enviar Mensaje</Button>
+              <div className="flex justify-center">
+                <Button type="submit" className="h-12 px-8 text-base" disabled={contactLoading}>
+                  {contactLoading ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Enviando...
+                    </span>
+                  ) : 'Enviar Mensaje'}
+                </Button>
+              </div>
             </form>
           </div>
         </section>
@@ -234,10 +267,7 @@ export default function Landing() {
       <footer className="border-t border-border bg-surface py-12">
         <div className="container mx-auto px-4 text-center text-text-secondary">
           <div className="flex items-center justify-center gap-2 mb-6">
-            <span className="text-xl font-bold">
-              <span className="text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]">Inventario</span>
-              <span className="drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]">Y</span>
-            </span>
+            <InventarioYLogo size="lg" />
           </div>
           <div className="flex justify-center gap-6 mb-8 text-sm">
             <a href="#" className="hover:text-primary transition-colors">Términos y Condiciones</a>

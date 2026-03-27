@@ -62,7 +62,7 @@ export default function RecipesView() {
     setIngredients(current => current.filter(ing => ing.product_id !== productId));
   };
 
-  const handleCreateRecipe = (e: React.FormEvent) => {
+  const handleCreateRecipe = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
     if (ingredients.length === 0) {
@@ -70,17 +70,19 @@ export default function RecipesView() {
       return;
     }
 
-    addRecipe({
-      name: recipeName,
-      selling_price,
-      ingredients
-    });
-
-    // Reset form
-    setRecipeName('');
-    setSellingPrice(0);
-    setIngredients([]);
-    toast.success('Receta creada exitosamente');
+    try {
+      await addRecipe({
+        name: recipeName,
+        selling_price,
+        ingredients
+      });
+      setRecipeName('');
+      setSellingPrice(0);
+      setIngredients([]);
+      toast.success('Receta creada exitosamente');
+    } catch (err) {
+      toast.error((err as Error).message || 'Error al crear la receta');
+    }
   };
 
   const filteredRecipes = recipes.filter(r => 
@@ -215,7 +217,7 @@ export default function RecipesView() {
               </div>
             </div>
 
-            <Button type="submit" className="w-full">
+            <Button type="submit" className="px-8">
               Guardar Receta
             </Button>
           </form>
@@ -257,10 +259,14 @@ export default function RecipesView() {
                 return (
                   <div key={recipe.id} className="relative rounded-xl border border-border bg-bg p-4 transition-colors hover:border-primary/50">
                     <button 
-                      onClick={() => {
+                      onClick={async () => {
                         if(window.confirm('¿Seguro que deseas eliminar esta receta?')) {
-                          deleteRecipe(recipe.id);
-                          toast.success('Receta eliminada exitosamente');
+                          try {
+                            await deleteRecipe(recipe.id);
+                            toast.success('Receta eliminada exitosamente');
+                          } catch (err) {
+                            toast.error((err as Error).message || 'Error al eliminar la receta');
+                          }
                         }
                       }}
                       className="absolute right-4 top-4 text-text-secondary hover:text-danger transition-colors"

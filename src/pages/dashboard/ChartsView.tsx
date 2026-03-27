@@ -1,12 +1,11 @@
 import React, { useMemo } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
 import { 
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  BarChart, Bar, PieChart, Pie, Cell, Legend
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend
 } from 'recharts';
-import { PieChart as PieChartIcon, BarChart3, TrendingUp } from 'lucide-react';
+import { BarChart3, TrendingUp, Activity } from 'lucide-react';
 
-const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+const COLORS = ['#d4af37', '#b8962f', '#a68527', '#947220', '#83601a', '#724e15'];
 
 export default function ChartsView() {
   const { sales, products, movements } = useDatabaseStore();
@@ -75,7 +74,7 @@ export default function ChartsView() {
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={salesOverTime} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                <BarChart data={salesOverTime} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
                   <XAxis dataKey="date" stroke="#888" fontSize={12} tickLine={false} axisLine={false} />
                   <YAxis stroke="#888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `$${value}`} />
@@ -84,8 +83,8 @@ export default function ChartsView() {
                     itemStyle={{ color: '#fff' }}
                     formatter={(value: number) => [`$${value.toFixed(2)}`, 'Ventas']}
                   />
-                  <Line type="monotone" dataKey="total" stroke="#6366f1" strokeWidth={3} dot={{ r: 4, fill: '#6366f1' }} activeDot={{ r: 6 }} />
-                </LineChart>
+                  <Bar dataKey="total" fill="#d4af37" radius={[4, 4, 0, 0]} barSize={32} />
+                </BarChart>
               </ResponsiveContainer>
             )}
           </div>
@@ -116,7 +115,7 @@ export default function ChartsView() {
                     cursor={{ fill: '#333', opacity: 0.4 }}
                     formatter={(value: number) => [value, 'Unidades']}
                   />
-                  <Bar dataKey="quantity" fill="#10b981" radius={[0, 4, 4, 0]} barSize={24}>
+                  <Bar dataKey="quantity" fill="#d4af37" radius={[0, 4, 4, 0]} barSize={24}>
                     {topProducts.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
@@ -131,7 +130,7 @@ export default function ChartsView() {
         <div className="rounded-xl border border-border bg-surface p-6 shadow-sm">
           <div className="mb-6 flex items-center gap-3 border-b border-border pb-4">
             <div className="rounded-lg bg-primary/10 p-2 text-primary">
-              <PieChartIcon className="h-5 w-5" />
+              <Activity className="h-5 w-5" />
             </div>
             <h2 className="text-lg font-semibold text-text">Distribución de Movimientos</h2>
           </div>
@@ -143,32 +142,25 @@ export default function ChartsView() {
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={movementsDistribution}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {movementsDistribution.map((entry, index) => {
-                      // Custom colors based on movement type
-                      let color = COLORS[index % COLORS.length];
-                      if (entry.name === 'ENTRADA') color = '#10b981'; // success
-                      if (entry.name === 'SALIDA') color = '#6366f1'; // primary
-                      if (entry.name === 'MERMA') color = '#ef4444'; // danger
-                      
-                      return <Cell key={`cell-${index}`} fill={color} />;
-                    })}
-                  </Pie>
+                <BarChart data={movementsDistribution} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                  <XAxis dataKey="name" stroke="#888" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#888" fontSize={12} tickLine={false} axisLine={false} />
                   <Tooltip 
                     contentStyle={{ backgroundColor: '#1a1a1a', borderColor: '#333', borderRadius: '8px' }}
+                    cursor={{ fill: '#333', opacity: 0.4 }}
                     formatter={(value: number) => [value, 'Registros']}
                   />
-                  <Legend verticalAlign="bottom" height={36} />
-                </PieChart>
+                  <Bar dataKey="value" fill="#d4af37" radius={[4, 4, 0, 0]} barSize={40}>
+                    {movementsDistribution.map((entry, index) => {
+                      let color = COLORS[index % COLORS.length];
+                      if (entry.name === 'ENTRADA') color = '#10b981';
+                      if (entry.name === 'SALIDA') color = '#6366f1';
+                      if (entry.name === 'MERMA') color = '#ef4444';
+                      return <Cell key={`cell-${index}`} fill={color} />;
+                    })}
+                  </Bar>
+                </BarChart>
               </ResponsiveContainer>
             )}
           </div>

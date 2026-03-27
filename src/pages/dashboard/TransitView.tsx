@@ -1,251 +1,363 @@
 import React, { useState } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
-import { AlertTriangle, CheckCircle2, Search, FileText, X, Clock, ArrowRightLeft } from 'lucide-react';
+import { Search, Clock, Package, TrendingDown, RefreshCw, RotateCcw, X, AlertTriangle } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
 
 export default function TransitView() {
-  const { movements, products, justifyMovement } = useDatabaseStore();
+  const { transitItems, products, cancelTransit } = useDatabaseStore();
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<'ELABORACION' | 'ANOMALIAS'>('ELABORACION');
-  
-  // Modal state
-  const [justifyingId, setJustifyingId] = useState<string | null>(null);
-  const [justificationText, setJustificationText] = useState('');
+  const [cancelModal, setCancelModal] = useState<{
+    item: any;
+    quantity: number;
+    reason: string;
+  } | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
-  const getProductName = (id: string) => products.find(p => p.id === id)?.name || 'Producto Eliminado';
+  const getProduct = (id: string) => products.find(p => p.id === id);
 
-  const transitMovements = movements
-    .filter(m => m.type === 'SALIDA')
-    .filter(m => !m.reason?.startsWith('Venta')) // Solo salidas manuales desde Inventario
-    .filter(m => 
-      getProductName(m.product_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.reason?.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-  const anomalyMovements = movements
-    .filter(m => m.status === 'ANOMALIA' || m.status === 'JUSTIFICADO')
-    .filter(m => 
-      getProductName(m.product_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.type.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-  const handleJustify = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (justifyingId && justificationText.trim()) {
-      justifyMovement(justifyingId, justificationText);
-      setJustifyingId(null);
-      setJustificationText('');
-      toast.success('Anomalía justificada exitosamente');
+  const handleCancel = async () => {
+    if (!cancelModal || !cancelModal.reason.trim()) {
+      toast.error('Ingresa un motivo para la devolución');
+      return;
+    }
+    setIsCancelling(true);
+    const result = await cancelTransit(cancelModal.item.id, cancelModal.quantity, cancelModal.reason);
+    setIsCancelling(false);
+    if (result.success) {
+      toast.success('Producto devuelto al stock exitosamente');
+      setCancelModal(null);
+    } else {
+      toast.error(result.error || 'Error al devolver el producto');
     }
   };
 
+  const filteredTransit = transitItems.filter(t => {
+    const product = getProduct(t.product_id);
+    if (!product) return false;
+    return product.name.toLowerCase().includes(searchTerm.toLowerCase());
+  });
+
+  const groupedByProduct = filteredTransit.reduce((acc, item) => {
+    const product = getProduct(item.product_id);
+    if (!product) return acc;
+    if (!acc[item.product_id]) {
+      acc[item.product_id] = {
+        product,
+        items: [],
+        totalQuantity: 0,
+        totalConsumed: 0,
+        totalRemaining: 0,
+        oldestDate: item.sent_date,
+      };
+    }
+    acc[item.product_id].items.push(item);
+    acc[item.product_id].totalQuantity += item.quantity;
+    acc[item.product_id].totalConsumed += item.consumed;
+    acc[item.product_id].totalRemaining += item.remaining;
+    if (new Date(item.sent_date) < new Date(acc[item.product_id].oldestDate)) {
+      acc[item.product_id].oldestDate = item.sent_date;
+    }
+    return acc;
+  }, {} as Record<string, { product: any; items: any[]; totalQuantity: number; totalConsumed: number; totalRemaining: number; oldestDate: string }>);
+
+  const groupedArray = Object.values(groupedByProduct).sort(
+    (a, b) => new Date(b.oldestDate).getTime() - new Date(a.oldestDate).getTime()
+  );
+
+  const totalInTransit = transitItems.reduce((sum, t) => sum + t.remaining, 0);
+  const totalSent = transitItems.reduce((sum, t) => sum + t.quantity, 0);
+  const totalConsumed = transitItems.reduce((sum, t) => sum + t.consumed, 0);
+  const pendingProducts = Object.keys(groupedByProduct).length;
+
+  const getAntiquityColor = (sentDate: string) => {
+    const days = (Date.now() - new Date(sentDate).getTime()) / (1000 * 60 * 60 * 24);
+    if (days < 1) return { bg: 'bg-success/10', text: 'text-success', label: 'Hoy' };
+    if (days < 3) return { bg: 'bg-warning/10', text: 'text-warning', label: `${Math.floor(days)} dia(s)` };
+    return { bg: 'bg-danger/10', text: 'text-danger', label: `${Math.floor(days)} dia(s)` };
+  };
+
+  const getProgressColor = (consumed: number, total: number) => {
+    const pct = total > 0 ? consumed / total : 0;
+    if (pct >= 0.9) return 'bg-success';
+    if (pct >= 0.5) return 'bg-primary';
+    return 'bg-warning';
+  };
+
   return (
-    <div className="space-y-6 relative">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-text">Tránsito y Anomalías</h1>
+        <h1 className="text-2xl font-bold text-text">Tránsito de Productos</h1>
         <p className="text-sm text-text-secondary">
-          Gestión de productos en elaboración, detección de anomalías y sistema de justificación
+          Productos enviados a producción que aún no han sido consumidos en ventas
         </p>
       </div>
 
-      <div className="flex space-x-1 rounded-xl bg-surface p-1 shadow-sm border border-border">
-        <button
-          onClick={() => setActiveTab('ELABORACION')}
-          className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition-all ${
-            activeTab === 'ELABORACION'
-              ? 'bg-primary text-bg shadow-sm'
-              : 'text-text-secondary hover:bg-surface-hover hover:text-text'
-          }`}
-        >
-          <Clock className="h-4 w-4" />
-          En Elaboración
-        </button>
-        <button
-          onClick={() => setActiveTab('ANOMALIAS')}
-          className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition-all ${
-            activeTab === 'ANOMALIAS'
-              ? 'bg-danger text-white shadow-sm'
-              : 'text-text-secondary hover:bg-surface-hover hover:text-text'
-          }`}
-        >
-          <AlertTriangle className="h-4 w-4" />
-          Anomalías Detectadas
-          {anomalyMovements.filter(m => m.status === 'ANOMALIA').length > 0 && (
-            <span className="ml-1 flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-xs text-white">
-              {anomalyMovements.filter(m => m.status === 'ANOMALIA').length}
-            </span>
-          )}
-        </button>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="rounded-xl border border-border bg-surface p-4 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+              <Package className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-text">{totalInTransit}</p>
+              <p className="text-xs text-text-secondary">En Transito</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-border bg-surface p-4 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
+              <TrendingDown className="h-5 w-5 text-success" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-text">{totalConsumed}</p>
+              <p className="text-xs text-text-secondary">Consumido</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-border bg-surface p-4 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning/10">
+              <RefreshCw className="h-5 w-5 text-warning" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-text">{totalSent}</p>
+              <p className="text-xs text-text-secondary">Total Enviado</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-border bg-surface p-4 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-danger/10">
+              <Clock className="h-5 w-5 text-danger" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-text">{pendingProducts}</p>
+              <p className="text-xs text-text-secondary">Productos</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="rounded-xl border border-border bg-surface p-4 shadow-sm">
         <div className="mb-4 flex items-center gap-2">
           <div className="relative flex-1 max-w-md">
+            <label htmlFor="transit-search" className="sr-only">Buscar por producto</label>
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary" />
             <Input
-              placeholder="Buscar por producto o motivo..."
+              id="transit-search"
+              placeholder="Buscar por producto..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-9"
             />
           </div>
+          <span className="text-sm text-text-secondary">
+            {groupedArray.length} producto{groupedArray.length !== 1 ? 's' : ''} en transito
+          </span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-text [&_tr]:divide-x [&_tr]:divide-border/50">
-            <thead className="border-b border-border bg-bg/50 text-xs uppercase text-text-secondary">
-              <tr>
-                <th className="px-4 py-3 font-medium">Fecha</th>
-                <th className="px-4 py-3 font-medium">Producto</th>
-                <th className="px-4 py-3 font-medium text-right">Cantidad</th>
-                {activeTab === 'ELABORACION' && <th className="px-4 py-3 font-medium">Motivo/Destino</th>}
-                <th className="px-4 py-3 font-medium text-center">Estado</th>
-                {activeTab === 'ANOMALIAS' && <th className="px-4 py-3 font-medium text-center">Acción</th>}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {activeTab === 'ELABORACION' ? (
-                transitMovements.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-text-secondary">
-                      No hay productos en elaboración actualmente.
-                    </td>
-                  </tr>
-                ) : (
-                  transitMovements.map((movement) => (
-                    <tr key={movement.id} className="transition-colors hover:bg-surface-hover">
-                      <td className="px-4 py-3 whitespace-nowrap text-text-secondary">
-                        {new Date(movement.date).toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 font-medium">{getProductName(movement.product_id)}</td>
-                      <td className="px-4 py-3 text-right font-mono text-primary">
-                        {movement.quantity} {movement.unit}
-                      </td>
-                      <td className="px-4 py-3 text-text-secondary truncate max-w-[200px]" title={movement.reason || 'Envío a producción'}>
-                        {movement.reason || 'Envío a producción'}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
+        {groupedArray.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-surface-hover">
+              <Package className="h-8 w-8 text-text-secondary" />
+            </div>
+            <p className="text-lg font-medium text-text">No hay productos en tránsito</p>
+            <p className="mt-1 text-sm text-text-secondary">
+              Los productos apareceran aqui cuando realices una salida de inventario hacia produccion.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {groupedArray.map((group) => {
+              const pct = group.totalQuantity > 0 ? (group.totalConsumed / group.totalQuantity) * 100 : 0;
+              const antiquity = getAntiquityColor(group.oldestDate);
+
+              return (
+                <div
+                  key={group.product.id}
+                  className="rounded-xl border border-border bg-bg p-4 transition-colors hover:border-primary/30"
+                >
+                  <div className="mb-3 flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-semibold text-text truncate">{group.product.name}</h3>
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${antiquity.bg} ${antiquity.text}`}>
                           <Clock className="h-3 w-3" />
-                          En Proceso
+                          {antiquity.label}
                         </span>
-                      </td>
-                    </tr>
-                  ))
-                )
-              ) : (
-                anomalyMovements.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-text-secondary">
-                      No hay anomalías registradas.
-                    </td>
-                  </tr>
-                ) : (
-                  anomalyMovements.map((movement) => {
-                    const isAnomaly = movement.status === 'ANOMALIA';
-                    const isJustified = movement.status === 'JUSTIFICADO';
-                    
-                    return (
-                      <tr
-                        key={movement.id}
-                        className={`transition-colors hover:bg-surface-hover ${
-                          isAnomaly ? 'bg-danger/5' : ''
-                        }`}
-                      >
-                        <td className="px-4 py-3 whitespace-nowrap text-text-secondary">
-                          {new Date(movement.date).toLocaleString()}
-                        </td>
-                      <td className="px-4 py-3 font-medium">{getProductName(movement.product_id)}</td>
-                        <td className="px-4 py-3 text-right font-mono">
-                          {movement.type === 'ENTRADA' ? '+' : '-'}{movement.quantity} {movement.unit}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          {isAnomaly ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-danger/10 px-2 py-1 text-xs font-medium text-danger">
-                              <AlertTriangle className="h-3 w-3" />
-                              Anomalía
-                            </span>
-                          ) : isJustified ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-1 text-xs font-medium text-success" title={movement.justification_date}>
-                              <CheckCircle2 className="h-3 w-3" />
-                              Justificado
-                            </span>
-                          ) : (
-                            <span className="text-text-secondary">-</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          {isAnomaly ? (
-                            <Button 
-                              variant="destructive" 
-                              size="sm" 
-                              className="h-8 text-xs"
-                              onClick={() => setJustifyingId(movement.id)}
-                            >
-                              Justificar
-                            </Button>
-                          ) : movement.reason || movement.justification ? (
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title={movement.justification || movement.reason}>
-                              <FileText className="h-4 w-4 text-text-secondary" />
-                            </Button>
-                          ) : (
-                            <span className="text-text-secondary">-</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )
-              )}
-            </tbody>
-          </table>
-        </div>
+                      </div>
+                      <p className="text-xs text-text-secondary">
+                        {group.items.length} lote{group.items.length !== 1 ? 's' : ''} · Enviado: {new Date(group.oldestDate).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-lg font-bold text-primary">{group.totalRemaining}</p>
+                      <p className="text-xs text-text-secondary">Restante</p>
+                    </div>
+                  </div>
+
+                  <div className="mb-2">
+                    <div className="mb-1 flex justify-between text-xs text-text-secondary">
+                      <span>Consumo: {group.totalConsumed} / {group.totalQuantity}</span>
+                      <span>{pct.toFixed(0)}%</span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-surface-hover">
+                      <div
+                        className={`h-full rounded-full transition-all ${getProgressColor(group.totalConsumed, group.totalQuantity)}`}
+                        style={{ width: `${Math.max(pct, 5)}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {group.items.length > 0 && (
+                    <details className="mt-3">
+                      <summary className="cursor-pointer text-xs text-text-secondary hover:text-primary">
+                        Ver detalle de {group.items.length} lote{group.items.length !== 1 ? 's' : ''}
+                      </summary>
+                      <div className="mt-2 space-y-2 rounded-lg bg-surface p-3">
+                        {group.items.map((item) => {
+                          const itemPct = item.quantity > 0 ? (item.consumed / item.quantity) * 100 : 0;
+                          const itemAntiquity = getAntiquityColor(item.sent_date);
+                          return (
+                            <div key={item.id} className="flex items-center justify-between gap-3 text-xs">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs font-medium ${itemAntiquity.bg} ${itemAntiquity.text}`}>
+                                  <Clock className="h-2.5 w-2.5" />
+                                  {new Date(item.sent_date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
+                                </span>
+                                <span className="text-text-secondary truncate">{item.reason || 'En produccion'}</span>
+                              </div>
+                              <div className="flex items-center gap-3 shrink-0">
+                                <div className="w-20 h-1.5 overflow-hidden rounded-full bg-surface-hover">
+                                  <div
+                                    className={`h-full rounded-full ${getProgressColor(item.consumed, item.quantity)}`}
+                                    style={{ width: `${Math.max(itemPct, 5)}%` }}
+                                  />
+                                </div>
+                                <span className="font-mono text-text">
+                                  <span className="text-success">{item.consumed}</span>
+                                  <span className="text-text-secondary">/</span>
+                                  <span className="text-primary">{item.quantity}</span>
+                                  <span className="text-text-secondary"> = </span>
+                                  <span className="text-warning">{item.remaining}</span>
+                                </span>
+                                {item.remaining > 0 && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setCancelModal({ item, quantity: item.remaining, reason: '' });
+                                    }}
+                                    className="flex items-center justify-center h-7 w-7 rounded-lg text-text-secondary hover:text-danger hover:bg-danger/10 transition-colors shrink-0"
+                                    title="Devolver cantidad al stock"
+                                  >
+                                    <RotateCcw className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </details>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          )}
       </div>
 
-      {/* Justification Modal */}
-      {justifyingId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      {cancelModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-text flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-danger" />
-                Justificar Anomalía
-              </h3>
-              <button 
-                onClick={() => setJustifyingId(null)}
-                className="text-text-secondary hover:text-text"
+            <div className="mb-6 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-danger/10">
+                  <RotateCcw className="h-5 w-5 text-danger" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-text">Devolver al Stock</h2>
+                  <p className="text-xs text-text-secondary">
+                    {getProduct(cancelModal.item.product_id)?.name}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setCancelModal(null)}
+                className="rounded-full p-2 text-text-secondary hover:bg-surface-hover hover:text-text transition-colors"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
-            
-            <form onSubmit={handleJustify} className="space-y-4">
-              <p className="text-sm text-text-secondary">
-                Este movimiento fue detectado como inusual. Por favor, ingresa una justificación detallada para el registro de auditoría.
-              </p>
-              
-              <textarea
-                required
-                rows={4}
-                className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                placeholder="Ej: Se retiró stock adicional para un evento especial..."
-                value={justificationText}
-                onChange={(e) => setJustificationText(e.target.value)}
-              />
-              
-              <div className="flex justify-end gap-3 pt-2">
-                <Button type="button" variant="outline" onClick={() => setJustifyingId(null)}>
-                  Cancelar
-                </Button>
-                <Button type="submit" variant="default">
-                  Guardar Justificación
-                </Button>
+
+            <div className="mb-4 space-y-4">
+              <div className="rounded-xl bg-bg/50 border border-border p-4">
+                <div className="flex items-center gap-2 mb-3 text-sm text-text-secondary">
+                  <AlertTriangle className="h-4 w-4 text-warning" />
+                  Disponible para devolver: <span className="font-bold text-text">{cancelModal.item.remaining} {getProduct(cancelModal.item.product_id)?.unit}</span>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-text-secondary">Cantidad a devolver *</label>
+                  <Input
+                    type="number"
+                    min="0.01"
+                    max={cancelModal.item.remaining}
+                    step="0.01"
+                    value={cancelModal.quantity}
+                    onChange={(e) => setCancelModal({ ...cancelModal, quantity: Number(e.target.value) })}
+                    className="no-spin"
+                  />
+                  <div className="flex gap-2 mt-1">
+                    {[cancelModal.item.remaining * 0.25, cancelModal.item.remaining * 0.5, cancelModal.item.remaining].map((val, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setCancelModal({ ...cancelModal, quantity: Number(val.toFixed(2)) })}
+                        className="flex-1 rounded-lg border border-border bg-surface px-2 py-1 text-xs text-text-secondary hover:border-primary hover:text-primary transition-colors"
+                      >
+                        {i === 2 ? '100%' : `${i === 0 ? '25' : '50'}%`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </form>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-text-secondary">Motivo de la devolución *</label>
+                <textarea
+                  className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  rows={2}
+                  placeholder="Ej: Producto en mal estado, cancelacion de produccion..."
+                  value={cancelModal.reason}
+                  onChange={(e) => setCancelModal({ ...cancelModal, reason: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setCancelModal(null)}
+                className="flex-1"
+                disabled={isCancelling}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleCancel}
+                className="flex-1 gap-2"
+                disabled={isCancelling || cancelModal.quantity <= 0 || cancelModal.quantity > cancelModal.item.remaining || !cancelModal.reason.trim()}
+              >
+                {isCancelling ? 'Devolviendo...' : <><RotateCcw className="h-4 w-4" /> Devolver</>}
+              </Button>
+            </div>
           </div>
         </div>
       )}

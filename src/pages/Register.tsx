@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Sparkles } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Sparkles, Loader2 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
@@ -14,17 +14,12 @@ export default function Register() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const register = useAuthStore((state) => state.register);
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
-
-    if (!email.endsWith('@gmail.com')) {
-      setError('Solo se permiten correos @gmail.com');
-      setIsLoading(false);
-      return;
-    }
 
     if (password.length < 6) {
       setError('La contraseña debe tener al menos 6 caracteres');
@@ -37,6 +32,7 @@ export default function Register() {
 
     if (result.success) {
       toast.success('Revisa tu correo electrónico para confirmar tu cuenta antes de iniciar sesión');
+      navigate('/login');
     } else {
       setError(result.error || 'Error al registrar');
     }
@@ -94,7 +90,7 @@ export default function Register() {
             </div>
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-text-secondary mb-1">
-                Correo Electrónico (@gmail.com)
+                Correo Electrónico
               </label>
               <input
                 id="email"
@@ -103,7 +99,7 @@ export default function Register() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="flex h-10 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-text ring-offset-bg placeholder:text-text-secondary transition-all duration-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary focus-visible:shadow-[0_0_15px_-3px_rgba(255,193,7,0.3)]"
-                placeholder="tu@gmail.com"
+                placeholder="tu@correo.com"
               />
             </div>
             <div>
@@ -122,9 +118,16 @@ export default function Register() {
             </div>
           </div>
 
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? 'Creando cuenta...' : 'Registrarse y Comenzar'}
-          </Button>
+          <div className="flex justify-center">
+            <Button type="submit" className="px-8" disabled={isLoading}>
+              {isLoading ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Creando cuenta...
+                </span>
+              ) : 'Registrarse y Comenzar'}
+            </Button>
+          </div>
         </form>
 
         <p className="text-center text-sm text-text-secondary">

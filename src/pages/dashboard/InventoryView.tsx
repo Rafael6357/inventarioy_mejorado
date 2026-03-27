@@ -32,8 +32,21 @@ export default function InventoryView() {
   const [isCustomCategory, setIsCustomCategory] = useState(false);
   const [customCategory, setCustomCategory] = useState('');
 
-  const existingCategories = Array.from(new Set(activeProducts.map(p => p.category).filter(Boolean)));
-  const allCategories = Array.from(new Set([...DEFAULT_CATEGORIES, ...existingCategories])).sort();
+  const normalizeStr = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  const existingCategories = Array.from(
+    new Set(
+      activeProducts
+        .map(p => p.category)
+        .filter(Boolean)
+        .map(c => normalizeStr(c))
+    )
+  );
+  const allCategories = Array.from(
+    new Set([
+      ...DEFAULT_CATEGORIES.map(c => normalizeStr(c)),
+      ...existingCategories
+    ])
+  ).sort().map(c => c.charAt(0).toUpperCase() + c.slice(1));
 
   const [newProduct, setNewProduct] = useState({
     name: '',
@@ -42,13 +55,11 @@ export default function InventoryView() {
     quantity: 0,
     price: 0,
     cost: 0,
-    stock_min: 0,
-    stock_max: 0,
+    rop: 0,
+    eoq: 0,
     expiration_date: '',
     description: '',
     is_individual: false,
-    eoq: 0,
-    rop: 0,
     lead_time: 0,
     order_cost: 0,
     holding_cost: 0,
@@ -59,7 +70,7 @@ export default function InventoryView() {
     product_id: '',
     quantity: 0,
     unit: 'unidades',
-    date: new Date().toISOString(),
+    date: new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16),
     cost: 0,
     reason: '',
     status: 'NORMAL' as 'NORMAL' | 'ANOMALIA' | 'JUSTIFICADO',
@@ -69,45 +80,64 @@ export default function InventoryView() {
     e.preventDefault();
     if (!user) return;
     
-    await addProduct({
-      ...newProduct,
-      is_active: true,
-    });
-    
-    setNewProduct({
-      name: '', category: '', unit: 'unidades', quantity: 0, price: 0, cost: 0,
-      stock_min: 0, stock_max: 0, expiration_date: '', description: '', is_individual: false,
-      eoq: 0, rop: 0, lead_time: 0, order_cost: 0, holding_cost: 0,
-    });
-    setIsCustomCategory(false);
-    toast.success('Producto agregado exitosamente');
+    try {
+      await addProduct({
+        ...newProduct,
+        is_active: true,
+      });
+      
+      setNewProduct({
+        name: '', category: '', unit: 'unidades', quantity: 0, price: 0, cost: 0,
+        rop: 0, eoq: 0, expiration_date: '', description: '', is_individual: false,
+        lead_time: 0, order_cost: 0, holding_cost: 0,
+      });
+      setIsCustomCategory(false);
+      toast.success('Producto agregado exitosamente');
+    } catch (error: any) {
+      if (error.message?.includes("ya existe")) {
+        toast.warning(error.message);
+      } else {
+        toast.error(error.message || 'Error al agregar producto');
+      }
+    }
+  };
+
+  const convertToUTC = (dateStr: string) => {
+    return new Date(dateStr).toISOString();
   };
 
   const handleAddMovement = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !movement.product_id) return;
 
-    const product = products.find(p => p.id === movement.product_id);
-    const isAnomaly = movement.type === 'SALIDA' && product && movement.quantity > (Number(product.quantity) * 0.5);
+    try {
+      const product = products.find(p => p.id === movement.product_id);
+      const isAnomaly = movement.type === 'SALIDA' && product && movement.quantity > (Number(product.quantity) * 0.5);
 
-    await addMovement({
-      ...movement,
-      quantity: Number(movement.quantity),
-      cost: Number(movement.cost) || (product ? Number(product.cost) : 0),
-      status: isAnomaly ? 'ANOMALIA' : 'NORMAL',
-    });
+      const movementData = {
+        ...movement,
+        quantity: Number(movement.quantity),
+        cost: Number(movement.cost),
+        status: isAnomaly ? 'ANOMALIA' : 'NORMAL',
+        date: convertToUTC(movement.date),
+      };
 
-    setMovement({
-      type: 'ENTRADA',
-      product_id: '',
-      quantity: 0,
-      unit: 'unidades',
-      date: new Date().toISOString(),
-      cost: 0,
-      reason: '',
-      status: 'NORMAL',
-    });
-    toast.success('Movimiento registrado exitosamente');
+      await addMovement(movementData);
+
+      setMovement({
+        type: 'ENTRADA',
+        product_id: '',
+        quantity: 0,
+        unit: 'unidades',
+        date: new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16),
+        cost: 0,
+        reason: '',
+        status: 'NORMAL',
+      });
+      toast.success('Movimiento registrado exitosamente');
+    } catch (error: any) {
+      toast.error(error.message || 'Error al registrar movimiento');
+    }
   };
 
   return (
@@ -205,19 +235,20 @@ export default function InventoryView() {
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="space-y-2">
-                <Label htmlFor="cost">Costo Unitario *</Label>
-                <Input id="cost" type="number" min="0" step="0.01" required value={newProduct.cost} onChange={e => setNewProduct({...newProduct, cost: Number(e.target.value)})} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="stock_min">Stock Mínimo *</Label>
-                <Input id="stock_min" type="number" min="0" step="0.01" required value={newProduct.stock_min} onChange={e => setNewProduct({...newProduct, stock_min: Number(e.target.value)})} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="stock_max">Stock Máximo *</Label>
-                <Input id="stock_max" type="number" min="0" step="0.01" required value={newProduct.stock_max} onChange={e => setNewProduct({...newProduct, stock_max: Number(e.target.value)})} />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="cost">Costo Unitario *</Label>
+              <Input 
+                id="cost" 
+                type="number" 
+                min="0.01" 
+                step="0.01" 
+                required 
+                value={newProduct.cost} 
+                onChange={e => {
+                  const val = Number(e.target.value);
+                  if (val >= 0) setNewProduct({...newProduct, cost: val});
+                }} 
+              />
             </div>
 
             <div className="space-y-2">
@@ -258,19 +289,19 @@ export default function InventoryView() {
                 className="flex items-center gap-2 text-sm font-medium text-primary hover:underline"
               >
                 <Settings2 className="h-4 w-4" />
-                {showAdvanced ? 'Ocultar Parámetros Avanzados' : 'Mostrar Parámetros Avanzados (EOQ, ROP)'}
+                {showAdvanced ? 'Ocultar Parámetros Avanzados' : 'Mostrar Parámetros Avanzados (ROP, EOQ)'}
               </button>
             </div>
 
             {showAdvanced && (
               <div className="grid gap-4 rounded-lg border border-border bg-bg/50 p-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="eoq" className="text-xs">EOQ (Cant. Económica)</Label>
-                  <Input id="eoq" type="number" min="0" value={newProduct.eoq} onChange={e => setNewProduct({...newProduct, eoq: Number(e.target.value)})} />
+                  <Label htmlFor="rop" className="text-xs">ROP (Punto de Reorden)</Label>
+                  <Input id="rop" type="number" min="0" value={newProduct.rop} onChange={e => setNewProduct({...newProduct, rop: Number(e.target.value)})} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="rop" className="text-xs">ROP (Punto Reorden)</Label>
-                  <Input id="rop" type="number" min="0" value={newProduct.rop} onChange={e => setNewProduct({...newProduct, rop: Number(e.target.value)})} />
+                  <Label htmlFor="eoq" className="text-xs">EOQ (Cant. Económica)</Label>
+                  <Input id="eoq" type="number" min="0" value={newProduct.eoq} onChange={e => setNewProduct({...newProduct, eoq: Number(e.target.value)})} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="lead_time" className="text-xs">Lead Time (días)</Label>
@@ -283,7 +314,7 @@ export default function InventoryView() {
               </div>
             )}
 
-            <Button type="submit" className="w-full mt-6">
+            <Button type="submit" className="mt-6 px-8">
               Agregar Producto
             </Button>
           </form>
@@ -321,26 +352,40 @@ export default function InventoryView() {
                 value={movement.product_id}
                 onChange={e => {
                   const prod = products.find(p => p.id === e.target.value);
+                  const availableStock = prod ? Number(prod.quantity) - (Number(prod.in_transit) || 0) : 0;
                   setMovement({
                     ...movement, 
                     product_id: e.target.value,
-                    unit: prod ? prod.unit : 'unidades'
+                    unit: prod ? prod.unit : 'unidades',
+                    cost: prod ? Number(prod.cost) : 0,
                   });
                 }}
               >
                 <option value="">Seleccione un producto...</option>
-                {activeProducts.map(p => (
-                  <option key={p.id} value={p.id}>{p.name} (Stock: {p.quantity} {p.unit})</option>
-                ))}
+                {activeProducts.map(p => {
+                  const availableStock = Number(p.quantity) - (Number(p.in_transit) || 0);
+                  return (
+                    <option key={p.id} value={p.id}>{p.name} (Stock: {availableStock} {p.unit})</option>
+                  );
+                })}
               </select>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="mov_qty">Cantidad *</Label>
-                <div className="relative">
-                  <Input id="mov_qty" type="number" min="0.01" step="0.01" required value={movement.quantity} onChange={e => setMovement({...movement, quantity: Number(e.target.value)})} />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-text-secondary">
+                <div className="relative flex items-center gap-2">
+                  <Input 
+                    id="mov_qty" 
+                    type="number" 
+                    min="0.01" 
+                    step="0.01" 
+                    required 
+                    value={movement.quantity} 
+                    onChange={e => setMovement({...movement, quantity: Number(e.target.value)})} 
+                    className="no-spin pr-14"
+                  />
+                  <span className="absolute right-3 text-xs text-text-secondary whitespace-nowrap">
                     {movement.unit}
                   </span>
                 </div>
@@ -351,10 +396,12 @@ export default function InventoryView() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="mov_cost">Costo Total del Movimiento (Opcional)</Label>
-              <Input id="mov_cost" type="number" min="0" step="0.01" value={movement.cost} onChange={e => setMovement({...movement, cost: Number(e.target.value)})} />
-            </div>
+            {movement.type === 'ENTRADA' && (
+              <div className="space-y-2">
+                <Label htmlFor="mov_cost">Costo Unitario *</Label>
+                <Input id="mov_cost" type="number" min="0" step="0.01" required value={movement.cost} onChange={e => setMovement({...movement, cost: Number(e.target.value)})} />
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="mov_reason">Razón / Motivo (Opcional)</Label>
@@ -370,10 +417,10 @@ export default function InventoryView() {
 
             <Button 
               type="submit" 
-              className="w-full mt-6"
-              variant={movement.type === 'ENTRADA' ? 'default' : movement.type === 'SALIDA' ? 'secondary' : 'destructive'}
+              className="mt-6 px-8"
+              variant={movement.type === 'MERMA' ? 'destructive' : 'default'}
             >
-              Registrar {movement.type}
+              Registrar {movement.type.charAt(0) + movement.type.slice(1).toLowerCase()}
             </Button>
           </form>
         </div>

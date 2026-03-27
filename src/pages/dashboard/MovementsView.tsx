@@ -25,30 +25,33 @@ export default function MovementsView() {
   const getProductName = (id: string) => products.find(p => p.id === id)?.name || 'Producto Eliminado';
 
   const filteredMovements = useMemo(() => {
-    // Group movements by product to calculate running balance
-    const productBalances: Record<string, number> = {};
-    
-    // Initialize balances with current stock
-    products.forEach(p => {
-      productBalances[p.id] = p.quantity;
-    });
+    // Paso 1: Ordenar del más antiguo al más reciente para calcular el balance acumulativo
+    const sortedMovements = [...movements].sort((a, b) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
 
-    // Sort all movements by date descending (newest first)
-    const sortedAllMovements = [...movements].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    
-    const movementsWithBal = sortedAllMovements.map(m => {
-      const balanceAfter = productBalances[m.product_id] || 0;
+    const productBalances: Record<string, number> = {};
+
+    const movementsWithBal = sortedMovements.map(m => {
+      const prevBalance = productBalances[m.product_id] || 0;
+      let currentBalance = prevBalance;
       
-      // Calculate balance before this movement to use for the next older movement
-      const qty = m.type === 'ENTRADA' ? m.quantity : -m.quantity;
-      productBalances[m.product_id] = balanceAfter - qty;
+      if (m.type === 'ENTRADA') {
+        currentBalance += m.quantity;
+      } else {
+        // SALIDA o MERMA: restan del stock
+        currentBalance -= m.quantity;
+      }
+      
+      productBalances[m.product_id] = currentBalance;
       
       return {
         ...m,
-        balance: balanceAfter
+        balance: currentBalance
       };
     });
 
+    // Paso 2: Aplicar filtros
     return movementsWithBal
       .filter(m => {
         const isNotSale = !m.reason?.startsWith('Venta');
@@ -66,7 +69,8 @@ export default function MovementsView() {
         }
         
         return isNotSale && matchesSearch && matchesType && matchesDate;
-      });
+      })
+      .reverse(); // Mostrar los más recientes primero en la tabla
   }, [movements, searchTerm, typeFilter, startDate, endDate, products]);
 
   return (
@@ -164,7 +168,14 @@ export default function MovementsView() {
                   return (
                     <tr key={movement.id} className="transition-colors hover:bg-surface-hover">
                       <td className="px-4 py-3 whitespace-nowrap text-text-secondary">
-                        {new Date(movement.date).toLocaleString()}
+                        {new Date(movement.date).toLocaleString('es-ES', { 
+                          year: 'numeric', 
+                          month: '2-digit', 
+                          day: '2-digit', 
+                          hour: '2-digit', 
+                          minute: '2-digit',
+                          hour12: false 
+                        })}
                       </td>
                       <td className="px-4 py-3 font-medium">{getProductName(movement.product_id)}</td>
                       <td className="px-4 py-3">

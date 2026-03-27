@@ -11,17 +11,16 @@ export interface Product {
   unit: string;
   price: number;
   cost: number;
-  stock_min: number;
-  stock_max: number;
+  rop: number;
+  eoq: number;
+  lead_time?: number;
+  order_cost?: number;
+  holding_cost?: number;
   expiration_date?: string;
   description?: string;
   is_individual: boolean;
   is_active: boolean;
-  eoq?: number;
-  rop?: number;
-  lead_time?: number;
-  order_cost?: number;
-  holding_cost?: number;
+  in_transit?: number;
   created_at: string;
   updated_at: string;
 }
@@ -36,9 +35,21 @@ export interface Movement {
   date: string;
   cost: number;
   reason?: string;
-  status: 'NORMAL' | 'ANOMALIA' | 'JUSTIFICADO';
+  status?: string;
   justification?: string;
   justification_date?: string;
+  created_at: string;
+}
+
+export interface TransitItem {
+  id: string;
+  user_id: string;
+  product_id: string;
+  quantity: number;
+  consumed: number;
+  remaining: number;
+  reason?: string;
+  sent_date: string;
   created_at: string;
 }
 
@@ -101,6 +112,46 @@ export interface Category {
   created_at: string;
 }
 
+export interface DailyClosing {
+  id: string;
+  user_id: string;
+  closing_date: string;
+  total_sales: number;
+  total_discounts: number;
+  total_refunds: number;
+  closing_amount: number;
+  notes?: string;
+  created_by?: string;
+  created_by_name?: string;
+  created_at: string;
+}
+
+export interface HRDocument {
+  id: string;
+  user_id: string;
+  name: string;
+  doc_type: 'MANUAL' | 'REGLAMENTO' | 'PNO';
+  file_url: string;
+  file_name: string;
+  file_size?: number;
+  created_at: string;
+}
+
+export interface EmployeeDocument {
+  id: string;
+  user_id: string;
+  employee_id: string;
+  name: string;
+  doc_type: 'CONTRATO' | 'IDENTIFICACION' | 'OTRO';
+  file_url: string;
+  file_name: string;
+  file_size?: number;
+  created_at: string;
+}
+
+const capitalize = (str: string) =>
+  str.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+
 interface DatabaseState {
   products: Product[];
   movements: Movement[];
@@ -108,6 +159,10 @@ interface DatabaseState {
   recipes: Recipe[];
   employees: Employee[];
   categories: Category[];
+  transitItems: TransitItem[];
+  dailyClosings: DailyClosing[];
+  hrDocuments: HRDocument[];
+  employeeDocuments: EmployeeDocument[];
   isLoading: boolean;
 
   fetchAll: () => Promise<void>;
@@ -118,7 +173,10 @@ interface DatabaseState {
   addMovement: (movement: Omit<Movement, 'id' | 'user_id' | 'created_at'>) => Promise<void>;
   justifyMovement: (id: string, justification: string) => Promise<void>;
   
-  addSale: (sale: Omit<Sale, 'id' | 'user_id' | 'created_at'>) => Promise<void>;
+  consumeFromTransit: (productId: string, quantity: number, reason?: string) => Promise<{ success: boolean; error?: string }>;
+  cancelTransit: (transitItemId: string, quantity: number, reason: string) => Promise<{ success: boolean; error?: string }>;
+  
+  addSale: (sale: Omit<Sale, 'id' | 'user_id' | 'created_at'>) => Promise<{ success: boolean; error?: string }>;
   
   addRecipe: (recipe: Omit<Recipe, 'id' | 'user_id' | 'created_at'>) => Promise<void>;
   updateRecipe: (id: string, updates: Partial<Recipe>) => Promise<void>;
@@ -132,6 +190,16 @@ interface DatabaseState {
   deleteCategory: (id: string) => Promise<void>;
 
   recalculateStock: () => Promise<void>;
+  createDailyClosing: (closing: Omit<DailyClosing, 'id' | 'created_at'>) => Promise<{ success: boolean; error?: string }>;
+  getDailyClosings: () => Promise<void>;
+
+  uploadHRDocument: (file: File, docType: 'MANUAL' | 'REGLAMENTO' | 'PNO') => Promise<{ success: boolean; error?: string }>;
+  fetchHRDocuments: () => Promise<void>;
+  deleteHRDocument: (id: string, fileUrl: string) => Promise<void>;
+
+  uploadEmployeeDocument: (file: File, employeeId: string, docType: 'CONTRATO' | 'IDENTIFICACION' | 'OTRO', name?: string) => Promise<{ success: boolean; error?: string }>;
+  fetchEmployeeDocuments: (employeeId: string) => Promise<void>;
+  deleteEmployeeDocument: (id: string, fileUrl: string) => Promise<void>;
 }
 
 export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
@@ -141,24 +209,31 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
   recipes: [],
   employees: [],
   categories: [],
+  transitItems: [],
+  dailyClosings: [],
+  hrDocuments: [],
+  employeeDocuments: [],
   isLoading: true,
 
   fetchAll: async () => {
     const user = useAuthStore.getState().user;
     if (!user) {
-      set({ products: [], movements: [], sales: [], recipes: [], employees: [], categories: [], isLoading: false });
+      set({ products: [], movements: [], sales: [], recipes: [], employees: [], categories: [], transitItems: [], dailyClosings: [], hrDocuments: [], employeeDocuments: [], isLoading: false });
       return;
     }
 
     set({ isLoading: true });
 
-    const [productsRes, movementsRes, salesRes, recipesRes, employeesRes, categoriesRes] = await Promise.all([
+    const [productsRes, movementsRes, salesRes, recipesRes, employeesRes, categoriesRes, transitRes, dailyClosingsRes, hrDocsRes] = await Promise.all([
       supabase.from('products').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
       supabase.from('movements').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-      supabase.from('sales').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+      supabase.from('sales').select('*, sale_items(*)').eq('user_id', user.id).order('created_at', { ascending: false }),
       supabase.from('recipes').select('*, recipe_ingredients(*)').eq('user_id', user.id).order('created_at', { ascending: false }),
       supabase.from('employees').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
       supabase.from('categories').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+      supabase.from('transit_items').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+      supabase.from('daily_closings').select('*').eq('user_id', user.id).order('closing_date', { ascending: false }),
+      supabase.from('hr_documents').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
     ]);
 
     const recipes = recipesRes.data?.map(r => ({
@@ -166,44 +241,100 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       ingredients: r.recipe_ingredients || [],
     })) || [];
 
+    const sales = salesRes.data?.map(s => ({
+      ...s,
+      items: s.sale_items || [],
+    })) || [];
+
+    const transitItems = (transitRes.data || []).filter(t => t.remaining > 0);
+
     set({
       products: productsRes.data || [],
       movements: movementsRes.data || [],
-      sales: salesRes.data || [],
+      sales,
       recipes,
       employees: employeesRes.data || [],
       categories: categoriesRes.data || [],
+      transitItems,
+      dailyClosings: dailyClosingsRes.data || [],
+      hrDocuments: hrDocsRes.data || [],
       isLoading: false,
     });
   },
 
   addProduct: async (product) => {
-    const user = useAuthStore.getState().user;
+    const { user } = useAuthStore.getState();
     if (!user) return;
+
+    const normalizeString = (str: string) =>
+      str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
+    const isDuplicate = get().products.some(
+      p => normalizeString(p.name) === normalizeString(product.name) && p.is_active !== false
+    );
+
+    if (isDuplicate) {
+      throw new Error(`¡Ups! El producto "${product.name}" ya existe. Intenta con otro nombre.`);
+    }
+
+    const productData = {
+      ...product,
+      name: capitalize(product.name),
+      category: capitalize(product.category),
+      user_id: user.id,
+      expiration_date: product.expiration_date || null,
+    };
 
     const { data, error } = await supabase
       .from('products')
-      .insert({ ...product, user_id: user.id })
+      .insert(productData)
       .select()
       .single();
 
     if (error) {
-      console.error('Error adding product:', error);
-      return;
+      if (import.meta.env.DEV) console.error('Error adding product:', error);
+      throw new Error('Este producto ya existe');
+    }
+
+    // Crear movimiento inicial si hay cantidad > 0
+    if (Number(product.quantity) > 0) {
+      const { error: movementError } = await supabase
+        .from('movements')
+        .insert({
+          user_id: user.id,
+          product_id: data.id,
+          type: 'ENTRADA',
+          quantity: Number(product.quantity),
+          unit: product.unit,
+          date: new Date().toISOString(),
+          cost: Number(product.cost),
+          reason: 'Stock inicial (Registro de producto)',
+          status: 'NORMAL',
+        });
+
+      if (movementError && import.meta.env.DEV) {
+        console.error('Error creating initial movement:', movementError);
+      }
     }
 
     set((state) => ({ products: [data, ...state.products] }));
+    await get().fetchAll(); // Refrescar todo para asegurar consistencia
   },
 
   updateProduct: async (id, updates) => {
+    const capitalizedUpdates = {
+      ...updates,
+      ...(updates.name !== undefined && { name: capitalize(updates.name) }),
+      ...(updates.category !== undefined && { category: capitalize(updates.category) }),
+      updated_at: new Date().toISOString(),
+    };
     const { error } = await supabase
       .from('products')
-      .update({ ...updates, updated_at: new Date().toISOString() })
+      .update(capitalizedUpdates)
       .eq('id', id);
 
     if (error) {
-      console.error('Error updating product:', error);
-      return;
+      throw new Error('No se pudo actualizar el producto');
     }
 
     set((state) => ({
@@ -218,8 +349,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       .eq('id', id);
 
     if (error) {
-      console.error('Error deleting product:', error);
-      return;
+      throw new Error('No se pudo eliminar el producto');
     }
 
     set((state) => ({
@@ -234,53 +364,71 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
-    let status = movement.status || 'NORMAL';
-    
-    if ((movement.type === 'SALIDA' || movement.type === 'MERMA') && status === 'NORMAL') {
-      const previousOutputs = get().movements.filter(
-        m => m.product_id === movement.product_id && (m.type === 'SALIDA' || m.type === 'MERMA')
-      );
-      
-      if (previousOutputs.length > 0) {
-        const totalOutput = previousOutputs.reduce((sum, m) => sum + Number(m.quantity), 0);
-        const averageOutput = totalOutput / previousOutputs.length;
-        
-        if (Number(movement.quantity) > averageOutput * 1.5) {
-          status = 'ANOMALIA';
-        }
-      }
-    }
+    // Usar la fecha tal cual viene del frontend (ya en formato local)
+    const movementDate = movement.date || new Date().toISOString();
 
     const { data: newMovement, error: movementError } = await supabase
       .from('movements')
-      .insert({ ...movement, user_id: user.id, status })
+      .insert({ ...movement, user_id: user.id, date: movementDate })
       .select()
       .single();
 
     if (movementError) {
-      console.error('Error adding movement:', movementError);
-      return;
+      throw new Error('No se pudo registrar el movimiento');
     }
 
     const product = get().products.find(p => p.id === movement.product_id);
     if (!product) return;
 
     let newQuantity = Number(product.quantity);
+    let newInTransit = Number(product.in_transit) || 0;
     let newCost = Number(product.cost);
 
     if (movement.type === 'ENTRADA') {
+      const unitCost = Number(movement.cost) || Number(product.cost);
       const currentTotalValue = Number(product.quantity) * Number(product.cost);
-      const newTotalValue = Number(movement.quantity) * Number(movement.cost);
+      const newTotalValue = Number(movement.quantity) * unitCost;
       newQuantity = Number(product.quantity) + Number(movement.quantity);
       
       if (newQuantity > 0) {
         newCost = (currentTotalValue + newTotalValue) / newQuantity;
       }
-    } else {
-      newQuantity = Number(product.quantity) - Number(movement.quantity);
-    }
+      
+      await get().updateProduct(movement.product_id, { quantity: newQuantity, cost: newCost });
+    } else if (movement.type === 'SALIDA') {
+      // SALIDA (Tránsito): El stock TOTAL no cambia (el producto sigue en el local).
+      // Solo aumenta el contador de tránsito para que el "Disponible" baje.
+      newInTransit = newInTransit + Number(movement.quantity);
+      
+      await get().updateProduct(movement.product_id, { in_transit: newInTransit });
+      
+      const { data: newTransitItem, error: transitError } = await supabase
+        .from('transit_items')
+        .insert({
+          user_id: user.id,
+          product_id: movement.product_id,
+          quantity: Number(movement.quantity),
+          consumed: 0,
+          remaining: Number(movement.quantity),
+          reason: movement.reason || 'Enviado a cocina/preparacion',
+          sent_date: movementDate,
+        })
+        .select()
+        .single();
 
-    await get().updateProduct(movement.product_id, { quantity: newQuantity, cost: newCost });
+      if (!transitError && newTransitItem) {
+        set((state) => ({ 
+          transitItems: [newTransitItem, ...state.transitItems],
+          products: state.products.map(p => 
+            p.id === movement.product_id ? { ...p, in_transit: newInTransit } : p
+          ),
+        }));
+      }
+    } else if (movement.type === 'MERMA') {
+      newQuantity = Number(product.quantity) - Number(movement.quantity);
+      
+      await get().updateProduct(movement.product_id, { quantity: newQuantity });
+    }
 
     set((state) => ({ movements: [newMovement, ...state.movements] }));
   },
@@ -296,8 +444,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       .eq('id', id);
 
     if (error) {
-      console.error('Error justifying movement:', error);
-      return;
+      throw new Error('No se pudo justificar el movimiento');
     }
 
     set((state) => ({
@@ -309,7 +456,49 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
 
   addSale: async (sale) => {
     const user = useAuthStore.getState().user;
-    if (!user) return;
+    if (!user) return { success: false, error: 'No hay usuario autenticado' };
+
+    const itemsToConsume: { productId: string; name: string; qtyNeeded: number; qtyAvailable: number }[] = [];
+
+    for (const item of sale.items) {
+      if (!item.is_recipe) {
+        const transitAvailable = get().transitItems
+          .filter(t => t.product_id === item.product_id)
+          .reduce((sum, t) => sum + t.remaining, 0);
+        
+        const productName = get().products.find(p => p.id === item.product_id)?.name || 'producto';
+        
+        if (transitAvailable < item.quantity) {
+          return { 
+            success: false, 
+            error: `No hay suficiente "${productName}" en transito. Necesitas: ${item.quantity}, Disponible: ${transitAvailable}` 
+          };
+        }
+        itemsToConsume.push({ productId: item.product_id, name: productName, qtyNeeded: item.quantity, qtyAvailable: transitAvailable });
+      } else if (item.is_recipe && item.recipe_snapshot) {
+        for (const ing of item.recipe_snapshot.ingredients) {
+          const transitAvailable = get().transitItems
+            .filter(t => t.product_id === ing.product_id)
+            .reduce((sum, t) => sum + t.remaining, 0);
+          const needed = ing.quantity * item.quantity;
+          
+          const ingProductName = get().products.find(p => p.id === ing.product_id)?.name || 'ingrediente';
+          
+          if (transitAvailable < needed) {
+            return { 
+              success: false, 
+              error: `No hay suficiente "${ingProductName}" en transito para la receta "${item.recipe_snapshot?.name}". Necesitas: ${needed}, Disponible: ${transitAvailable}` 
+            };
+          }
+          const existing = itemsToConsume.find(i => i.productId === ing.product_id);
+          if (existing) {
+            existing.qtyNeeded += needed;
+          } else {
+            itemsToConsume.push({ productId: ing.product_id, name: ingProductName, qtyNeeded: needed, qtyAvailable: transitAvailable });
+          }
+        }
+      }
+    }
 
     const { data: newSale, error: saleError } = await supabase
       .from('sales')
@@ -325,10 +514,10 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       .select()
       .single();
 
-    if (saleError) {
-      console.error('Error adding sale:', saleError);
-      return;
-    }
+      if (saleError) {
+        if (import.meta.env.DEV) console.error('Error adding sale:', saleError);
+        return { success: false, error: 'Error al registrar la venta' };
+      }
 
     const saleItems = sale.items.map(item => ({
       sale_id: newSale.id,
@@ -344,39 +533,183 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     await supabase.from('sale_items').insert(saleItems);
 
     for (const item of sale.items) {
-      const product = get().products.find(p => p.id === item.product_id);
-      
-      if (product && !item.is_recipe) {
-        await get().addMovement({
-          product_id: product.id,
-          type: 'SALIDA',
-          quantity: item.quantity,
-          unit: product.unit,
-          date: sale.date,
-          cost: product.cost,
-          reason: `Venta ${sale.sale_type === 'DOMICILIO' ? 'a domicilio' : 'en salón'}`,
-          status: 'NORMAL',
-        });
+      if (!item.is_recipe) {
+        await get().consumeFromTransit(item.product_id, item.quantity, `Venta #${newSale.id.slice(0, 8)}`);
       } else if (item.is_recipe && item.recipe_snapshot) {
         for (const ing of item.recipe_snapshot.ingredients) {
-          const ingProduct = get().products.find(p => p.id === ing.product_id);
-          if (ingProduct) {
-            await get().addMovement({
-              product_id: ing.product_id,
-              type: 'SALIDA',
-              quantity: ing.quantity * item.quantity,
-              unit: ingProduct.unit,
-              date: sale.date,
-              cost: ingProduct.cost,
-              reason: `Venta de receta: ${item.recipe_snapshot?.name}`,
-              status: 'NORMAL',
-            });
-          }
+          await get().consumeFromTransit(ing.product_id, ing.quantity * item.quantity, `Venta #${newSale.id.slice(0, 8)} (Receta: ${item.recipe_snapshot.name})`);
         }
       }
     }
 
-    set((state) => ({ sales: [newSale, ...state.sales] }));
+    const saleWithItems = { ...newSale, items: saleItems };
+    set((state) => ({ sales: [saleWithItems, ...state.sales] }));
+    return { success: true };
+  },
+
+  consumeFromTransit: async (productId: string, qtyNeeded: number, reason?: string) => {
+    const user = useAuthStore.getState().user;
+    if (!user) return { success: false, error: 'No hay usuario autenticado' };
+
+    const product = get().products.find(p => p.id === productId);
+    if (!product) return { success: false, error: 'Producto no encontrado' };
+
+    let remaining = qtyNeeded;
+    const transitItemsForProduct = get().transitItems
+      .filter(t => t.product_id === productId && t.remaining > 0)
+      .sort((a, b) => new Date(a.sent_date).getTime() - new Date(b.sent_date).getTime());
+
+    const updatedItems: { id: string; newRemaining: number; newConsumed: number }[] = [];
+
+    for (const item of transitItemsForProduct) {
+      if (remaining <= 0) break;
+
+      const toConsume = Math.min(item.remaining, remaining);
+      const newRemaining = item.remaining - toConsume;
+      const newConsumed = item.consumed + toConsume;
+      remaining -= toConsume;
+
+      const { error } = await supabase
+        .from('transit_items')
+        .update({ remaining: newRemaining, consumed: newConsumed, updated_at: new Date().toISOString() })
+        .eq('id', item.id);
+
+      if (error) {
+        throw new Error('No se pudo actualizar el item en tránsito');
+      }
+      updatedItems.push({ id: item.id, newRemaining, newConsumed });
+    }
+
+    if (remaining > 0) {
+      return { success: false, error: 'No habia suficiente cantidad en transito' };
+    }
+
+    const newTotalInTransit = updatedItems.reduce((sum, u) => sum + u.newRemaining, 0);
+    const newQuantity = Number(product.quantity) - qtyNeeded;
+
+    // Registrar el movimiento de SALIDA en el Kárdex para la venta
+    const { data: newMovement, error: movementError } = await supabase
+      .from('movements')
+      .insert({
+        user_id: user.id,
+        product_id: productId,
+        type: 'SALIDA',
+        quantity: qtyNeeded,
+        unit: product.unit,
+        date: new Date().toISOString(),
+        cost: Number(product.cost),
+        reason: reason || 'Venta de producto/ingrediente',
+        status: 'NORMAL'
+      })
+      .select()
+      .single();
+
+    if (movementError && import.meta.env.DEV) {
+      console.error('Error recording sale movement:', movementError);
+    }
+
+    const { error: productError } = await supabase
+      .from('products')
+      .update({ 
+        in_transit: newTotalInTransit,
+        quantity: newQuantity,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', productId);
+
+    if (productError) {
+      throw new Error('No se pudo actualizar el tránsito del producto');
+    }
+
+    set((state) => {
+      const updatedTransitItems = state.transitItems
+        .map(t => {
+          const updated = updatedItems.find(u => u.id === t.id);
+          if (updated) {
+            return { ...t, remaining: updated.newRemaining, consumed: updated.newConsumed };
+          }
+          return t;
+        })
+        .filter(t => t.remaining > 0);
+
+      const movements = newMovement ? [newMovement, ...state.movements] : state.movements;
+
+      return {
+        transitItems: updatedTransitItems,
+        movements,
+        products: state.products.map(p => 
+          p.id === productId ? { ...p, in_transit: newTotalInTransit, quantity: newQuantity } : p
+        ),
+      };
+    });
+
+    return { success: true };
+  },
+
+  cancelTransit: async (transitItemId: string, quantity: number, reason: string) => {
+    const user = useAuthStore.getState().user;
+    if (!user) return { success: false, error: 'No autenticado' };
+
+    const transitItem = get().transitItems.find(t => t.id === transitItemId);
+    if (!transitItem) return { success: false, error: 'Item no encontrado' };
+
+    if (quantity <= 0) return { success: false, error: 'La cantidad debe ser mayor a 0' };
+    if (quantity > transitItem.remaining) {
+      return { success: false, error: `La cantidad no puede exceder ${transitItem.remaining}` };
+    }
+
+    const product = get().products.find(p => p.id === transitItem.product_id);
+    if (!product) return { success: false, error: 'Producto no encontrado' };
+
+    const { error: updateError } = await supabase
+      .from('transit_items')
+      .update({ remaining: 0, consumed: transitItem.quantity })
+      .eq('id', transitItemId);
+
+    if (updateError) {
+      return { success: false, error: 'No se pudo actualizar el item en tránsito' };
+    }
+
+    const newInTransit = Math.max(0, Number(product.in_transit || 0) - quantity);
+
+    const { error: productUpdateError } = await supabase
+      .from('products')
+      .update({ in_transit: newInTransit })
+      .eq('id', product.id);
+
+    if (productUpdateError) {
+      await supabase.from('transit_items').update({ remaining: transitItem.remaining }).eq('id', transitItemId);
+      return { success: false, error: 'No se pudo devolver al stock' };
+    }
+
+    const { error: movementError } = await supabase
+      .from('movements')
+      .insert({
+        user_id: user.id,
+        product_id: product.id,
+        type: 'ENTRADA',
+        quantity,
+        unit: product.unit,
+        date: new Date().toISOString(),
+        cost: Number(product.cost),
+        reason: `Devolución de tránsito: ${reason}`,
+        status: 'NORMAL',
+      });
+
+    if (movementError) {
+      if (import.meta.env.DEV) console.error('Error registering return movement:', movementError);
+    }
+
+    set((state) => ({
+      transitItems: state.transitItems.filter(t => t.id !== transitItemId),
+      products: state.products.map(p =>
+        p.id === product.id
+          ? { ...p, in_transit: newInTransit }
+          : p
+      ),
+    }));
+
+    return { success: true };
   },
 
   addRecipe: async (recipe) => {
@@ -387,15 +720,14 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       .from('recipes')
       .insert({ 
         user_id: user.id, 
-        name: recipe.name, 
+        name: capitalize(recipe.name), 
         selling_price: recipe.selling_price 
       })
       .select()
       .single();
 
     if (error) {
-      console.error('Error adding recipe:', error);
-      return;
+      throw new Error('No se pudo crear la receta');
     }
 
     if (recipe.ingredients.length > 0) {
@@ -417,12 +749,11 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
   updateRecipe: async (id, updates) => {
     const { error } = await supabase
       .from('recipes')
-      .update({ name: updates.name, selling_price: updates.selling_price })
+      .update({ name: capitalize(updates.name), selling_price: updates.selling_price })
       .eq('id', id);
 
     if (error) {
-      console.error('Error updating recipe:', error);
-      return;
+      throw new Error('No se pudo actualizar la receta');
     }
 
     if (updates.ingredients) {
@@ -449,8 +780,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const { error } = await supabase.from('recipes').delete().eq('id', id);
 
     if (error) {
-      console.error('Error deleting recipe:', error);
-      return;
+      throw new Error('No se pudo eliminar la receta');
     }
 
     set((state) => ({ recipes: state.recipes.filter(r => r.id !== id) }));
@@ -462,24 +792,26 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
 
     const { data, error } = await supabase
       .from('employees')
-      .insert({ ...employee, user_id: user.id })
+      .insert({ ...employee, name: capitalize(employee.name), user_id: user.id })
       .select()
       .single();
 
     if (error) {
-      console.error('Error adding employee:', error);
-      return;
+      throw new Error('No se pudo agregar el empleado');
     }
 
     set((state) => ({ employees: [data, ...state.employees] }));
   },
 
   updateEmployee: async (id, updates) => {
-    const { error } = await supabase.from('employees').update(updates).eq('id', id);
+    const capitalizedUpdates = {
+      ...updates,
+      ...(updates.name !== undefined && { name: capitalize(updates.name) }),
+    };
+    const { error } = await supabase.from('employees').update(capitalizedUpdates).eq('id', id);
 
     if (error) {
-      console.error('Error updating employee:', error);
-      return;
+      throw new Error('No se pudo actualizar el empleado');
     }
 
     set((state) => ({
@@ -491,8 +823,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const { error } = await supabase.from('employees').delete().eq('id', id);
 
     if (error) {
-      console.error('Error deleting employee:', error);
-      return;
+      throw new Error('No se pudo eliminar el empleado');
     }
 
     set((state) => ({ employees: state.employees.filter(e => e.id !== id) }));
@@ -504,13 +835,12 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
 
     const { data, error } = await supabase
       .from('categories')
-      .insert({ user_id: user.id, name })
+      .insert({ user_id: user.id, name: capitalize(name) })
       .select()
       .single();
 
     if (error) {
-      console.error('Error adding category:', error);
-      return;
+      throw new Error('No se pudo agregar la categoría');
     }
 
     set((state) => ({ categories: [data, ...state.categories] }));
@@ -520,14 +850,239 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const { error } = await supabase.from('categories').delete().eq('id', id);
 
     if (error) {
-      console.error('Error deleting category:', error);
-      return;
+      throw new Error('No se pudo eliminar la categoría');
     }
 
     set((state) => ({ categories: state.categories.filter(c => c.id !== id) }));
   },
 
+  getDailyClosings: async () => {
+    const user = useAuthStore.getState().user;
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('daily_closings')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('closing_date', { ascending: false });
+
+    if (error) {
+      throw new Error('No se pudieron cargar los cierres de caja');
+    }
+
+    set({ dailyClosings: data || [] });
+  },
+
+  createDailyClosing: async (closing) => {
+    const user = useAuthStore.getState().user;
+    if (!user) return { success: false, error: 'No autenticado' };
+
+    const { data, error } = await supabase
+      .from('daily_closings')
+      .insert({ ...closing, user_id: user.id })
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === '23505') {
+        return { success: false, error: 'Ya existe un cierre para esta fecha' };
+      }
+      throw new Error('No se pudo registrar el cierre de caja');
+    }
+
+    set((state) => ({ dailyClosings: [data, ...state.dailyClosings] }));
+    return { success: true };
+  },
+
   recalculateStock: async () => {
+    const user = useAuthStore.getState().user;
+    if (!user) return;
+
+    const { data: movements } = await supabase
+      .from('movements')
+      .select('*')
+      .eq('user_id', user.id);
+
+    const { data: products } = await supabase
+      .from('products')
+      .select('*')
+      .eq('user_id', user.id);
+
+    if (!movements || !products) return;
+
+    for (const product of products) {
+      let calculatedQty = 0;
+      movements
+        .filter(m => m.product_id === product.id)
+        .forEach(m => {
+          if (m.type === 'ENTRADA') {
+            calculatedQty += Number(m.quantity);
+          } else {
+            calculatedQty -= Number(m.quantity);
+          }
+        });
+
+      await supabase
+        .from('products')
+        .update({ quantity: Math.max(0, calculatedQty), updated_at: new Date().toISOString() })
+        .eq('id', product.id);
+    }
+
     await get().fetchAll();
+  },
+
+  uploadHRDocument: async (file: File, docType: 'MANUAL' | 'REGLAMENTO' | 'PNO') => {
+    const user = useAuthStore.getState().user;
+    if (!user) return { success: false, error: 'No autenticado' };
+
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${user.id}/${docType}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+    const filePath = `hr-documents/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('hr-documents')
+      .upload(filePath, file, { upsert: false });
+
+    if (uploadError) {
+      return { success: false, error: 'Error al subir el archivo: ' + uploadError.message };
+    }
+
+    const { data: urlData } = supabase.storage.from('hr-documents').getPublicUrl(filePath);
+
+    const docName = file.name.replace(`.${fileExt}`, '').replace(/_/g, ' ').replace(/[.-]/g, ' ');
+
+    const { error: dbError } = await supabase
+      .from('hr_documents')
+      .insert({
+        user_id: user.id,
+        name: docName,
+        doc_type: docType,
+        file_url: urlData.publicUrl,
+        file_name: file.name,
+        file_size: file.size,
+      });
+
+    if (dbError) {
+      await supabase.storage.from('hr-documents').remove([filePath]);
+      return { success: false, error: 'Error al guardar el registro: ' + dbError.message };
+    }
+
+    await get().fetchHRDocuments();
+    return { success: true };
+  },
+
+  fetchHRDocuments: async () => {
+    const user = useAuthStore.getState().user;
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('hr_documents')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      throw new Error('No se pudieron cargar los documentos');
+    }
+
+    set({ hrDocuments: data || [] });
+  },
+
+  deleteHRDocument: async (id: string, fileUrl: string) => {
+    const { error: dbError } = await supabase
+      .from('hr_documents')
+      .delete()
+      .eq('id', id);
+
+    if (dbError) {
+      throw new Error('No se pudo eliminar el registro');
+    }
+
+    const filePath = fileUrl.split('/hr-documents/')[1];
+    if (filePath) {
+      await supabase.storage.from('hr-documents').remove([`${filePath}`]);
+    }
+
+    set((state) => ({
+      hrDocuments: state.hrDocuments.filter((d) => d.id !== id),
+    }));
+  },
+
+  uploadEmployeeDocument: async (file: File, employeeId: string, docType: 'CONTRATO' | 'IDENTIFICACION' | 'OTRO', name?: string) => {
+    const user = useAuthStore.getState().user;
+    if (!user) return { success: false, error: 'No autenticado' };
+
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${user.id}/employees/${employeeId}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
+    const filePath = `hr-documents/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('hr-documents')
+      .upload(filePath, file, { upsert: false });
+
+    if (uploadError) {
+      return { success: false, error: 'Error al subir el archivo: ' + uploadError.message };
+    }
+
+    const { data: urlData } = supabase.storage.from('hr-documents').getPublicUrl(filePath);
+
+    const docName = name || file.name.replace(`.${fileExt}`, '').replace(/_/g, ' ').replace(/[.-]/g, ' ');
+
+    const { error: dbError } = await supabase
+      .from('employee_documents')
+      .insert({
+        user_id: user.id,
+        employee_id: employeeId,
+        name: docName,
+        doc_type: docType,
+        file_url: urlData.publicUrl,
+        file_name: file.name,
+        file_size: file.size,
+      });
+
+    if (dbError) {
+      await supabase.storage.from('hr-documents').remove([filePath]);
+      return { success: false, error: 'Error al guardar el registro: ' + dbError.message };
+    }
+
+    await get().fetchEmployeeDocuments(employeeId);
+    return { success: true };
+  },
+
+  fetchEmployeeDocuments: async (employeeId: string) => {
+    const user = useAuthStore.getState().user;
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('employee_documents')
+      .select('*')
+      .eq('employee_id', employeeId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      throw new Error('No se pudieron cargar los documentos');
+    }
+
+    set({ employeeDocuments: data || [] });
+  },
+
+  deleteEmployeeDocument: async (id: string, fileUrl: string) => {
+    const { error: dbError } = await supabase
+      .from('employee_documents')
+      .delete()
+      .eq('id', id);
+
+    if (dbError) {
+      throw new Error('No se pudo eliminar el registro');
+    }
+
+    const filePath = fileUrl.split('/hr-documents/')[1];
+    if (filePath) {
+      await supabase.storage.from('hr-documents').remove([`${filePath}`]);
+    }
+
+    set((state) => ({
+      employeeDocuments: state.employeeDocuments.filter((d) => d.id !== id),
+    }));
   },
 }));

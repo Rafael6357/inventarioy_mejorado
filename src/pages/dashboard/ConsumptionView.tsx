@@ -6,18 +6,26 @@ import { Input } from '../../components/ui/input';
 export default function ConsumptionView() {
   const { products, recipes, sales } = useDatabaseStore();
   
-  // Default to today
-  const [selectedDate, setSelectedDate] = useState(() => {
+  // Date range defaults to today
+  const [startDate, setStartDate] = useState(() => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState(() => {
     const today = new Date();
     return today.toISOString().split('T')[0];
   });
 
-  // Calculate consumption for the selected date
+  // Calculate consumption for the date range
   const consumptionData = useMemo(() => {
-    // Filter sales by selected date
+    // Filter sales by date range
     const dailySales = sales.filter(sale => {
-      const saleDate = new Date(sale.date).toISOString().split('T')[0];
-      return saleDate === selectedDate;
+      // Get YYYY-MM-DD from ISO date or locale date
+      const saleDateStr = new Date(sale.date).toISOString().split('T')[0];
+      
+      if (startDate && saleDateStr < startDate) return false;
+      if (endDate && saleDateStr > endDate) return false;
+      return true;
     });
 
     // Map to store consumption per product
@@ -34,7 +42,7 @@ export default function ConsumptionView() {
     // Initialize map with all products to 0? No, only show consumed ones.
     
     dailySales.forEach(sale => {
-      sale.items.forEach(item => {
+      sale.items?.forEach(item => {
         // Is it a direct product?
         const product = products.find(p => p.id === item.product_id);
         if (product) {
@@ -54,7 +62,7 @@ export default function ConsumptionView() {
         } else {
           // Is it a recipe?
           if (item.is_recipe && item.recipe_snapshot) {
-            item.recipe_snapshot.ingredients.forEach(ing => {
+            item.recipe_snapshot.ingredients?.forEach(ing => {
               const ingProduct = products.find(p => p.id === ing.product_id);
               if (ingProduct) {
                 const existing = consumptionMap.get(ingProduct.id) || {
@@ -69,7 +77,7 @@ export default function ConsumptionView() {
                 const consumedQty = ing.quantity * item.quantity;
                 existing.recipeQty += consumedQty;
                 existing.totalQty += consumedQty;
-                existing.totalCost += (ing.cost * consumedQty);
+                existing.totalCost += (ingProduct.cost * consumedQty);
                 
                 // Track which recipe caused this consumption
                   const recipeEntry = existing.recipes.find(r => r.recipeName === item.recipe_snapshot!.name);
@@ -85,7 +93,7 @@ export default function ConsumptionView() {
           } else {
             // Fallback for legacy sales without snapshot
             const recipe = recipes.find(r => r.id === item.product_id);
-            if (recipe) {
+            if (recipe && recipe.ingredients) {
               recipe.ingredients.forEach(ing => {
                 const ingProduct = products.find(p => p.id === ing.product_id);
                 if (ingProduct) {
@@ -122,7 +130,7 @@ export default function ConsumptionView() {
 
     // Convert map to array and sort by total cost descending
     return Array.from(consumptionMap.values()).sort((a, b) => b.totalCost - a.totalCost);
-  }, [sales, products, recipes, selectedDate]);
+  }, [sales, products, recipes, startDate, endDate]);
 
   const totalDailyCost = consumptionData.reduce((sum, item) => sum + item.totalCost, 0);
 
@@ -136,13 +144,21 @@ export default function ConsumptionView() {
           </p>
         </div>
         
-        <div className="flex items-center gap-3 bg-surface p-2 rounded-lg border border-border shadow-sm">
-          <Calendar className="h-5 w-5 text-primary" />
+        <div className="flex items-center gap-3 bg-surface p-2 rounded-lg border border-border shadow-sm overflow-visible">
+          <Calendar className="h-5 w-5 text-primary shrink-0" />
+          <span className="text-xs text-text-secondary shrink-0">Desde:</span>
           <Input 
             type="date" 
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="border-none bg-transparent focus:ring-0 w-40"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="border-none bg-transparent focus:ring-0 w-28 no-spin"
+          />
+          <span className="text-xs text-text-secondary shrink-0">Hasta:</span>
+          <Input 
+            type="date" 
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="border-none bg-transparent focus:ring-0 w-28 no-spin"
           />
         </div>
       </div>
@@ -203,7 +219,7 @@ export default function ConsumptionView() {
               {consumptionData.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center text-text-secondary">
-                    No hay registros de consumo para esta fecha.
+                    No hay registros de consumo para el rango de fechas seleccionado.
                   </td>
                 </tr>
               ) : (

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
-import { Filter, Search, ArrowUpDown, Package, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Filter, Search, ArrowUpDown, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 
@@ -43,9 +43,10 @@ export default function FilteredCenterView() {
     // 3. Stock Status Filter
     if (stockFilter !== 'ALL') {
       result = result.filter(p => {
-        if (stockFilter === 'LOW') return p.quantity <= p.stock_min;
-        if (stockFilter === 'NORMAL') return p.quantity > p.stock_min && p.quantity <= p.stock_max;
-        if (stockFilter === 'OVER') return p.quantity > p.stock_max;
+        const physicalStock = Number(p.quantity) - (Number(p.in_transit) || 0);
+        if (stockFilter === 'LOW') return physicalStock <= p.rop;
+        if (stockFilter === 'NORMAL') return physicalStock > p.rop;
+        if (stockFilter === 'OVER') return physicalStock > (Number(p.rop) * 2);
         return true;
       });
     }
@@ -59,11 +60,13 @@ export default function FilteredCenterView() {
         valA = a.price;
         valB = b.price;
       } else if (sortBy === 'stock') {
-        valA = a.quantity;
-        valB = b.quantity;
+        valA = Number(a.quantity) - (Number(a.in_transit) || 0);
+        valB = Number(b.quantity) - (Number(b.in_transit) || 0);
       } else if (sortBy === 'value') {
-        valA = a.quantity * a.cost;
-        valB = b.quantity * b.cost;
+        const physA = Number(a.quantity) - (Number(a.in_transit) || 0);
+        const physB = Number(b.quantity) - (Number(b.in_transit) || 0);
+        valA = physA * Number(a.cost);
+        valB = physB * Number(b.cost);
       }
 
       if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
@@ -194,17 +197,14 @@ export default function FilteredCenterView() {
                 </tr>
               ) : (
                 filteredAndSortedProducts.map((product) => {
-                  const isLow = product.quantity <= product.stock_min;
-                  const isOver = product.quantity > product.stock_max;
+                  const isLow = product.quantity <= product.rop;
+                  const isOver = product.quantity > product.rop * 2;
                   const totalValue = product.quantity * product.cost;
 
                   return (
                     <tr key={product.id} className="transition-colors hover:bg-surface-hover">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-bg text-text-secondary">
-                            <Package className="h-4 w-4" />
-                          </div>
                           <div>
                             <p className="font-medium text-text">{product.name}</p>
                             {product.description && (

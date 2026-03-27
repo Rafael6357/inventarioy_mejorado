@@ -4,6 +4,7 @@ import { Button } from '../components/ui/button';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
 import InventarioYLogo from '../components/InventarioYLogo';
+import { Loader2 } from 'lucide-react';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -17,12 +18,6 @@ export default function Login() {
     e.preventDefault();
     setError('');
     setIsLoading(true);
-
-    if (!email.endsWith('@gmail.com')) {
-      setError('Solo se permiten correos @gmail.com');
-      setIsLoading(false);
-      return;
-    }
 
     if (password.length < 6) {
       setError('La contraseña debe tener al menos 6 caracteres');
@@ -92,9 +87,16 @@ export default function Login() {
             </div>
           </div>
 
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
-          </Button>
+          <div className="flex justify-center">
+            <Button type="submit" className="px-8" disabled={isLoading}>
+              {isLoading ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Iniciando sesión...
+                </span>
+              ) : 'Iniciar Sesión'}
+            </Button>
+          </div>
         </form>
 
         <p className="text-center text-sm text-text-secondary">

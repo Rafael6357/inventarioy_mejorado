@@ -13,6 +13,10 @@ const GROQ_KEYS = [
   import.meta.env.VITE_GROQ_KEY_10,
 ].filter(Boolean);
 
+if (import.meta.env.DEV && GROQ_KEYS.length === 0) {
+  console.warn('[Groq] No API keys configured. Set VITE_GROQ_KEY_1, VITE_GROQ_KEY_2, etc. in your .env file.');
+}
+
 let currentKeyIndex = 0;
 
 export function getCurrentKey(): string | null {
@@ -55,6 +59,9 @@ export async function sendToGroq(
     }
 
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 60000);
+
       const response = await fetch(GROQ_API_URL, {
         method: 'POST',
         headers: {
@@ -67,7 +74,10 @@ export async function sendToGroq(
           temperature: 0.7,
           max_tokens: 2048,
         }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeout);
 
       if (response.status === 429) {
         rotateKey();

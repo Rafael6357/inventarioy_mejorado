@@ -14,9 +14,9 @@ export default function InventarioY({ className = '', size = 'md' }: InventarioY
   };
 
   return (
-    <span className={`font-bold text-gradient hero-glow inline ${sizeClasses[size]} ${className}`}>
-      <span className="text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]">Inventario</span>
-      <span className="drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]">Y</span>
+    <span className={`font-bold inline ${sizeClasses[size]} ${className}`}>
+      <span className="text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.8)]">Inventario</span>
+      <span className="text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.9)]">Y</span>
     </span>
   );
 }
