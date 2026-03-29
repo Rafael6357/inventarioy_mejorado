@@ -39,6 +39,7 @@ export default function PaymentsView() {
   const [selectedUser, setSelectedUser] = useState<ProfilePayment | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
+  const [deletingPaymentId, setDeletingPaymentId] = useState<string | null>(null);
   const isMountedRef = useRef(true);
 
   const fetchProfiles = useCallback(async () => {
@@ -119,17 +120,23 @@ export default function PaymentsView() {
   };
 
   const handleDeletePayment = async (paymentId: string) => {
-    if (!confirm('¿Estás seguro de eliminar este registro de pago?')) return;
+    if (!isMountedRef.current) return;
     
+    const confirmed = window.confirm('¿Estás seguro de eliminar este registro de pago?');
+    if (!confirmed) return;
+
     const { error } = await supabase
       .from('payments')
       .delete()
       .eq('id', paymentId);
 
+    if (!isMountedRef.current) return;
+
     if (error) {
       toast.error('Error al eliminar el pago');
     } else {
       toast.success('Pago eliminado exitosamente');
+      setDeletingPaymentId(null);
       fetchProfiles();
     }
   };
@@ -196,6 +203,7 @@ export default function PaymentsView() {
   const openPaymentModal = (profile: ProfilePayment) => {
     setSelectedUser(profile);
     setShowPaymentModal(true);
+    setDeletingPaymentId(null);
   };
 
   if (user?.role !== 'admin') {
@@ -386,7 +394,10 @@ export default function PaymentsView() {
                 <p className="text-xs text-text-secondary">{selectedUser.email}</p>
               </div>
               <button 
-                onClick={() => setShowPaymentModal(false)}
+                onClick={() => {
+                  setShowPaymentModal(false);
+                  setDeletingPaymentId(null);
+                }}
                 className="rounded-lg p-1.5 text-text-secondary hover:bg-surface-hover hover:text-text transition-colors"
               >
                 ✕
@@ -470,11 +481,19 @@ export default function PaymentsView() {
                           {pmt.notes && <p className="text-text-secondary italic">{pmt.notes}</p>}
                         </div>
                         <button 
-                          onClick={() => handleDeletePayment(pmt.id)}
-                          className="ml-2 rounded p-1 text-text-secondary hover:text-danger hover:bg-danger/10 transition-colors"
+                          onClick={() => {
+                            setDeletingPaymentId(pmt.id);
+                            handleDeletePayment(pmt.id);
+                          }}
+                          disabled={deletingPaymentId === pmt.id}
+                          className="ml-2 rounded p-1 text-text-secondary hover:text-danger hover:bg-danger/10 transition-colors disabled:opacity-50"
                           title="Eliminar pago"
                         >
-                          <XCircle className="h-4 w-4" />
+                          {deletingPaymentId === pmt.id ? (
+                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-danger border-t-transparent" />
+                          ) : (
+                            <XCircle className="h-4 w-4" />
+                          )}
                         </button>
                       </div>
                     ))}
