@@ -90,11 +90,13 @@ export default function PaymentsView() {
     if (!isMountedRef.current) return;
     setSavingStatus(true);
     const updates: Partial<ProfilePayment> = { subscription_status: newStatus };
+    
     if (validUntil !== undefined) {
       updates.valid_until = validUntil;
-    }
-    if (newStatus === 'active' && !validUntil) {
+    } else if (newStatus === 'active') {
       updates.valid_until = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    } else if (newStatus === 'trialing') {
+      updates.valid_until = null;
     }
 
     const { error } = await supabase
@@ -111,6 +113,43 @@ export default function PaymentsView() {
       fetchProfiles();
       if (selectedUser?.id === profile.id) {
         setSelectedUser({ ...profile, ...updates });
+      }
+    }
+    setSavingStatus(false);
+  };
+
+  const handleDeletePayment = async (paymentId: string) => {
+    if (!confirm('¿Estás seguro de eliminar este registro de pago?')) return;
+    
+    const { error } = await supabase
+      .from('payments')
+      .delete()
+      .eq('id', paymentId);
+
+    if (error) {
+      toast.error('Error al eliminar el pago');
+    } else {
+      toast.success('Pago eliminado exitosamente');
+      fetchProfiles();
+    }
+  };
+
+  const handleUpdateExpirationDate = async (profile: ProfilePayment, newDate: string) => {
+    setSavingStatus(true);
+    const { error } = await supabase
+      .from('profiles')
+      .update({ valid_until: newDate })
+      .eq('id', profile.id);
+
+    if (!isMountedRef.current) return;
+
+    if (error) {
+      toast.error('Error al actualizar la fecha');
+    } else {
+      toast.success('Fecha de expiración actualizada');
+      fetchProfiles();
+      if (selectedUser?.id === profile.id) {
+        setSelectedUser({ ...profile, valid_until: newDate });
       }
     }
     setSavingStatus(false);
@@ -368,10 +407,17 @@ export default function PaymentsView() {
                   </div>
                 </div>
                 {selectedUser.valid_until && (
-                  <p className="mt-2 text-xs text-text-secondary">
-                    <Calendar className="inline h-3 w-3 mr-1" />
-                    Válido hasta: {new Date(selectedUser.valid_until).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })}
-                  </p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <Calendar className="inline h-3 w-3 text-text-secondary" />
+                    <span className="text-xs text-text-secondary">Válido hasta:</span>
+                    <input 
+                      type="date" 
+                      value={selectedUser.valid_until}
+                      onChange={(e) => handleUpdateExpirationDate(selectedUser, e.target.value)}
+                      disabled={savingStatus}
+                      className="text-xs rounded border border-border bg-bg px-2 py-1 text-text focus:border-primary focus:outline-none disabled:opacity-50"
+                    />
+                  </div>
                 )}
               </div>
 
@@ -423,6 +469,13 @@ export default function PaymentsView() {
                           </p>
                           {pmt.notes && <p className="text-text-secondary italic">{pmt.notes}</p>}
                         </div>
+                        <button 
+                          onClick={() => handleDeletePayment(pmt.id)}
+                          className="ml-2 rounded p-1 text-text-secondary hover:text-danger hover:bg-danger/10 transition-colors"
+                          title="Eliminar pago"
+                        >
+                          <XCircle className="h-4 w-4" />
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -463,6 +516,7 @@ export default function PaymentsView() {
                     toast.error('Error al registrar el pago');
                   } else {
                     toast.success('Pago registrado exitosamente');
+                    form.reset();
                     fetchProfiles();
                   }
                 }} className="space-y-2">
