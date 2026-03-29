@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../lib/supabase';
 import { CreditCard, Search, ShieldCheck, CheckCircle2, XCircle, AlertCircle, Calendar, DollarSign, Eye } from 'lucide-react';
@@ -39,19 +39,18 @@ export default function PaymentsView() {
   const [selectedUser, setSelectedUser] = useState<ProfilePayment | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
+  const isMountedRef = useRef(true);
 
-  useEffect(() => {
-    if (user?.role === 'admin') {
-      fetchProfiles();
-    }
-  }, [user]);
-
-  const fetchProfiles = async () => {
+  const fetchProfiles = useCallback(async () => {
+    if (!isMountedRef.current) return;
     setLoading(true);
+    
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .order('created_at', { ascending: false });
+
+    if (!isMountedRef.current) return;
 
     if (error) {
       toast.error('Error al cargar los perfiles');
@@ -64,14 +63,31 @@ export default function PaymentsView() {
           .select('*')
           .eq('user_id', p.id)
           .order('payment_date', { ascending: false });
-        allPayments[p.id] = pmt || [];
+        if (isMountedRef.current) {
+          allPayments[p.id] = pmt || [];
+        }
       }
-      setPayments(allPayments);
+      if (isMountedRef.current) {
+        setPayments(allPayments);
+      }
     }
-    setLoading(false);
-  };
+    if (isMountedRef.current) {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    if (user?.role === 'admin') {
+      fetchProfiles();
+    }
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [user, fetchProfiles]);
 
   const handleStatusChange = async (profile: ProfilePayment, newStatus: ProfilePayment['subscription_status'], validUntil?: string | null) => {
+    if (!isMountedRef.current) return;
     setSavingStatus(true);
     const updates: Partial<ProfilePayment> = { subscription_status: newStatus };
     if (validUntil !== undefined) {
@@ -85,6 +101,8 @@ export default function PaymentsView() {
       .from('profiles')
       .update(updates)
       .eq('id', profile.id);
+
+    if (!isMountedRef.current) return;
 
     if (error) {
       toast.error('Error al actualizar el estado');
