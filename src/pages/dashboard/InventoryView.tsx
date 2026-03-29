@@ -420,7 +420,7 @@ export default function InventoryView() {
               className="mt-6 px-8"
               variant={movement.type === 'MERMA' ? 'destructive' : 'default'}
             >
-              Registrar {movement.type.charAt(0) + movement.type.slice(1).toLowerCase()}
+              {movement.type === 'ENTRADA' ? 'Registrar Entrada' : movement.type === 'SALIDA' ? 'Registrar Salida' : 'Registrar Merma'}
             </Button>
           </form>
         </div>

@@ -101,7 +101,7 @@ export default function Dashboard() {
   const handleSidebarMouseLeave = () => {
     sidebarTimeoutRef.current = setTimeout(() => {
       setIsSidebarVisible(false);
-    }, 1500);
+    }, 500);
   };
 
   useEffect(() => {
