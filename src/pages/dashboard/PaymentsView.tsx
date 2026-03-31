@@ -40,48 +40,110 @@ export default function PaymentsView() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
   const [deletingPaymentId, setDeletingPaymentId] = useState<string | null>(null);
+  const [subscriptionDays, setSubscriptionDays] = useState<30 | 365>(30);
   const isMountedRef = useRef(true);
+
+  const getDaysRemaining = (profile: ProfilePayment): number => {
+    if (profile.subscription_status === 'active' && profile.valid_until) {
+      const days = Math.ceil((new Date(profile.valid_until).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+      return days > 0 ? days : 0;
+    }
+    if (profile.subscription_status === 'trialing' && profile.trial_ends_at) {
+      const days = Math.ceil((new Date(profile.trial_ends_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+      return days > 0 ? days : 0;
+    }
+    return 0;
+  };
 
   const fetchProfiles = useCallback(async () => {
     if (!isMountedRef.current) return;
     setLoading(true);
     
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('created_at', { ascending: false });
+    let timeoutId: NodeJS.Timeout;
+    let isCancelled = false;
 
-    if (!isMountedRef.current) return;
+    const fetchWithTimeout = async (ms: number) => {
+      const promise = supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      const timeoutPromise = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('Timeout')), ms);
+      });
 
-    if (error) {
-      toast.error('Error al cargar los perfiles');
-    } else {
-      setProfiles(data || []);
-      const allPayments: Record<string, Payment[]> = {};
-      for (const p of (data || [])) {
-        const { data: pmt } = await supabase
-          .from('payments')
-          .select('*')
-          .eq('user_id', p.id)
-          .order('payment_date', { ascending: false });
-        if (isMountedRef.current) {
-          allPayments[p.id] = pmt || [];
+      try {
+        const result = await Promise.race([promise, timeoutPromise]);
+        clearTimeout(timeoutId);
+        return result;
+      } catch (err) {
+        clearTimeout(timeoutId);
+        throw err;
+      }
+    };
+
+    try {
+      console.log('Iniciando consulta a profiles...');
+      const queryStart = Date.now();
+      
+      const result = await fetchWithTimeout(8000);
+      const { data, error } = result as any;
+
+      console.log('Consulta completada en', Date.now() - queryStart, 'ms');
+
+      if (isCancelled) return;
+
+      if (error) {
+        console.error('Error cargando perfiles:', error);
+        toast.error('Error al cargar los perfiles: ' + error.message);
+        setLoading(false);
+      } else {
+        console.log('Perfiles obtenidos:', data);
+        if (!data || data.length === 0) {
+          console.log('No se encontraron perfiles en la base de datos');
+          toast.info('No hay usuarios registrados');
+          setProfiles([]);
+          setPayments({});
+          setLoading(false);
+        } else {
+          setProfiles(data || []);
+          const allPayments: Record<string, Payment[]> = {};
+          for (const p of (data || [])) {
+            const { data: pmt } = await supabase
+              .from('payments')
+              .select('*')
+              .eq('user_id', p.id)
+              .order('payment_date', { ascending: false });
+            if (isMountedRef.current) {
+              allPayments[p.id] = pmt || [];
+            }
+          }
+          if (isMountedRef.current) {
+            setPayments(allPayments);
+          }
+          setLoading(false);
         }
       }
-      if (isMountedRef.current) {
-        setPayments(allPayments);
-      }
-    }
-    if (isMountedRef.current) {
+    } catch (err) {
+      console.error('Excepción en fetchProfiles:', err);
+      toast.error('Error al cargar los perfiles');
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     isMountedRef.current = true;
-    if (user?.role === 'admin') {
-      fetchProfiles();
+    console.log('PaymentsView - user:', user);
+    console.log('PaymentsView - user.role:', user?.role);
+    
+    if (!user) {
+      console.log('PaymentsView - Usuario no autenticado');
+      return;
     }
+    
+    console.log('PaymentsView - Llamando fetchProfiles');
+    fetchProfiles();
+    
     return () => {
       isMountedRef.current = false;
     };
@@ -97,7 +159,7 @@ export default function PaymentsView() {
     } else if (newStatus === 'active') {
       updates.valid_until = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     } else if (newStatus === 'trialing') {
-      updates.valid_until = null;
+      updates.valid_until = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     }
 
     const { error } = await supabase
@@ -142,10 +204,12 @@ export default function PaymentsView() {
   };
 
   const handleUpdateExpirationDate = async (profile: ProfilePayment, newDate: string) => {
+    if (!newDate) return;
     setSavingStatus(true);
+    const formattedDate = newDate.split('T')[0];
     const { error } = await supabase
       .from('profiles')
-      .update({ valid_until: newDate })
+      .update({ valid_until: formattedDate })
       .eq('id', profile.id);
 
     if (!isMountedRef.current) return;
@@ -201,9 +265,25 @@ export default function PaymentsView() {
   };
 
   const openPaymentModal = (profile: ProfilePayment) => {
-    setSelectedUser(profile);
-    setShowPaymentModal(true);
-    setDeletingPaymentId(null);
+    setSelectedUser(null);
+    setTimeout(() => {
+      if (isMountedRef.current) {
+        setSelectedUser(profile);
+        setShowPaymentModal(true);
+        setDeletingPaymentId(null);
+      }
+    }, 0);
+  };
+
+  const closePaymentModal = () => {
+    setShowPaymentModal(false);
+    setSubscriptionDays(30);
+    setTimeout(() => {
+      if (isMountedRef.current) {
+        setSelectedUser(null);
+        setDeletingPaymentId(null);
+      }
+    }, 100);
   };
 
   if (user?.role !== 'admin') {
@@ -338,43 +418,14 @@ export default function PaymentsView() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button 
-                          onClick={() => openPaymentModal(p)}
-                          className="flex items-center gap-1 rounded-md bg-primary/10 px-2.5 py-1.5 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
-                          title="Registrar pago"
-                        >
-                          <DollarSign className="h-3 w-3" />
-                          Pago
-                        </button>
-                        {p.subscription_status !== 'active' && (
-                          <button 
-                            onClick={() => handleStatusChange(p, 'active')}
-                            disabled={savingStatus}
-                            className="rounded-md bg-success/10 px-2.5 py-1.5 text-xs font-medium text-success hover:bg-success/20 transition-colors disabled:opacity-50"
-                          >
-                            Activar
-                          </button>
-                        )}
-                        {p.subscription_status === 'active' && (
-                          <button 
-                            onClick={() => handleStatusChange(p, 'canceled')}
-                            disabled={savingStatus}
-                            className="rounded-md bg-danger/10 px-2.5 py-1.5 text-xs font-medium text-danger hover:bg-danger/20 transition-colors disabled:opacity-50"
-                          >
-                            Suspender
-                          </button>
-                        )}
-                        {p.subscription_status === 'trialing' && (
-                          <button 
-                            onClick={() => handleStatusChange(p, 'past_due')}
-                            disabled={savingStatus}
-                            className="rounded-md bg-danger/10 px-2.5 py-1.5 text-xs font-medium text-danger hover:bg-danger/20 transition-colors disabled:opacity-50"
-                          >
-                            Marcar Vencido
-                          </button>
-                        )}
-                      </div>
+                      <button 
+                        onClick={() => openPaymentModal(p)}
+                        className="flex items-center gap-1 rounded-md bg-primary/10 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
+                        title="Gestionar suscripción y registrar pago"
+                      >
+                        <DollarSign className="h-3 w-3" />
+                        Gestionar
+                      </button>
                     </td>
                   </tr>
                 ))
@@ -386,7 +437,7 @@ export default function PaymentsView() {
 
       {/* Payment & History Modal */}
       {showPaymentModal && selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div key={selectedUser.id} className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="w-full max-w-lg rounded-2xl border border-border bg-surface shadow-xl max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-surface border-b border-border p-4 flex items-center justify-between">
               <div>
@@ -394,10 +445,7 @@ export default function PaymentsView() {
                 <p className="text-xs text-text-secondary">{selectedUser.email}</p>
               </div>
               <button 
-                onClick={() => {
-                  setShowPaymentModal(false);
-                  setDeletingPaymentId(null);
-                }}
+                onClick={() => closePaymentModal()}
                 className="rounded-lg p-1.5 text-text-secondary hover:bg-surface-hover hover:text-text transition-colors"
               >
                 ✕
@@ -417,44 +465,21 @@ export default function PaymentsView() {
                     <p className="mt-1 font-bold text-text">{getDaysLeft(selectedUser)}</p>
                   </div>
                 </div>
-                {selectedUser.valid_until && (
-                  <div className="mt-2 flex items-center gap-2">
-                    <Calendar className="inline h-3 w-3 text-text-secondary" />
-                    <span className="text-xs text-text-secondary">Válido hasta:</span>
-                    <input 
-                      type="date" 
-                      value={selectedUser.valid_until}
-                      onChange={(e) => handleUpdateExpirationDate(selectedUser, e.target.value)}
+                {selectedUser.subscription_status !== 'canceled' && (
+                  <div className="mt-3 pt-3 border-t border-border">
+                    <button 
+                      onClick={() => {
+                        if (window.confirm('¿Estás seguro de cancelar la suscripción de este usuario?')) {
+                          handleStatusChange(selectedUser, 'canceled');
+                        }
+                      }}
                       disabled={savingStatus}
-                      className="text-xs rounded border border-border bg-bg px-2 py-1 text-text focus:border-primary focus:outline-none disabled:opacity-50"
-                    />
+                      className="w-full flex items-center justify-center gap-2 rounded-lg bg-danger/10 px-3 py-2 text-xs font-medium text-danger hover:bg-danger/20 transition-colors disabled:opacity-50"
+                    >
+                      <XCircle className="h-3 w-3" /> Cancelar Suscripción
+                    </button>
                   </div>
                 )}
-              </div>
-
-              {/* Quick Actions */}
-              <div className="flex flex-wrap gap-2">
-                <button 
-                  onClick={() => handleStatusChange(selectedUser, 'active')}
-                  disabled={savingStatus || selectedUser.subscription_status === 'active'}
-                  className="flex items-center gap-1 rounded-lg bg-success/10 px-3 py-2 text-xs font-medium text-success hover:bg-success/20 transition-colors disabled:opacity-50"
-                >
-                  <CheckCircle2 className="h-3 w-3" /> Activar Suscripción
-                </button>
-                <button 
-                  onClick={() => handleStatusChange(selectedUser, 'canceled')}
-                  disabled={savingStatus || selectedUser.subscription_status === 'canceled'}
-                  className="flex items-center gap-1 rounded-lg bg-danger/10 px-3 py-2 text-xs font-medium text-danger hover:bg-danger/20 transition-colors disabled:opacity-50"
-                >
-                  <XCircle className="h-3 w-3" /> Suspender
-                </button>
-                <button 
-                  onClick={() => handleStatusChange(selectedUser, 'trialing')}
-                  disabled={savingStatus || selectedUser.subscription_status === 'trialing'}
-                  className="flex items-center gap-1 rounded-lg bg-warning/10 px-3 py-2 text-xs font-medium text-warning hover:bg-warning/20 transition-colors disabled:opacity-50"
-                >
-                  <AlertCircle className="h-3 w-3" /> Resetear a Prueba
-                </button>
               </div>
 
               {/* Payment History */}
@@ -521,7 +546,15 @@ export default function PaymentsView() {
                     return;
                   }
 
-                  const { error } = await supabase.from('payments').insert({
+                  const currentDays = getDaysRemaining(selectedUser!);
+                  if (selectedUser!.subscription_status === 'active' && currentDays > 0) {
+                    const confirmed = window.confirm(
+                      `El usuario ya tiene ${currentDays} días restantes. ¿Está seguro de activar por ${subscriptionDays} días adicionales?`
+                    );
+                    if (!confirmed) return;
+                  }
+
+                  const { error: paymentError } = await supabase.from('payments').insert({
                     user_id: selectedUser.id,
                     admin_id: user?.id,
                     amount: Number(amount),
@@ -531,13 +564,44 @@ export default function PaymentsView() {
                     payment_date: date || new Date().toISOString().split('T')[0],
                   });
 
-                  if (error) {
+                  if (paymentError) {
                     toast.error('Error al registrar el pago');
-                  } else {
-                    toast.success('Pago registrado exitosamente');
-                    form.reset();
-                    fetchProfiles();
+                    return;
                   }
+
+                  const now = new Date();
+                  let startDate = now;
+
+                  // Solo extendemos si el estado es 'active' y la fecha actual es futura.
+                  // Si está cancelado, trialing o past_due, empezamos desde ahora.
+                  if (selectedUser.subscription_status === 'active' && selectedUser.valid_until) {
+                    const currentValidDate = new Date(selectedUser.valid_until);
+                    if (currentValidDate > now) {
+                      startDate = currentValidDate;
+                    }
+                  }
+
+                  const newDate = new Date(startDate.getTime() + (subscriptionDays * 24 * 60 * 60 * 1000));
+                  const formattedDate = newDate.toISOString().split('T')[0];
+
+                  const { error: updateError } = await supabase
+                    .from('profiles')
+                    .update({ 
+                      subscription_status: 'active',
+                      valid_until: formattedDate 
+                    })
+                    .eq('id', selectedUser.id);
+
+                  if (updateError) {
+                    toast.error('Pago registrado pero error al activar suscripción');
+                  } else {
+                    toast.success(`Pago registrado y suscripción activada por ${subscriptionDays} días`);
+                  }
+
+                  setSubscriptionDays(30);
+                  form.reset();
+                  fetchProfiles();
+                  setShowPaymentModal(false);
                 }} className="space-y-2">
                   <div className="grid grid-cols-2 gap-2">
                     <div>
@@ -566,8 +630,35 @@ export default function PaymentsView() {
                     <label className="text-xs text-text-secondary">Notas</label>
                     <textarea name="notes" rows={2} placeholder="Observaciones..." className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none" />
                   </div>
+
+                  <div className="rounded-lg border border-border bg-bg p-3 space-y-2">
+                    <span className="text-sm font-medium text-text">Activar Suscripción:</span>
+                    <div className="flex gap-4 ml-0">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input 
+                          type="radio" 
+                          name="subscriptionDays"
+                          checked={subscriptionDays === 30}
+                          onChange={() => setSubscriptionDays(30)}
+                          className="w-4 h-4 text-primary border-border focus:ring-primary"
+                        />
+                        <span className="text-sm text-text">30 días (1 mes)</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input 
+                          type="radio" 
+                          name="subscriptionDays"
+                          checked={subscriptionDays === 365}
+                          onChange={() => setSubscriptionDays(365)}
+                          className="w-4 h-4 text-primary border-border focus:ring-primary"
+                        />
+                        <span className="text-sm text-text">365 días (1 año)</span>
+                      </label>
+                    </div>
+                  </div>
+
                   <Button type="submit" className="w-full text-sm">
-                    Registrar Pago
+                    {`Registrar Pago y Activar Suscripción (${subscriptionDays} días)`}
                   </Button>
                 </form>
               </div>

@@ -304,7 +304,7 @@ export default function InventoryView() {
                   <Input id="eoq" type="number" min="0" value={newProduct.eoq} onChange={e => setNewProduct({...newProduct, eoq: Number(e.target.value)})} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="lead_time" className="text-xs">Lead Time (días)</Label>
+                  <Label htmlFor="lead_time" className="text-xs">Tiempo de Entrega (días)</Label>
                   <Input id="lead_time" type="number" min="0" value={newProduct.lead_time} onChange={e => setNewProduct({...newProduct, lead_time: Number(e.target.value)})} />
                 </div>
                 <div className="space-y-2">

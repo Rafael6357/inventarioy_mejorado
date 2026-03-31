@@ -12,7 +12,7 @@ export default function Login() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  const login = useAuthStore((state) => state.login);
+  const { login, user } = useAuthStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,14 +26,27 @@ export default function Login() {
     }
 
     const result = await login(email, password);
-    setIsLoading(false);
-
-    if (result.success) {
-      toast.success('Sesión iniciada correctamente');
-      navigate('/dashboard');
-    } else {
+    
+    if (!result.success) {
+      setIsLoading(false);
       setError(result.error || 'Error al iniciar sesión');
+      return;
     }
+
+    await new Promise(r => setTimeout(r, 500));
+    
+    const currentUser = useAuthStore.getState().user;
+    
+    if (currentUser && !currentUser.isSubscriptionActive) {
+      setIsLoading(false);
+      setError('Tu suscripción ha vencido. Adquiere el plan profesional para seguir usando la aplicación.');
+      await useAuthStore.getState().logout();
+      return;
+    }
+
+    setIsLoading(false);
+    toast.success('Sesión iniciada correctamente');
+    navigate('/dashboard');
   };
 
   return (

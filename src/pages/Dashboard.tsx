@@ -24,6 +24,7 @@ import {
 import { useAuthStore } from '../store/authStore';
 import { useDatabaseStore } from '../store/dbStore';
 import InventarioYLogo from '../components/InventarioYLogo';
+import SubscriptionBanner from '../components/SubscriptionBanner';
 import StockView from './dashboard/StockView';
 import InventoryView from './dashboard/InventoryView';
 import TransitView from './dashboard/TransitView';
@@ -127,12 +128,17 @@ export default function Dashboard() {
   }
 
   const handleLogout = async () => {
+    console.log('handleLogout ejecutado');
     await logout();
-    navigate('/');
+    console.log('logout completado, navegando...');
+    window.location.href = '/';
   };
 
+  const bannerPadding = user?.isSubscriptionActive === false ? 'pt-16' : '';
+
   return (
-    <div className="flex h-screen overflow-hidden bg-bg">
+    <div className={`flex h-screen overflow-hidden bg-bg ${bannerPadding}`}>
+      <SubscriptionBanner />
       {isMobileMenuOpen && (
         <div 
           className="fixed inset-0 z-40 bg-black/50 lg:hidden"

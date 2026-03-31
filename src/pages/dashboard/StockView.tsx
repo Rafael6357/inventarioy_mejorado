@@ -418,7 +418,7 @@ export default function StockView() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="edit_lead_time">Lead Time (días)</Label>
+                <Label htmlFor="edit_lead_time">Tiempo de Entrega (días)</Label>
                 <Input
                   id="edit_lead_time"
                   type="number"

@@ -13,6 +13,7 @@ export interface User {
     trialEndsAt: string;
     validUntil: string | null;
   };
+  isSubscriptionActive: boolean;
 }
 
 interface AuthState {
@@ -28,6 +29,41 @@ interface AuthState {
 }
 
 let _isInitializing = false;
+let _authListenerSubscription: any = null;
+
+const checkSubscriptionActive = (email: string, subscription: User['subscription']): boolean => {
+  if (email === 'nikko6357@gmail.com') {
+    return true;
+  }
+  
+  if (subscription.status === 'canceled') {
+    return false;
+  }
+  
+  if (subscription.status === 'past_due') {
+    return false;
+  }
+  
+  if (subscription.status === 'active') {
+    if (subscription.validUntil) {
+      const validUntil = new Date(subscription.validUntil);
+      if (validUntil > new Date()) {
+        return true;
+      }
+    }
+    return false;
+  }
+  
+  if (subscription.status === 'trialing') {
+    const trialEnd = new Date(subscription.trialEndsAt);
+    if (trialEnd > new Date()) {
+      return true;
+    }
+    return false;
+  }
+  
+  return false;
+};
 
 const translateError = (message: string): string => {
   const errorTranslations: Record<string, string> = {
@@ -92,75 +128,145 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   isLoading: true,
 
   initialize: async () => {
-    if (_isInitializing) return;
+    if (_isInitializing) {
+      console.log('initialize ya está en progreso, ignorando...');
+      return;
+    }
     _isInitializing = true;
+    console.log('Inicializando autenticación...');
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        await get().fetchUser();
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        clearTimeout(timeoutId);
+        
+        if (session?.user) {
+          await get().fetchUser();
+        } else {
+          set({ isLoading: false });
+        }
+      } catch (abortErr: any) {
+        clearTimeout(timeoutId);
+        if (abortErr.name === 'AbortError') {
+          console.warn('Timeout en getSession');
+          set({ isLoading: false });
+          _isInitializing = false;
+          return;
+        }
+        throw abortErr;
+      }
+
+      if (!_authListenerSubscription) {
+        console.log('Creando listener de autenticación...');
+        _authListenerSubscription = supabase.auth.onAuthStateChange(async (event, session) => {
+          console.log('Auth state change:', event);
+          if (event === 'SIGNED_IN' && session?.user) {
+            await get().fetchUser();
+          } else if (event === 'SIGNED_OUT') {
+            set({ user: null, isAuthenticated: false, isLoading: false });
+          }
+        });
+      }
+    } catch (err: any) {
+      if (err?.message?.includes('429') || err?.status === 429) {
+        console.warn('Rate limit alcanzado en autenticación, reintentando en 5 segundos...');
+        await new Promise(r => setTimeout(r, 5000));
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user) {
+            await get().fetchUser();
+          } else {
+            set({ isLoading: false });
+          }
+        } catch {
+          set({ isLoading: false });
+        }
+      } else if (import.meta.env.DEV) {
+        console.error('Error en initialize:', err);
+        set({ isLoading: false });
       } else {
         set({ isLoading: false });
       }
-
-      supabase.auth.onAuthStateChange(async (event, session) => {
-        if (event === 'SIGNED_IN' && session?.user) {
-          const { data: { user: authUser } } = await supabase.auth.getUser();
-          if (authUser) {
-            await get().fetchUser();
-          }
-        } else if (event === 'SIGNED_OUT') {
-          set({ user: null, isAuthenticated: false, isLoading: false });
-        }
-      });
-    } catch (err) {
-      if (import.meta.env.DEV) console.error('Error en initialize:', err);
-      set({ isLoading: false });
     } finally {
       _isInitializing = false;
     }
   },
 
   fetchUser: async () => {
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    if (!authUser) return;
-
-    let profile = null;
-    let retries = 0;
-    const maxRetries = 3;
-
-    while (!profile && retries < maxRetries) {
-      const result = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', authUser.id)
-        .single();
-
-      if (result.error && (result.error as any).status === 406) {
-        retries++;
-        await new Promise(r => setTimeout(r, 300 * retries));
-        continue;
+    console.log('fetchUser llamado...');
+    try {
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError) {
+        console.error('Error en getUser:', authError);
+        return;
+      }
+      
+      if (!authUser) {
+        console.log('No hay usuario autenticado');
+        return;
       }
 
-      profile = result.data;
-      break;
-    }
+      let profile = null;
+      let retries = 0;
+      const maxRetries = 3;
 
-    const user: User = {
-      id: authUser.id,
-      email: authUser.email || '',
-      name: profile?.name || authUser.user_metadata?.name || '',
-      businessName: profile?.business_name || '',
-      role: (profile?.role as 'admin' | 'user') || 'user',
-      createdAt: authUser.created_at,
-      subscription: {
+      while (!profile && retries < maxRetries) {
+        try {
+          const result = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', authUser.id)
+            .single();
+
+          if (result.error && (result.error as any).status === 406) {
+            retries++;
+            await new Promise(r => setTimeout(r, 300 * retries));
+            continue;
+          }
+
+          profile = result.data;
+          break;
+        } catch (dbErr: any) {
+          console.error('Error de base de datos en fetchUser:', dbErr);
+          retries++;
+          if (retries >= maxRetries) throw dbErr;
+          await new Promise(r => setTimeout(r, 500));
+        }
+      }
+
+      if (!profile) {
+        console.warn('No se pudo obtener el perfil después de retries');
+        set({ isLoading: false });
+        return;
+      }
+
+      const subscription = {
         status: (profile?.subscription_status as any) || 'trialing',
         trialEndsAt: profile?.trial_ends_at || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        validUntil: profile?.valid_until || null,
-      },
-    };
+        validUntil: profile?.valid_until ? profile.valid_until.split('T')[0] : null,
+      };
 
-    set({ user, isAuthenticated: true, isLoading: false });
+      const user: User = {
+        id: authUser.id,
+        email: authUser.email || '',
+        name: profile?.name || authUser.user_metadata?.name || '',
+        businessName: profile?.business_name || '',
+        role: (profile?.role as 'admin' | 'user') || 'user',
+        createdAt: authUser.created_at,
+        subscription,
+        isSubscriptionActive: checkSubscriptionActive(authUser.email || '', subscription),
+      };
+
+      console.log('Usuario cargado:', user.email, 'role:', user.role, 'subscriptionActive:', user.isSubscriptionActive);
+      set({ user, isAuthenticated: true, isLoading: false });
+    } catch (err) {
+      console.error('Error en fetchUser:', err);
+      set({ isLoading: false });
+    }
   },
 
   login: async (email: string, password: string) => {
@@ -219,8 +325,18 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 
   logout: async () => {
-    await supabase.auth.signOut();
-    set({ user: null, isAuthenticated: false, isLoading: false });
+    console.log('Logout llamado...');
+    try {
+      _isInitializing = false;
+      _authListenerSubscription = null;
+      await supabase.auth.signOut();
+      console.log('SignOut exitoso');
+    } catch (err) {
+      console.error('Error en logout:', err);
+    } finally {
+      set({ user: null, isAuthenticated: false, isLoading: false });
+      console.log('Estado de auth limpiado');
+    }
   },
 
   updateSubscription: async (updates) => {
