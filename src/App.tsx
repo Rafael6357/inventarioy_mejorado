@@ -9,8 +9,15 @@ import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
+import ConnectionStatus from './components/ConnectionStatus';
+import { useEffect } from 'react';
+import { initOfflineDB } from './lib/offlineDB';
 
 export default function App() {
+  useEffect(() => {
+    initOfflineDB().catch(err => console.error('Failed to initialize offline DB:', err));
+  }, []);
+
   return (
     <Router>
       <Toaster 
@@ -26,6 +33,7 @@ export default function App() {
           }
         }}
       />
+      <ConnectionStatus />
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />

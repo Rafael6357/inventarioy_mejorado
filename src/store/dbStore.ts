@@ -1,6 +1,24 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from './authStore';
+import { toast } from 'sonner';
+import {
+  initOfflineDB,
+  savePendingSale,
+  savePendingMovement,
+  savePendingClosing,
+  getAllPendingSales,
+  getAllPendingMovements,
+  getAllPendingClosings,
+  markSaleAsSynced,
+  markMovementAsSynced,
+  markClosingAsSynced,
+  incrementRetryCount,
+  deletePendingItem,
+  cacheProducts,
+  getCachedProducts,
+  STORES,
+} from '../lib/offlineDB';
 
 export interface Product {
   id: string;
@@ -200,6 +218,8 @@ interface DatabaseState {
   uploadEmployeeDocument: (file: File, employeeId: string, docType: 'CONTRATO' | 'IDENTIFICACION' | 'OTRO', name?: string) => Promise<{ success: boolean; error?: string }>;
   fetchEmployeeDocuments: (employeeId: string) => Promise<void>;
   deleteEmployeeDocument: (id: string, fileUrl: string) => Promise<void>;
+
+  syncPendingData: () => Promise<void>;
 }
 
 export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
@@ -361,11 +381,41 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const user = useAuthStore.getState().user;
     if (!user) return;
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
-
+    const isOnline = navigator.onLine;
+    
     // Usar la fecha tal cual viene del frontend (ya en formato local)
     const movementDate = movement.date || new Date().toISOString();
+
+    // Si está offline, guardar en IndexedDB
+    if (!isOnline) {
+      try {
+        await initOfflineDB();
+        await savePendingMovement({ data: { ...movement, user_id: user.id, date: movementDate } });
+        
+        // Actualizar stock localmente para que el usuario vea el cambio inmediatamente
+        const product = get().products.find(p => p.id === movement.product_id);
+        if (product && movement.type === 'ENTRADA') {
+          let newQuantity = Number(product.quantity) + Number(movement.quantity);
+          set((state) => ({
+            products: state.products.map(p => 
+              p.id === movement.product_id 
+                ? { ...p, quantity: newQuantity, updated_at: new Date().toISOString() } 
+                : p
+            ),
+          }));
+        }
+        
+        toast.success('Movimiento guardado. Se sincronizará cuando haya conexión.');
+      } catch (err) {
+        console.error('Error saving movement offline:', err);
+        throw new Error('No se pudo guardar el movimiento offline');
+      }
+      return;
+    }
+
+    // Si está online, proceder normalmente
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
 
     const { data: newMovement, error: movementError } = await supabase
       .from('movements')
@@ -458,6 +508,8 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const user = useAuthStore.getState().user;
     if (!user) return { success: false, error: 'No hay usuario autenticado' };
 
+    const isOnline = navigator.onLine;
+
     const itemsToConsume: { productId: string; name: string; qtyNeeded: number; qtyAvailable: number }[] = [];
 
     for (const item of sale.items) {
@@ -500,6 +552,42 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       }
     }
 
+    // Si está offline, guardar en IndexedDB
+    if (!isOnline) {
+      try {
+        await initOfflineDB();
+        await savePendingSale({
+          data: {
+            employee_id: sale.employee_id,
+            items: sale.items,
+            total_amount: sale.total_amount,
+            date: sale.date,
+            sale_type: sale.sale_type,
+            notes: sale.notes,
+            discount: sale.discount,
+          },
+        });
+
+        // Consumir del tránsito localmente
+        for (const item of sale.items) {
+          if (!item.is_recipe) {
+            await get().consumeFromTransit(item.product_id, item.quantity, `Venta offline`);
+          } else if (item.is_recipe && item.recipe_snapshot) {
+            for (const ing of item.recipe_snapshot.ingredients) {
+              await get().consumeFromTransit(ing.product_id, ing.quantity * item.quantity, `Venta offline (Receta)`);
+            }
+          }
+        }
+
+        toast.success('Venta guardada offline. Se sincronizará cuando haya conexión.');
+        return { success: true };
+      } catch (err) {
+        console.error('Error saving sale offline:', err);
+        return { success: false, error: 'No se pudo guardar la venta offline' };
+      }
+    }
+
+    // Si está online, proceder normalmente
     const { data: newSale, error: saleError } = await supabase
       .from('sales')
       .insert({ 
@@ -514,10 +602,10 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       .select()
       .single();
 
-      if (saleError) {
-        if (import.meta.env.DEV) console.error('Error adding sale:', saleError);
-        return { success: false, error: 'Error al registrar la venta' };
-      }
+    if (saleError) {
+      if (import.meta.env.DEV) console.error('Error adding sale:', saleError);
+      return { success: false, error: 'Error al registrar la venta' };
+    }
 
     const saleItems = sale.items.map(item => ({
       sale_id: newSale.id,
@@ -877,6 +965,43 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const user = useAuthStore.getState().user;
     if (!user) return { success: false, error: 'No autenticado' };
 
+    const isOnline = navigator.onLine;
+
+    // Si está offline, guardar en IndexedDB
+    if (!isOnline) {
+      try {
+        await initOfflineDB();
+        await savePendingClosing({
+          data: {
+            closing_date: closing.closing_date,
+            total_sales: closing.total_sales,
+            total_discounts: closing.total_discounts,
+            total_refunds: closing.total_refunds,
+            closing_amount: closing.closing_amount,
+            notes: closing.notes,
+            created_by: closing.created_by,
+            created_by_name: closing.created_by_name,
+          },
+        });
+
+        // Actualizar el estado local para que el usuario vea el cierre
+        const tempClosing = {
+          id: `offline-${Date.now()}`,
+          user_id: user.id,
+          ...closing,
+          created_at: new Date().toISOString(),
+        };
+        
+        set((state) => ({ dailyClosings: [tempClosing, ...state.dailyClosings] }));
+        toast.success('Cierre de caja guardado offline. Se sincronizará cuando haya conexión.');
+        return { success: true };
+      } catch (err) {
+        console.error('Error saving closing offline:', err);
+        return { success: false, error: 'No se pudo guardar el cierre offline' };
+      }
+    }
+
+    // Si está online, proceder normalmente
     const { data, error } = await supabase
       .from('daily_closings')
       .insert({ ...closing, user_id: user.id })
@@ -1084,5 +1209,132 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     set((state) => ({
       employeeDocuments: state.employeeDocuments.filter((d) => d.id !== id),
     }));
+  },
+
+  syncPendingData: async () => {
+    if (!navigator.onLine) return;
+    
+    const user = useAuthStore.getState().user;
+    if (!user) return;
+
+    try {
+      await initOfflineDB();
+
+      const pendingSales = await getAllPendingSales();
+      const pendingMovements = await getAllPendingMovements();
+      const pendingClosings = await getAllPendingClosings();
+
+      for (const sale of pendingSales) {
+        if (sale.retryCount >= 3) continue;
+        
+        try {
+          const { data, error } = await supabase
+            .from('sales')
+            .insert({
+              user_id: user.id,
+              employee_id: sale.data.employee_id,
+              total_amount: sale.data.total_amount,
+              date: sale.data.date,
+              sale_type: sale.data.sale_type,
+              notes: sale.data.notes,
+              discount: sale.data.discount,
+            })
+            .select()
+            .single();
+
+          if (error) {
+            await incrementRetryCount(sale.id, STORES.PENDING_SALES);
+            continue;
+          }
+
+          if (sale.data.items && sale.data.items.length > 0) {
+            const saleItems = sale.data.items.map(item => ({
+              sale_id: data.id,
+              product_id: item.product_id,
+              quantity: item.quantity,
+              unit_cost: item.unit_cost,
+              selling_price: item.selling_price,
+              subtotal: item.subtotal,
+              is_recipe: item.is_recipe || false,
+              recipe_snapshot: item.recipe_snapshot,
+            }));
+            await supabase.from('sale_items').insert(saleItems);
+          }
+
+          await markSaleAsSynced(sale.id);
+        } catch (err) {
+          console.error('Error syncing sale:', err);
+          await incrementRetryCount(sale.id, STORES.PENDING_SALES);
+        }
+      }
+
+      for (const movement of pendingMovements) {
+        if (movement.retryCount >= 3) continue;
+        
+        try {
+          const { error } = await supabase
+            .from('movements')
+            .insert({
+              user_id: user.id,
+              product_id: movement.data.product_id,
+              type: movement.data.type,
+              quantity: movement.data.quantity,
+              unit: movement.data.unit,
+              date: movement.data.date,
+              cost: movement.data.cost,
+              reason: movement.data.reason,
+            });
+
+          if (error) {
+            await incrementRetryCount(movement.id, STORES.PENDING_MOVEMENTS);
+            continue;
+          }
+
+          await markMovementAsSynced(movement.id);
+        } catch (err) {
+          console.error('Error syncing movement:', err);
+          await incrementRetryCount(movement.id, STORES.PENDING_MOVEMENTS);
+        }
+      }
+
+      for (const closing of pendingClosings) {
+        if (closing.retryCount >= 3) continue;
+        
+        try {
+          const { error } = await supabase
+            .from('daily_closings')
+            .insert({
+              user_id: user.id,
+              closing_date: closing.data.closing_date,
+              total_sales: closing.data.total_sales,
+              total_discounts: closing.data.total_discounts,
+              total_refunds: closing.data.total_refunds,
+              closing_amount: closing.data.closing_amount,
+              notes: closing.data.notes,
+              created_by: closing.data.created_by,
+              created_by_name: closing.data.created_by_name,
+            });
+
+          if (error) {
+            if (error.code !== '23505') {
+              await incrementRetryCount(closing.id, STORES.PENDING_CLOSINGS);
+              continue;
+            }
+          }
+
+          await markClosingAsSynced(closing.id);
+        } catch (err) {
+          console.error('Error syncing closing:', err);
+          await incrementRetryCount(closing.id, STORES.PENDING_CLOSINGS);
+        }
+      }
+
+      if (pendingSales.length > 0 || pendingMovements.length > 0 || pendingClosings.length > 0) {
+        await get().fetchAll();
+        toast.success('Datos sincronizados correctamente');
+      }
+    } catch (err) {
+      console.error('Error in syncPendingData:', err);
+    }
   },
 }));
