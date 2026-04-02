@@ -639,6 +639,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const user = useAuthStore.getState().user;
     if (!user) return { success: false, error: 'No hay usuario autenticado' };
 
+    const isOnline = navigator.onLine;
     const product = get().products.find(p => p.id === productId);
     if (!product) return { success: false, error: 'Producto no encontrado' };
 
@@ -657,13 +658,16 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       const newConsumed = item.consumed + toConsume;
       remaining -= toConsume;
 
-      const { error } = await supabase
-        .from('transit_items')
-        .update({ remaining: newRemaining, consumed: newConsumed, updated_at: new Date().toISOString() })
-        .eq('id', item.id);
+      // Si está online, actualizar en Supabase
+      if (isOnline) {
+        const { error } = await supabase
+          .from('transit_items')
+          .update({ remaining: newRemaining, consumed: newConsumed, updated_at: new Date().toISOString() })
+          .eq('id', item.id);
 
-      if (error) {
-        throw new Error('No se pudo actualizar el item en tránsito');
+        if (error) {
+          throw new Error('No se pudo actualizar el item en tránsito');
+        }
       }
       updatedItems.push({ id: item.id, newRemaining, newConsumed });
     }
@@ -674,41 +678,47 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
 
     const newTotalInTransit = updatedItems.reduce((sum, u) => sum + u.newRemaining, 0);
     const newQuantity = Number(product.quantity) - qtyNeeded;
+    let newMovement = null;
 
-    // Registrar el movimiento de SALIDA en el Kárdex para la venta
-    const { data: newMovement, error: movementError } = await supabase
-      .from('movements')
-      .insert({
-        user_id: user.id,
-        product_id: productId,
-        type: 'SALIDA',
-        quantity: qtyNeeded,
-        unit: product.unit,
-        date: new Date().toISOString(),
-        cost: Number(product.cost),
-        reason: reason || 'Venta de producto/ingrediente',
-        status: 'NORMAL'
-      })
-      .select()
-      .single();
+    // Si está online, registrar el movimiento y actualizar producto en Supabase
+    if (isOnline) {
+      const { data: movementData, error: movementError } = await supabase
+        .from('movements')
+        .insert({
+          user_id: user.id,
+          product_id: productId,
+          type: 'SALIDA',
+          quantity: qtyNeeded,
+          unit: product.unit,
+          date: new Date().toISOString(),
+          cost: Number(product.cost),
+          reason: reason || 'Venta de producto/ingrediente',
+          status: 'NORMAL'
+        })
+        .select()
+        .single();
 
-    if (movementError && import.meta.env.DEV) {
-      console.error('Error recording sale movement:', movementError);
+      newMovement = movementData;
+
+      if (movementError && import.meta.env.DEV) {
+        console.error('Error recording sale movement:', movementError);
+      }
+
+      const { error: productError } = await supabase
+        .from('products')
+        .update({ 
+          in_transit: newTotalInTransit,
+          quantity: newQuantity,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', productId);
+
+      if (productError) {
+        throw new Error('No se pudo actualizar el tránsito del producto');
+      }
     }
 
-    const { error: productError } = await supabase
-      .from('products')
-      .update({ 
-        in_transit: newTotalInTransit,
-        quantity: newQuantity,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', productId);
-
-    if (productError) {
-      throw new Error('No se pudo actualizar el tránsito del producto');
-    }
-
+    // Siempre actualizar el estado local (funciona tanto online como offline)
     set((state) => {
       const updatedTransitItems = state.transitItems
         .map(t => {
@@ -720,7 +730,8 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
         })
         .filter(t => t.remaining > 0);
 
-      const movements = newMovement ? [newMovement, ...state.movements] : state.movements;
+      // Solo agregar movimiento si estamos online (ya que offline no se guarda en Supabase)
+      const movements = isOnline && newMovement ? [newMovement, ...state.movements] : state.movements;
 
       return {
         transitItems: updatedTransitItems,
