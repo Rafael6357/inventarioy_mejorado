@@ -5,19 +5,28 @@ import { getPendingCounts } from '../lib/offlineDB';
 
 export default function ConnectionStatus() {
   const [isOnline, setIsOnline] = useState(true);
-  const [pendingCounts, setPendingCounts] = useState({ sales: 0, movements: 0, closings: 0 });
+  const [pendingCounts, setPendingCounts] = useState({ sales: 0, movements: 0, closings: 0, transitConsumptions: 0 });
   const [isSyncing, setIsSyncing] = useState(false);
   const syncPendingData = useDatabaseStore((state) => state.syncPendingData);
 
   useEffect(() => {
     setIsOnline(navigator.onLine);
+    if (import.meta.env.DEV) {
+      console.log('[ConnectionStatus] Initial isOnline:', navigator.onLine);
+    }
 
     const handleOnline = () => {
+      if (import.meta.env.DEV) {
+        console.log('[ConnectionStatus] online event fired');
+      }
       setIsOnline(true);
       syncPendingData();
     };
 
     const handleOffline = () => {
+      if (import.meta.env.DEV) {
+        console.log('[ConnectionStatus] offline event fired');
+      }
       setIsOnline(false);
     };
 
@@ -45,7 +54,23 @@ export default function ConnectionStatus() {
     return () => clearInterval(interval);
   }, []);
 
-  const totalPending = pendingCounts.sales + pendingCounts.movements + pendingCounts.closings;
+  const totalPending = pendingCounts.sales + pendingCounts.movements + pendingCounts.closings + pendingCounts.transitConsumptions;
+
+  const getPendingText = () => {
+    const parts: string[] = [];
+    if (pendingCounts.sales > 0) parts.push(`${pendingCounts.sales} venta${pendingCounts.sales !== 1 ? 's' : ''}`);
+    if (pendingCounts.movements > 0) parts.push(`${pendingCounts.movements} movimiento${pendingCounts.movements !== 1 ? 's' : ''}`);
+    if (pendingCounts.transitConsumptions > 0) parts.push(`${pendingCounts.transitConsumptions} tránsito${pendingCounts.transitConsumptions !== 1 ? 's' : ''}`);
+    if (pendingCounts.closings > 0) parts.push(`${pendingCounts.closings} cierre${pendingCounts.closings !== 1 ? 's' : ''}`);
+    
+    if (parts.length === 0) return '';
+    if (parts.length === 1) return parts[0];
+    if (parts.length === 2) return parts.join(' y ');
+    return parts.slice(0, -1).join(', ') + ' y ' + parts[parts.length - 1];
+  };
+
+  const pendingText = getPendingText();
+  const isPlural = pendingText.includes(' y ') || pendingText.includes(', ') || (totalPending > 1 && !pendingText.includes('1 '));
 
   if (isOnline && totalPending === 0) {
     return null;
@@ -81,9 +106,9 @@ export default function ConnectionStatus() {
           {isOnline ? 'Conexión restaurada' : 'Modo offline'}
         </span>
         
-        {totalPending > 0 && (
+        {totalPending > 0 && pendingText && (
           <span className="text-xs text-text-secondary">
-            {totalPending} operación{totalPending !== 1 ? 'es' : ''} pendiente{totalPending !== 1 ? 's' : ''}
+            {pendingText} pendiente{isPlural ? 's' : ''}
           </span>
         )}
       </div>

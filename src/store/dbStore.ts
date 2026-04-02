@@ -7,16 +7,20 @@ import {
   savePendingSale,
   savePendingMovement,
   savePendingClosing,
+  savePendingTransitConsumption,
   getAllPendingSales,
   getAllPendingMovements,
   getAllPendingClosings,
+  getAllPendingTransitConsumptions,
   markSaleAsSynced,
   markMovementAsSynced,
   markClosingAsSynced,
+  markTransitConsumptionAsSynced,
   incrementRetryCount,
   deletePendingItem,
   cacheProducts,
   getCachedProducts,
+  checkClosingExists,
   STORES,
 } from '../lib/offlineDB';
 
@@ -509,6 +513,9 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     if (!user) return { success: false, error: 'No hay usuario autenticado' };
 
     const isOnline = navigator.onLine;
+    if (import.meta.env.DEV) {
+      console.log('[addSale] isOnline:', isOnline, 'navigator.onLine:', navigator.onLine);
+    }
 
     const itemsToConsume: { productId: string; name: string; qtyNeeded: number; qtyAvailable: number }[] = [];
 
@@ -658,7 +665,6 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       const newConsumed = item.consumed + toConsume;
       remaining -= toConsume;
 
-      // Si está online, actualizar en Supabase
       if (isOnline) {
         const { error } = await supabase
           .from('transit_items')
@@ -668,6 +674,18 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
         if (error) {
           throw new Error('No se pudo actualizar el item en tránsito');
         }
+      } else {
+        await initOfflineDB();
+        await savePendingTransitConsumption({
+          data: {
+            product_id: productId,
+            transit_item_id: item.id,
+            quantity: toConsume,
+            reason: reason || 'Venta offline',
+            unit: product.unit,
+            cost: Number(product.cost),
+          },
+        });
       }
       updatedItems.push({ id: item.id, newRemaining, newConsumed });
     }
@@ -680,7 +698,6 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const newQuantity = Number(product.quantity) - qtyNeeded;
     let newMovement = null;
 
-    // Si está online, registrar el movimiento y actualizar producto en Supabase
     if (isOnline) {
       const { data: movementData, error: movementError } = await supabase
         .from('movements')
@@ -718,7 +735,6 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       }
     }
 
-    // Siempre actualizar el estado local (funciona tanto online como offline)
     set((state) => {
       const updatedTransitItems = state.transitItems
         .map(t => {
@@ -730,7 +746,6 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
         })
         .filter(t => t.remaining > 0);
 
-      // Solo agregar movimiento si estamos online (ya que offline no se guarda en Supabase)
       const movements = isOnline && newMovement ? [newMovement, ...state.movements] : state.movements;
 
       return {
@@ -1231,13 +1246,22 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     try {
       await initOfflineDB();
 
+      if (import.meta.env.DEV) {
+        console.log('[syncPendingData] Waiting for token refresh stabilization...');
+      }
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
       const pendingSales = await getAllPendingSales();
       const pendingMovements = await getAllPendingMovements();
       const pendingClosings = await getAllPendingClosings();
+      const pendingTransitConsumptions = await getAllPendingTransitConsumptions();
 
       for (const sale of pendingSales) {
         if (sale.retryCount >= 3) continue;
         
+        const delay = Math.min(1000 * Math.pow(2, sale.retryCount), 8000);
+        await new Promise(resolve => setTimeout(resolve, delay));
+
         try {
           const { data, error } = await supabase
             .from('sales')
@@ -1254,6 +1278,13 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
             .single();
 
           if (error) {
+            if (import.meta.env.DEV) {
+              console.error('[syncPendingData] Sale insert error:', error);
+            }
+            if (error.code === '23505') {
+              await markSaleAsSynced(sale.id);
+              continue;
+            }
             await incrementRetryCount(sale.id, STORES.PENDING_SALES);
             continue;
           }
@@ -1281,6 +1312,9 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
 
       for (const movement of pendingMovements) {
         if (movement.retryCount >= 3) continue;
+
+        const delay = Math.min(1000 * Math.pow(2, movement.retryCount), 8000);
+        await new Promise(resolve => setTimeout(resolve, delay));
         
         try {
           const { error } = await supabase
@@ -1297,6 +1331,13 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
             });
 
           if (error) {
+            if (import.meta.env.DEV) {
+              console.error('[syncPendingData] Movement insert error:', error);
+            }
+            if (error.code === '23505') {
+              await markMovementAsSynced(movement.id);
+              continue;
+            }
             await incrementRetryCount(movement.id, STORES.PENDING_MOVEMENTS);
             continue;
           }
@@ -1310,8 +1351,20 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
 
       for (const closing of pendingClosings) {
         if (closing.retryCount >= 3) continue;
+
+        const delay = Math.min(1000 * Math.pow(2, closing.retryCount), 8000);
+        await new Promise(resolve => setTimeout(resolve, delay));
         
         try {
+          const exists = await checkClosingExists(user.id, closing.data.closing_date);
+          if (exists) {
+            if (import.meta.env.DEV) {
+              console.log('[syncPendingData] Closing already exists, marking as synced:', closing.data.closing_date);
+            }
+            await markClosingAsSynced(closing.id);
+            continue;
+          }
+
           const { error } = await supabase
             .from('daily_closings')
             .insert({
@@ -1327,10 +1380,15 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
             });
 
           if (error) {
-            if (error.code !== '23505') {
-              await incrementRetryCount(closing.id, STORES.PENDING_CLOSINGS);
+            if (import.meta.env.DEV) {
+              console.error('[syncPendingData] Closing insert error:', error);
+            }
+            if (error.code === '23505') {
+              await markClosingAsSynced(closing.id);
               continue;
             }
+            await incrementRetryCount(closing.id, STORES.PENDING_CLOSINGS);
+            continue;
           }
 
           await markClosingAsSynced(closing.id);
@@ -1340,7 +1398,73 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
         }
       }
 
-      if (pendingSales.length > 0 || pendingMovements.length > 0 || pendingClosings.length > 0) {
+      for (const consumption of pendingTransitConsumptions) {
+        if (consumption.retryCount >= 3) continue;
+
+        const delay = Math.min(1000 * Math.pow(2, consumption.retryCount), 8000);
+        await new Promise(resolve => setTimeout(resolve, delay));
+
+        try {
+          const transitItemRes = await supabase
+            .from('transit_items')
+            .select('*')
+            .eq('id', consumption.data.transit_item_id)
+            .single();
+
+          if (transitItemRes.error || !transitItemRes.data) {
+            await markTransitConsumptionAsSynced(consumption.id);
+            continue;
+          }
+
+          const transitItem = transitItemRes.data;
+          const newRemaining = transitItem.remaining - consumption.data.quantity;
+          const newConsumed = transitItem.consumed + consumption.data.quantity;
+
+          const { error: transitError } = await supabase
+            .from('transit_items')
+            .update({ 
+              remaining: Math.max(0, newRemaining), 
+              consumed: newConsumed,
+              updated_at: new Date().toISOString() 
+            })
+            .eq('id', consumption.data.transit_item_id);
+
+          if (transitError) {
+            if (import.meta.env.DEV) {
+              console.error('[syncPendingData] Transit item update error:', transitError);
+            }
+            await incrementRetryCount(consumption.id, STORES.PENDING_TRANSIT_CONSUMPTIONS);
+            continue;
+          }
+
+          const productRes = await supabase
+            .from('products')
+            .select('*')
+            .eq('id', consumption.data.product_id)
+            .single();
+
+          if (!productRes.error && productRes.data) {
+            const currentInTransit = Number(productRes.data.in_transit) || 0;
+            const currentQuantity = Number(productRes.data.quantity) || 0;
+            
+            await supabase
+              .from('products')
+              .update({ 
+                in_transit: Math.max(0, currentInTransit - consumption.data.quantity),
+                quantity: Math.max(0, currentQuantity - consumption.data.quantity),
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', consumption.data.product_id);
+          }
+
+          await markTransitConsumptionAsSynced(consumption.id);
+        } catch (err) {
+          console.error('Error syncing transit consumption:', err);
+          await incrementRetryCount(consumption.id, STORES.PENDING_TRANSIT_CONSUMPTIONS);
+        }
+      }
+
+      if (pendingSales.length > 0 || pendingMovements.length > 0 || pendingClosings.length > 0 || pendingTransitConsumptions.length > 0) {
         await get().fetchAll();
         toast.success('Datos sincronizados correctamente');
       }

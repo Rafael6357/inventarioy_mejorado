@@ -240,7 +240,7 @@ export default function SalesView() {
       setDiscount(0);
       setNotes('');
       setShowPreview(false);
-      toast.success('Venta registrada exitosamente');
+      toast.success(navigator.onLine ? 'Venta registrada exitosamente' : 'Venta guardada offline. Se sincronizará cuando haya conexión.');
     } catch (err) {
       setShowPreview(false);
       toast.error((err as Error).message || 'Error al registrar la venta');

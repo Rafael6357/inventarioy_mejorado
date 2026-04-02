@@ -1,10 +1,11 @@
 const DB_NAME = 'inventarioy_offline';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 export const STORES = {
   PENDING_SALES: 'pending_sales',
   PENDING_MOVEMENTS: 'pending_movements',
   PENDING_CLOSINGS: 'pending_closings',
+  PENDING_TRANSIT_CONSUMPTIONS: 'pending_transit_consumptions',
   CACHED_PRODUCTS: 'cached_products',
   SYNC_LOG: 'sync_log',
 };
@@ -34,6 +35,9 @@ export async function initOfflineDB(): Promise<IDBDatabase> {
       }
       if (!database.objectStoreNames.contains(STORES.PENDING_CLOSINGS)) {
         database.createObjectStore(STORES.PENDING_CLOSINGS, { keyPath: 'id' });
+      }
+      if (!database.objectStoreNames.contains(STORES.PENDING_TRANSIT_CONSUMPTIONS)) {
+        database.createObjectStore(STORES.PENDING_TRANSIT_CONSUMPTIONS, { keyPath: 'id' });
       }
       if (!database.objectStoreNames.contains(STORES.CACHED_PRODUCTS)) {
         database.createObjectStore(STORES.CACHED_PRODUCTS, { keyPath: 'id' });
@@ -102,6 +106,21 @@ export interface PendingClosing {
   retryCount: number;
 }
 
+export interface PendingTransitConsumption {
+  id: string;
+  data: {
+    product_id: string;
+    transit_item_id: string;
+    quantity: number;
+    reason?: string;
+    unit: string;
+    cost: number;
+  };
+  timestamp: string;
+  synced: boolean;
+  retryCount: number;
+}
+
 async function getStore(storeName: string, mode: IDBTransactionMode = 'readonly'): Promise<IDBObjectStore> {
   const database = await initOfflineDB();
   return database.transaction(storeName, mode).objectStore(storeName);
@@ -161,6 +180,24 @@ export async function savePendingClosing(closing: Omit<PendingClosing, 'id' | 't
   });
 }
 
+export async function savePendingTransitConsumption(consumption: Omit<PendingTransitConsumption, 'id' | 'timestamp' | 'synced' | 'retryCount'>): Promise<string> {
+  const id = generateId();
+  const pendingConsumption: PendingTransitConsumption = {
+    id,
+    ...consumption,
+    timestamp: new Date().toISOString(),
+    synced: false,
+    retryCount: 0,
+  };
+
+  const store = await getStore(STORES.PENDING_TRANSIT_CONSUMPTIONS, 'readwrite');
+  return new Promise((resolve, reject) => {
+    const request = store.add(pendingConsumption);
+    request.onsuccess = () => resolve(id);
+    request.onerror = () => reject(request.error);
+  });
+}
+
 export async function getAllPendingSales(): Promise<PendingSale[]> {
   const store = await getStore(STORES.PENDING_SALES);
   return new Promise((resolve, reject) => {
@@ -181,6 +218,15 @@ export async function getAllPendingMovements(): Promise<PendingMovement[]> {
 
 export async function getAllPendingClosings(): Promise<PendingClosing[]> {
   const store = await getStore(STORES.PENDING_CLOSINGS);
+  return new Promise((resolve, reject) => {
+    const request = store.getAll();
+    request.onsuccess = () => resolve(request.result.filter(c => !c.synced));
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function getAllPendingTransitConsumptions(): Promise<PendingTransitConsumption[]> {
+  const store = await getStore(STORES.PENDING_TRANSIT_CONSUMPTIONS);
   return new Promise((resolve, reject) => {
     const request = store.getAll();
     request.onsuccess = () => resolve(request.result.filter(c => !c.synced));
@@ -248,6 +294,26 @@ export async function markClosingAsSynced(id: string): Promise<void> {
   });
 }
 
+export async function markTransitConsumptionAsSynced(id: string): Promise<void> {
+  const store = await getStore(STORES.PENDING_TRANSIT_CONSUMPTIONS, 'readwrite');
+  return new Promise((resolve, reject) => {
+    const request = store.get(id);
+    request.onsuccess = () => {
+      const consumption = request.result as PendingTransitConsumption;
+      if (consumption) {
+        consumption.synced = true;
+        consumption.timestamp = new Date().toISOString();
+        const updateRequest = store.put(consumption);
+        updateRequest.onsuccess = () => resolve();
+        updateRequest.onerror = () => reject(updateRequest.error);
+      } else {
+        resolve();
+      }
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
 export async function incrementRetryCount(id: string, storeName: string): Promise<void> {
   const store = await getStore(storeName, 'readwrite');
   return new Promise((resolve, reject) => {
@@ -276,16 +342,18 @@ export async function deletePendingItem(id: string, storeName: string): Promise<
   });
 }
 
-export async function getPendingCounts(): Promise<{ sales: number; movements: number; closings: number }> {
-  const [sales, movements, closings] = await Promise.all([
+export async function getPendingCounts(): Promise<{ sales: number; movements: number; closings: number; transitConsumptions: number }> {
+  const [sales, movements, closings, transitConsumptions] = await Promise.all([
     getAllPendingSales(),
     getAllPendingMovements(),
     getAllPendingClosings(),
+    getAllPendingTransitConsumptions(),
   ]);
   return {
     sales: sales.length,
     movements: movements.length,
     closings: closings.length,
+    transitConsumptions: transitConsumptions.length,
   };
 }
 
@@ -308,7 +376,7 @@ export async function getCachedProducts(): Promise<any[]> {
 }
 
 export async function clearSyncedItems(): Promise<void> {
-  const storeNames = [STORES.PENDING_SALES, STORES.PENDING_MOVEMENTS, STORES.PENDING_CLOSINGS];
+  const storeNames = [STORES.PENDING_SALES, STORES.PENDING_MOVEMENTS, STORES.PENDING_CLOSINGS, STORES.PENDING_TRANSIT_CONSUMPTIONS];
   
   for (const storeName of storeNames) {
     const store = await getStore(storeName, 'readwrite');
@@ -324,4 +392,16 @@ export async function clearSyncedItems(): Promise<void> {
       }
     }
   }
+}
+
+export async function checkClosingExists(userId: string, closingDate: string): Promise<boolean> {
+  const { supabase } = await import('./supabase');
+  const { data, error } = await supabase
+    .from('daily_closings')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('closing_date', closingDate)
+    .single();
+  
+  return !!data && !error;
 }
