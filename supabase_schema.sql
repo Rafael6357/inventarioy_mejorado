@@ -436,3 +436,42 @@ do $$ begin
         for all using (auth.uid() = user_id);
 exception when duplicate_object then null;
 end $$;
+
+-- ============================================
+-- FUNCIÓN PARA RECALCULAR STOCK AUTOMÁTICO
+-- ============================================
+
+-- Función que recalcula el stock de un producto basándose en sus movimientos
+create or replace function public.recalculate_product_stock()
+returns trigger as $$
+declare
+    new_quantity numeric;
+begin
+    -- Calcular la nueva cantidad basada en todos los movimientos del producto
+    select 
+        coalesce(sum(
+            case 
+                when m.type = 'ENTRADA' then m.quantity
+                when m.type in ('SALIDA', 'MERMA') then -m.quantity
+                else 0
+            end
+        ), 0)
+    into new_quantity
+    from public.movements m
+    where m.product_id = COALESCE(new.product_id, old.product_id);
+
+    -- Actualizar el campo quantity del producto
+    update public.products
+    set quantity = greatest(0, new_quantity),
+        updated_at = now()
+    where id = COALESCE(new.product_id, old.product_id);
+
+    return coalesce(new, old);
+end;
+$$ language plpgsql security definer;
+
+-- Trigger para recalcular stock después de INSERT en movements
+drop trigger if exists trg_recalculate_stock_after_movement on public.movements;
+create trigger trg_recalculate_stock_after_movement
+    after insert or update or delete on public.movements
+    for each row execute function public.recalculate_product_stock();
