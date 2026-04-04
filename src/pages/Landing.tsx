@@ -43,7 +43,7 @@ export default function Landing() {
           </div>
           <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-text-secondary">
             <a href="#features" className="hover:text-primary transition-colors">Características</a>
-            <a href="#pricing" className="hover:text-primary transition-colors">Planes</a>
+            <a href="#pricing" className="hover:text-primary transition-colors">Plan</a>
             <a href="#faq" className="hover:text-primary transition-colors">FAQ</a>
           </nav>
           <div className="flex items-center gap-4">
@@ -82,7 +82,7 @@ export default function Landing() {
                 </Link>
                 <a href="#pricing">
                   <Button variant="outline" size="lg" className="w-full sm:w-auto text-base h-12 px-8">
-                    Ver Planes
+                    Ver Plan
                   </Button>
                 </a>
               </div>
@@ -135,7 +135,7 @@ export default function Landing() {
         <section id="pricing" className="py-24">
           <div className="container mx-auto px-4">
             <div className="text-center mb-16">
-              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">Precios simples y transparentes</h2>
+              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">Precio simple y transparente</h2>
               <p className="text-text-secondary max-w-2xl mx-auto">Sin sorpresas ni costos ocultos. Un solo plan con todo incluido.</p>
             </div>
 
@@ -153,10 +153,17 @@ export default function Landing() {
                 <ul className="mb-8 space-y-4">
                   {[
                     "Productos ilimitados",
-                    "Ventas y facturación ilimitadas",
-                    "Gestión de recetas y producción",
+                    "Control de inventario con alertas de stock",
+                    "Registro de movimientos (entradas, salidas, mermas)",
+                    "Módulo de Tránsito para control de ingredientes",
+                    "Cierres de caja diarios",
+                    "Gestión de pagos y gastos",
+                    "Punto de venta integrado",
+                    "Recetas y control de producción",
                     "Control de empleados y nómina",
-                    "Asistente de IA integrado (Groq)",
+                    "Gráficos y estadísticas en tiempo real",
+                    "Análisis con IA de tu negocio",
+                    "Modo offline (para registrar ventas sin internet)",
                     "Soporte prioritario",
                   ].map((item, i) => (
                     <li key={i} className="flex items-center gap-3">
