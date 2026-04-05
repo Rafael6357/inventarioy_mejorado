@@ -260,14 +260,14 @@ export default function TransitView() {
                       </p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-lg font-bold text-primary">{group.totalRemaining}</p>
+                      <p className="text-lg font-bold text-primary">{Number(group.totalRemaining).toFixed(4)} <span className="text-xs font-normal">{group.product.unit}</span></p>
                       <p className="text-xs text-text-secondary">Restante</p>
                     </div>
                   </div>
 
                   <div className="mb-2">
                     <div className="mb-1 flex justify-between text-xs text-text-secondary">
-                      <span>Consumo: {group.totalConsumed} / {group.totalQuantity}</span>
+                      <span>Consumo: {Number(group.totalConsumed).toFixed(4)} / {Number(group.totalQuantity).toFixed(4)} {group.product.unit}</span>
                       <span>{pct.toFixed(0)}%</span>
                     </div>
                     <div className="h-2 w-full overflow-hidden rounded-full bg-surface-hover">
@@ -304,11 +304,12 @@ export default function TransitView() {
                                   />
                                 </div>
                                 <span className="font-mono text-text">
-                                  <span className="text-success">{item.consumed}</span>
+                                  <span className="text-success">{Number(item.consumed).toFixed(4)}</span>
                                   <span className="text-text-secondary">/</span>
-                                  <span className="text-primary">{item.quantity}</span>
+                                  <span className="text-primary">{Number(item.quantity).toFixed(4)}</span>
                                   <span className="text-text-secondary"> = </span>
-                                  <span className="text-warning">{item.remaining}</span>
+                                  <span className="text-warning">{Number(item.remaining).toFixed(4)}</span>
+                                  <span className="text-text-secondary ml-1">{group.product.unit}</span>
                                 </span>
                                 {item.remaining > 0 && (
                                   <div className="flex items-center gap-1">

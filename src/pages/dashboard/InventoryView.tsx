@@ -396,18 +396,20 @@ export default function InventoryView() {
                 value={movement.product_id}
                 onChange={e => {
                   const prod = products.find(p => p.id === e.target.value);
-                  const baseUnit = prod ? normalizeUnit(prod.unit) : 'u';
+                  if (!prod) return;
+                  
+                  const baseUnit = normalizeUnit(prod.unit);
                   const compatibleUnits = getCompatibleUnits(baseUnit);
-                  const savedUnit = prod ? getLastUsedUnit(prod.id) : null;
+                  const savedUnit = getLastUsedUnit(prod.id);
                   const defaultUnit = savedUnit && compatibleUnits.includes(savedUnit) ? savedUnit : baseUnit;
                   
-                  setMovement({
-                    ...movement, 
+                  setMovement(prev => ({
+                    ...prev, 
                     product_id: e.target.value,
                     unit: baseUnit,
                     displayUnit: defaultUnit,
-                    cost: prod ? Number(prod.cost) : 0,
-                  });
+                    cost: Number(prod.cost),
+                  }));
                 }}
               >
                 <option value="">Seleccione un producto...</option>
@@ -427,7 +429,7 @@ export default function InventoryView() {
                   id="mov_qty" 
                   type="number" 
                   min="0.0001" 
-                  step="0.01" 
+                  step="any"
                   required 
                   value={movement.quantity} 
                   onChange={e => setMovement({...movement, quantity: Number(e.target.value)})} 
