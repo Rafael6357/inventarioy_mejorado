@@ -6,6 +6,15 @@ import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
 import { PackagePlus, ArrowRightLeft, Settings2 } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  convertUnit,
+  getCompatibleUnits,
+  getLastUsedUnit,
+  saveLastUsedUnit,
+  normalizeUnit,
+  UnitAbbrev,
+  UNIT_LABELS,
+} from '../../lib/unitConversion';
 
 const DEFAULT_CATEGORIES = [
   "Bebidas y Refrescos",
@@ -51,7 +60,7 @@ export default function InventoryView() {
   const [newProduct, setNewProduct] = useState({
     name: '',
     category: '',
-    unit: 'unidades',
+    unit: 'u',
     quantity: 0,
     price: 0,
     cost: 0,
@@ -69,7 +78,8 @@ export default function InventoryView() {
     type: 'ENTRADA' as 'ENTRADA' | 'SALIDA' | 'MERMA',
     product_id: '',
     quantity: 0,
-    unit: 'unidades',
+    unit: 'u' as UnitAbbrev,
+    displayUnit: 'u' as UnitAbbrev,
     date: new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16),
     cost: 0,
     reason: '',
@@ -112,23 +122,54 @@ export default function InventoryView() {
 
     try {
       const product = products.find(p => p.id === movement.product_id);
-      const isAnomaly = movement.type === 'SALIDA' && product && movement.quantity > (Number(product.quantity) * 0.5);
+      if (!product) {
+        toast.error('Producto no encontrado');
+        return;
+      }
+      
+      const baseUnit = normalizeUnit(product.unit);
+      const quantityInBase = convertUnit(movement.quantity, movement.displayUnit, baseUnit);
+      
+      if (quantityInBase <= 0) {
+        toast.error('La cantidad debe ser mayor a 0');
+        return;
+      }
+      
+      if (movement.type === 'SALIDA') {
+        const availableStock = Number(product.quantity) - (Number(product.in_transit) || 0);
+        if (quantityInBase > availableStock) {
+          toast.error(`La cantidad excede el stock disponible (${availableStock} ${baseUnit})`);
+          return;
+        }
+      }
+      
+      const isAnomaly = movement.type === 'SALIDA' && quantityInBase > (Number(product.quantity) * 0.5);
+
+      const movementCost = movement.type === 'ENTRADA' 
+        ? Number(movement.cost) 
+        : Number(product.cost);
 
       const movementData = {
-        ...movement,
-        quantity: Number(movement.quantity),
-        cost: Number(movement.cost),
+        product_id: movement.product_id,
+        type: movement.type,
+        quantity: quantityInBase,
+        unit: baseUnit,
+        cost: movementCost,
+        reason: movement.reason || null,
         status: isAnomaly ? 'ANOMALIA' : 'NORMAL',
         date: convertToUTC(movement.date),
       };
 
       await addMovement(movementData);
+      
+      saveLastUsedUnit(movement.product_id, movement.displayUnit);
 
       setMovement({
         type: 'ENTRADA',
         product_id: '',
         quantity: 0,
-        unit: 'unidades',
+        unit: 'u',
+        displayUnit: 'u',
         date: new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16),
         cost: 0,
         reason: '',
@@ -225,12 +266,15 @@ export default function InventoryView() {
                   value={newProduct.unit}
                   onChange={e => setNewProduct({...newProduct, unit: e.target.value})}
                 >
-                  <option value="unidades">Unidades</option>
+                  <option value="u">Unidades (u)</option>
                   <option value="kg">Kilogramos (kg)</option>
                   <option value="g">Gramos (g)</option>
-                  <option value="Lb">Libras (Lb)</option>
+                  <option value="lb">Libras (lb)</option>
+                  <option value="oz">Onzas (oz)</option>
                   <option value="L">Litros (L)</option>
                   <option value="ml">Mililitros (ml)</option>
+                  <option value="gal">Galones (gal)</option>
+                  <option value="fl oz">Onzas líquidas (fl oz)</option>
                 </select>
               </div>
             </div>
@@ -352,11 +396,16 @@ export default function InventoryView() {
                 value={movement.product_id}
                 onChange={e => {
                   const prod = products.find(p => p.id === e.target.value);
-                  const availableStock = prod ? Number(prod.quantity) - (Number(prod.in_transit) || 0) : 0;
+                  const baseUnit = prod ? normalizeUnit(prod.unit) : 'u';
+                  const compatibleUnits = getCompatibleUnits(baseUnit);
+                  const savedUnit = prod ? getLastUsedUnit(prod.id) : null;
+                  const defaultUnit = savedUnit && compatibleUnits.includes(savedUnit) ? savedUnit : baseUnit;
+                  
                   setMovement({
                     ...movement, 
                     product_id: e.target.value,
-                    unit: prod ? prod.unit : 'unidades',
+                    unit: baseUnit,
+                    displayUnit: defaultUnit,
                     cost: prod ? Number(prod.cost) : 0,
                   });
                 }}
@@ -374,21 +423,34 @@ export default function InventoryView() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="mov_qty">Cantidad *</Label>
-                <div className="relative flex items-center gap-2">
-                  <Input 
-                    id="mov_qty" 
-                    type="number" 
-                    min="0.01" 
-                    step="0.01" 
-                    required 
-                    value={movement.quantity} 
-                    onChange={e => setMovement({...movement, quantity: Number(e.target.value)})} 
-                    className="no-spin pr-14"
-                  />
-                  <span className="absolute right-3 text-xs text-text-secondary whitespace-nowrap">
-                    {movement.unit}
-                  </span>
-                </div>
+                <Input 
+                  id="mov_qty" 
+                  type="number" 
+                  min="0.0001" 
+                  step="0.01" 
+                  required 
+                  value={movement.quantity} 
+                  onChange={e => setMovement({...movement, quantity: Number(e.target.value)})} 
+                  className="no-spin"
+                  placeholder="Ej: 5"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="mov_unit">Unidad</Label>
+                <select
+                  id="mov_unit"
+                  value={movement.displayUnit}
+                  onChange={e => {
+                    const newUnit = e.target.value as UnitAbbrev;
+                    const convertedQty = convertUnit(movement.quantity, movement.displayUnit, newUnit);
+                    setMovement({...movement, displayUnit: newUnit, quantity: convertedQty});
+                  }}
+                  className="h-10 w-full rounded-lg border border-border bg-bg px-2 py-2 text-sm text-text"
+                >
+                  {getCompatibleUnits(movement.unit).map((u) => (
+                    <option key={u} value={u}>{UNIT_LABELS[u]}</option>
+                  ))}
+                </select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="mov_date">Fecha *</Label>

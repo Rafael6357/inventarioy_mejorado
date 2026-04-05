@@ -267,11 +267,11 @@ export default function StockView() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-right font-mono">
-                        {physicalStock}
+                        {Number(physicalStock).toFixed(4)}
                       </td>
                       <td className="px-4 py-3 text-right font-mono">
                         {inTransit > 0 ? (
-                          <span className="text-warning" title="En transito a produccion">{inTransit}</span>
+                          <span className="text-warning" title="En transito a produccion">{Number(inTransit).toFixed(4)}</span>
                         ) : (
                           <span className="text-text-secondary">-</span>
                         )}

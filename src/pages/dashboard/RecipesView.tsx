@@ -6,6 +6,15 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
+import {
+  convertUnit,
+  getCompatibleUnits,
+  getLastUsedUnit,
+  saveLastUsedUnit,
+  normalizeUnit,
+  UnitAbbrev,
+  UNIT_LABELS,
+} from '../../lib/unitConversion';
 
 export default function RecipesView() {
   const { user } = useAuthStore();
@@ -22,6 +31,7 @@ export default function RecipesView() {
     product_id: string;
     quantity: number;
     unit: string;
+    displayUnit: string;
   }[]>([]);
 
   // Calculate total cost of the recipe based on ingredients
@@ -29,9 +39,9 @@ export default function RecipesView() {
     return ingredients.reduce((sum, ing) => {
       const product = products.find(p => p.id === ing.product_id);
       if (!product) return sum;
-      // Assuming product.cost is per product.unit
-      // If the ingredient unit matches the product unit, it's a direct multiplication
-      return sum + (product.cost * ing.quantity);
+      const baseUnit = normalizeUnit(product.unit);
+      const quantityInBase = convertUnit(ing.quantity, ing.displayUnit as UnitAbbrev, baseUnit);
+      return sum + (product.cost * quantityInBase);
     }, 0);
   }, [ingredients, products]);
 
@@ -42,12 +52,18 @@ export default function RecipesView() {
     const product = products.find(p => p.id === productId);
     if (!product) return;
 
+    const baseUnit = normalizeUnit(product.unit);
+    const compatibleUnits = getCompatibleUnits(baseUnit);
+    const savedUnit = getLastUsedUnit(productId);
+    const defaultUnit = savedUnit && compatibleUnits.includes(savedUnit) ? savedUnit : baseUnit;
+
     setIngredients(current => {
       if (current.some(ing => ing.product_id === productId)) return current;
       return [...current, {
         product_id: productId,
         quantity: 1,
-        unit: product.unit
+        unit: baseUnit,
+        displayUnit: defaultUnit
       }];
     });
   };
@@ -71,10 +87,24 @@ export default function RecipesView() {
     }
 
     try {
+      const convertedIngredients = ingredients.map(ing => {
+        const product = products.find(p => p.id === ing.product_id);
+        const baseUnit = product ? normalizeUnit(product.unit) : 'u';
+        const quantityInBase = convertUnit(ing.quantity, ing.displayUnit as UnitAbbrev, baseUnit);
+        
+        saveLastUsedUnit(ing.product_id, ing.displayUnit as UnitAbbrev);
+        
+        return {
+          product_id: ing.product_id,
+          quantity: quantityInBase,
+          unit: baseUnit
+        };
+      });
+
       await addRecipe({
         name: recipeName,
         selling_price,
-        ingredients
+        ingredients: convertedIngredients
       });
       setRecipeName('');
       setSellingPrice(0);
@@ -159,22 +189,42 @@ export default function RecipesView() {
                       const product = products.find(p => p.id === ing.product_id);
                       if (!product) return null;
                       
+                      const baseUnit = normalizeUnit(product.unit);
+                      const compatibleUnits = getCompatibleUnits(baseUnit);
+                      const quantityInBase = convertUnit(ing.quantity, ing.displayUnit as UnitAbbrev, baseUnit);
+                      
                       return (
                         <div key={ing.product_id} className="flex items-center justify-between gap-3 rounded-md bg-surface p-2 border border-border">
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-text truncate">{product.name}</p>
-                            <p className="text-xs text-text-secondary">Costo: ${(product.cost * ing.quantity).toFixed(2)}</p>
+                            <p className="text-xs text-text-secondary">Costo: ${(product.cost * quantityInBase).toFixed(2)}</p>
                           </div>
                           <div className="flex items-center gap-2">
                             <Input 
                               type="number" 
-                              min="0.01" 
+                              min="0.0001" 
                               step="0.01" 
                               className="h-8 w-20 text-right text-sm"
                               value={ing.quantity}
                               onChange={e => updateIngredientQuantity(ing.product_id, Number(e.target.value))}
                             />
-                            <span className="text-xs text-text-secondary w-8">{ing.unit}</span>
+                            <select
+                              value={ing.displayUnit}
+                              onChange={e => {
+                                const newUnit = e.target.value as UnitAbbrev;
+                                const convertedQty = convertUnit(ing.quantity, ing.displayUnit as UnitAbbrev, newUnit);
+                                setIngredients(current => current.map(i => 
+                                  i.product_id === ing.product_id 
+                                    ? { ...i, displayUnit: newUnit, quantity: convertedQty }
+                                    : i
+                                ));
+                              }}
+                              className="h-8 rounded border border-border bg-bg px-1 text-xs text-text"
+                            >
+                              {compatibleUnits.map((u) => (
+                                <option key={u} value={u}>{UNIT_LABELS[u]}</option>
+                              ))}
+                            </select>
                             <button 
                               type="button"
                               onClick={() => removeIngredient(ing.product_id)}

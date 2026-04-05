@@ -197,6 +197,7 @@ interface DatabaseState {
   
   consumeFromTransit: (productId: string, quantity: number, reason?: string) => Promise<{ success: boolean; error?: string }>;
   cancelTransit: (transitItemId: string, quantity: number, reason: string) => Promise<{ success: boolean; error?: string }>;
+  registerWasteFromTransit: (transitItemId: string, quantity: number, reason: string) => Promise<{ success: boolean; error?: string }>;
   
   addSale: (sale: Omit<Sale, 'id' | 'user_id' | 'created_at'>) => Promise<{ success: boolean; error?: string }>;
   
@@ -764,6 +765,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const user = useAuthStore.getState().user;
     if (!user) return { success: false, error: 'No autenticado' };
 
+    const isOnline = navigator.onLine;
     const transitItem = get().transitItems.find(t => t.id === transitItemId);
     if (!transitItem) return { success: false, error: 'Item no encontrado' };
 
@@ -775,53 +777,161 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const product = get().products.find(p => p.id === transitItem.product_id);
     if (!product) return { success: false, error: 'Producto no encontrado' };
 
-    const { error: updateError } = await supabase
-      .from('transit_items')
-      .update({ remaining: 0, consumed: transitItem.quantity })
-      .eq('id', transitItemId);
-
-    if (updateError) {
-      return { success: false, error: 'No se pudo actualizar el item en tránsito' };
-    }
-
+    const newRemaining = transitItem.remaining - quantity;
+    const newConsumed = transitItem.consumed + quantity;
     const newInTransit = Math.max(0, Number(product.in_transit || 0) - quantity);
 
-    const { error: productUpdateError } = await supabase
-      .from('products')
-      .update({ in_transit: newInTransit })
-      .eq('id', product.id);
+    if (isOnline) {
+      const { error: updateError } = await supabase
+        .from('transit_items')
+        .update({ 
+          remaining: newRemaining, 
+          consumed: newConsumed 
+        })
+        .eq('id', transitItemId);
 
-    if (productUpdateError) {
-      await supabase.from('transit_items').update({ remaining: transitItem.remaining }).eq('id', transitItemId);
-      return { success: false, error: 'No se pudo devolver al stock' };
+      if (updateError) {
+        return { success: false, error: 'No se pudo actualizar el item en tránsito' };
+      }
+
+      const { error: productUpdateError } = await supabase
+        .from('products')
+        .update({ in_transit: newInTransit })
+        .eq('id', product.id);
+
+      if (productUpdateError) {
+        await supabase.from('transit_items').update({ remaining: transitItem.remaining, consumed: transitItem.consumed }).eq('id', transitItemId);
+        return { success: false, error: 'No se pudo devolver al stock' };
+      }
+
+      const { error: movementError } = await supabase
+        .from('movements')
+        .insert({
+          user_id: user.id,
+          product_id: product.id,
+          type: 'ENTRADA',
+          quantity,
+          unit: product.unit,
+          date: new Date().toISOString(),
+          cost: Number(product.cost),
+          reason: `Devolución de tránsito: ${reason}`,
+          status: 'NORMAL',
+        });
+
+      if (movementError) {
+        if (import.meta.env.DEV) console.error('Error registering return movement:', movementError);
+      }
     }
 
-    const { error: movementError } = await supabase
-      .from('movements')
-      .insert({
-        user_id: user.id,
-        product_id: product.id,
-        type: 'ENTRADA',
-        quantity,
-        unit: product.unit,
-        date: new Date().toISOString(),
-        cost: Number(product.cost),
-        reason: `Devolución de tránsito: ${reason}`,
-        status: 'NORMAL',
-      });
+    set((state) => {
+      if (newRemaining <= 0) {
+        return {
+          transitItems: state.transitItems.filter(t => t.id !== transitItemId),
+          products: state.products.map(p =>
+            p.id === product.id
+              ? { ...p, in_transit: newInTransit }
+              : p
+          ),
+        };
+      }
+      
+      return {
+        transitItems: state.transitItems.map(t =>
+          t.id === transitItemId
+            ? { ...t, remaining: newRemaining, consumed: newConsumed }
+            : t
+        ),
+        products: state.products.map(p =>
+          p.id === product.id
+            ? { ...p, in_transit: newInTransit }
+            : p
+        ),
+      };
+    });
 
-    if (movementError) {
-      if (import.meta.env.DEV) console.error('Error registering return movement:', movementError);
+    return { success: true };
+  },
+
+  registerWasteFromTransit: async (transitItemId: string, quantity: number, reason: string) => {
+    const user = useAuthStore.getState().user;
+    if (!user) return { success: false, error: 'No autenticado' };
+
+    const isOnline = navigator.onLine;
+    const transitItem = get().transitItems.find(t => t.id === transitItemId);
+    if (!transitItem) return { success: false, error: 'Item no encontrado' };
+
+    if (quantity <= 0) return { success: false, error: 'La cantidad debe ser mayor a 0' };
+    if (quantity > transitItem.remaining) {
+      return { success: false, error: `La cantidad no puede exceder ${transitItem.remaining}` };
     }
 
-    set((state) => ({
-      transitItems: state.transitItems.filter(t => t.id !== transitItemId),
-      products: state.products.map(p =>
-        p.id === product.id
-          ? { ...p, in_transit: newInTransit }
-          : p
-      ),
-    }));
+    const product = get().products.find(p => p.id === transitItem.product_id);
+    if (!product) return { success: false, error: 'Producto no encontrado' };
+
+    const newRemaining = transitItem.remaining - quantity;
+
+    if (isOnline) {
+      const { error: updateError } = await supabase
+        .from('transit_items')
+        .update({ remaining: newRemaining })
+        .eq('id', transitItemId);
+
+      if (updateError) {
+        return { success: false, error: 'No se pudo actualizar el item en tránsito' };
+      }
+
+      const newInTransit = Math.max(0, Number(product.in_transit || 0) - quantity);
+
+      const { error: productUpdateError } = await supabase
+        .from('products')
+        .update({ in_transit: newInTransit })
+        .eq('id', product.id);
+
+      if (productUpdateError) {
+        await supabase.from('transit_items').update({ remaining: transitItem.remaining }).eq('id', transitItemId);
+        return { success: false, error: 'No se pudo actualizar el tránsito del producto' };
+      }
+
+      const { error: movementError } = await supabase
+        .from('movements')
+        .insert({
+          user_id: user.id,
+          product_id: product.id,
+          type: 'MERMA',
+          quantity,
+          unit: product.unit,
+          date: new Date().toISOString(),
+          cost: Number(product.cost),
+          reason: `Merma en tránsito: ${reason}`,
+          status: 'NORMAL',
+        });
+
+      if (movementError) {
+        if (import.meta.env.DEV) console.error('Error registering waste movement:', movementError);
+      }
+    }
+
+    set((state) => {
+      const updatedTransitItems = state.transitItems
+        .map(t => {
+          if (t.id === transitItemId) {
+            return { ...t, remaining: newRemaining };
+          }
+          return t;
+        })
+        .filter(t => t.remaining > 0);
+
+      const newInTransit = Math.max(0, Number(product.in_transit || 0) - quantity);
+
+      return {
+        transitItems: updatedTransitItems,
+        products: state.products.map(p =>
+          p.id === product.id
+            ? { ...p, in_transit: newInTransit }
+            : p
+        ),
+      };
+    });
 
     return { success: true };
   },
