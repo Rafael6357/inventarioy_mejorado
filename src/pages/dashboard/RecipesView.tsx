@@ -219,7 +219,8 @@ export default function RecipesView() {
                                     : i
                                 ));
                               }}
-                              className="h-8 rounded border border-border bg-bg px-1 text-xs text-text"
+                              disabled={compatibleUnits.length <= 1}
+                              className="h-8 rounded border border-border bg-bg px-1 text-xs text-text disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               {compatibleUnits.map((u) => (
                                 <option key={u} value={u}>{UNIT_LABELS[u]}</option>

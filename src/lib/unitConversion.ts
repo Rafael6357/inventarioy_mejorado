@@ -42,7 +42,7 @@ const UNIT_ALIASES: Record<string, UnitAbbrev> = {
   'lb': 'lb', 'libras': 'lb', 'libra': 'lb', 'lbs': 'lb',
   'oz': 'oz', 'onzas': 'oz', 'onza': 'oz',
   'ml': 'ml', 'mililitros': 'ml', 'mililitro': 'ml',
-  'L': 'L', 'litros': 'L', 'litro': 'L', 'lts': 'L',
+  'l': 'L', 'litros': 'L', 'litro': 'L', 'lts': 'L',
   'gal': 'gal', 'galones': 'gal', 'galon': 'gal',
   'fl oz': 'fl oz', 'onzas liquidas': 'fl oz', 'ozfl': 'fl oz',
 };
@@ -54,12 +54,13 @@ export function normalizeUnit(unit: string): UnitAbbrev {
 }
 
 export function getUnitType(unit: UnitAbbrev): UnitType | null {
-  if (['g', 'kg', 'lb', 'oz', 'u'].includes(unit)) return 'weight';
-  if (['ml', 'L', 'gal', 'fl oz', 'u'].includes(unit)) return 'volume';
+  if (['g', 'kg', 'lb', 'oz'].includes(unit)) return 'weight';
+  if (['ml', 'L', 'gal', 'fl oz'].includes(unit)) return 'volume';
   return null;
 }
 
 export function getCompatibleUnits(baseUnit: UnitAbbrev): UnitAbbrev[] {
+  if (baseUnit === 'u') return ['u'];
   const type = getUnitType(baseUnit);
   if (!type) return [baseUnit];
   return UNITS_BY_TYPE[type];

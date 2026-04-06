@@ -91,7 +91,7 @@ export default function AnalysisView() {
     const rows = auditData.movements.map(m => [
       new Date(m.date).toLocaleDateString('es-CO'),
       m.type,
-      m.type === 'ENTRADA' ? `+${m.quantity}` : `-${m.quantity}`,
+      m.type === 'ENTRADA' ? `+${Number(m.quantity).toFixed(4)}` : `-${Number(m.quantity).toFixed(4)}`,
       (m.reason || '-').replace(/,/g, ' ')
     ]);
     
@@ -346,7 +346,7 @@ export default function AnalysisView() {
                         <td className={`px-4 py-3 text-right font-mono font-medium ${
                           m.type === 'ENTRADA' ? 'text-success' : 'text-danger'
                         }`}>
-                          {m.type === 'ENTRADA' ? '+' : '-'}{m.quantity}
+                          {m.type === 'ENTRADA' ? '+' : '-'}{Number(m.quantity).toFixed(4)}
                         </td>
                         <td className="px-4 py-3 text-text-secondary">{m.reason || '-'}</td>
                       </tr>
@@ -409,7 +409,7 @@ export default function AnalysisView() {
                         </span>
                       </td>
                       <td className="px-4 py-3 font-medium">{product.name}</td>
-                      <td className="px-4 py-3 text-right">{product.quantity} {product.unit}</td>
+                      <td className="px-4 py-3 text-right">{Number(product.quantity).toFixed(4)} {product.unit}</td>
                       <td className="px-4 py-3 text-right font-mono">${product.totalValue.toFixed(2)}</td>
                       <td className="px-4 py-3 text-right font-mono text-text-secondary">
                         {product.cumulativePercentage.toFixed(1)}%

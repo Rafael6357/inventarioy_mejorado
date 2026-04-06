@@ -193,7 +193,7 @@ export default function MovementsView() {
                       <td className={`px-4 py-3 text-right font-mono font-medium ${
                         isEntrada ? 'text-success' : 'text-danger'
                       }`}>
-                        {isEntrada ? '+' : '-'}{movement.quantity} {movement.unit}
+                        {isEntrada ? '+' : '-'}{Number(movement.quantity).toFixed(4)} {movement.unit}
                       </td>
                       <td className="px-4 py-3 text-right font-mono text-text-secondary">
                         ${movement.cost.toFixed(2)}

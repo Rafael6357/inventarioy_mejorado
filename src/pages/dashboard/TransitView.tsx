@@ -417,7 +417,8 @@ export default function TransitView() {
                           setCancelModal({ ...cancelModal, quantity: convertedQty, unit: newUnit });
                           saveLastUsedUnit(cancelModal.item.product_id, newUnit);
                         }}
-                        className="w-full rounded-lg border border-border bg-bg px-2 py-2 text-sm text-text"
+                        disabled={compatibleUnits.length <= 1}
+                        className="w-full rounded-lg border border-border bg-bg px-2 py-2 text-sm text-text disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {compatibleUnits.map((u) => (
                           <option key={u} value={u}>{UNIT_LABELS[u]}</option>
@@ -533,7 +534,8 @@ export default function TransitView() {
                           setWasteModal({ ...wasteModal, quantity: convertedQty, unit: newUnit });
                           saveLastUsedUnit(wasteModal.item.product_id, newUnit);
                         }}
-                        className="w-full rounded-lg border border-border bg-bg px-2 py-2 text-sm text-text"
+                        disabled={compatibleUnits.length <= 1}
+                        className="w-full rounded-lg border border-border bg-bg px-2 py-2 text-sm text-text disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {compatibleUnits.map((u) => (
                           <option key={u} value={u}>{UNIT_LABELS[u]}</option>

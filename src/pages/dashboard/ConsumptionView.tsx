@@ -232,7 +232,7 @@ export default function ConsumptionView() {
                     <td className="px-6 py-4">
                       {item.directQty > 0 ? (
                         <span className="inline-flex items-center rounded-full bg-surface px-2.5 py-1 text-xs font-medium border border-border">
-                          {item.directQty.toFixed(2)} {item.product.unit}
+                          {item.directQty.toFixed(4)} {item.product.unit}
                         </span>
                       ) : (
                         <span className="text-text-secondary">-</span>
@@ -242,12 +242,12 @@ export default function ConsumptionView() {
                       {item.recipeQty > 0 ? (
                         <div className="space-y-1">
                           <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
-                            {item.recipeQty.toFixed(2)} {item.product.unit}
+                            {item.recipeQty.toFixed(4)} {item.product.unit}
                           </span>
                           <div className="flex flex-col gap-1 mt-1">
                             {item.recipes.map((r, idx) => (
                               <span key={idx} className="text-[10px] text-text-secondary">
-                                • {r.recipeName}: {r.qty.toFixed(2)} {item.product.unit}
+                                • {r.recipeName}: {r.qty.toFixed(4)} {item.product.unit}
                               </span>
                             ))}
                           </div>
@@ -258,7 +258,7 @@ export default function ConsumptionView() {
                     </td>
                     <td className="px-6 py-4">
                       <span className="font-bold text-text">
-                        {item.totalQty.toFixed(2)} {item.product.unit}
+                        {item.totalQty.toFixed(4)} {item.product.unit}
                       </span>
                     </td>
                     <td className="px-6 py-4">

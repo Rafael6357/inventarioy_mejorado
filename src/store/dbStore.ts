@@ -778,15 +778,13 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     if (!product) return { success: false, error: 'Producto no encontrado' };
 
     const newRemaining = transitItem.remaining - quantity;
-    const newConsumed = transitItem.consumed + quantity;
     const newInTransit = Math.max(0, Number(product.in_transit || 0) - quantity);
 
     if (isOnline) {
       const { error: updateError } = await supabase
         .from('transit_items')
         .update({ 
-          remaining: newRemaining, 
-          consumed: newConsumed 
+          remaining: newRemaining
         })
         .eq('id', transitItemId);
 
@@ -838,7 +836,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       return {
         transitItems: state.transitItems.map(t =>
           t.id === transitItemId
-            ? { ...t, remaining: newRemaining, consumed: newConsumed }
+            ? { ...t, remaining: newRemaining }
             : t
         ),
         products: state.products.map(p =>
@@ -881,10 +879,11 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       }
 
       const newInTransit = Math.max(0, Number(product.in_transit || 0) - quantity);
+      const newQuantity = Math.max(0, Number(product.quantity || 0) - quantity);
 
       const { error: productUpdateError } = await supabase
         .from('products')
-        .update({ in_transit: newInTransit })
+        .update({ in_transit: newInTransit, quantity: newQuantity })
         .eq('id', product.id);
 
       if (productUpdateError) {
@@ -892,7 +891,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
         return { success: false, error: 'No se pudo actualizar el tránsito del producto' };
       }
 
-      const { error: movementError } = await supabase
+      const { data: movementData, error: movementError } = await supabase
         .from('movements')
         .insert({
           user_id: user.id,
@@ -904,10 +903,14 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
           cost: Number(product.cost),
           reason: `Merma en tránsito: ${reason}`,
           status: 'NORMAL',
-        });
+        })
+        .select()
+        .single();
 
       if (movementError) {
         if (import.meta.env.DEV) console.error('Error registering waste movement:', movementError);
+      } else if (movementData) {
+        set((state) => ({ movements: [movementData, ...state.movements] }));
       }
     }
 
@@ -922,12 +925,13 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
         .filter(t => t.remaining > 0);
 
       const newInTransit = Math.max(0, Number(product.in_transit || 0) - quantity);
+      const newQuantity = Math.max(0, Number(product.quantity || 0) - quantity);
 
       return {
         transitItems: updatedTransitItems,
         products: state.products.map(p =>
           p.id === product.id
-            ? { ...p, in_transit: newInTransit }
+            ? { ...p, in_transit: newInTransit, quantity: newQuantity }
             : p
         ),
       };

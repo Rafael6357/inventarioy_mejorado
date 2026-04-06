@@ -447,7 +447,8 @@ export default function InventoryView() {
                     const convertedQty = convertUnit(movement.quantity, movement.displayUnit, newUnit);
                     setMovement({...movement, displayUnit: newUnit, quantity: convertedQty});
                   }}
-                  className="h-10 w-full rounded-lg border border-border bg-bg px-2 py-2 text-sm text-text"
+                  disabled={getCompatibleUnits(movement.unit).length <= 1}
+                  className="h-10 w-full rounded-lg border border-border bg-bg px-2 py-2 text-sm text-text disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {getCompatibleUnits(movement.unit).map((u) => (
                     <option key={u} value={u}>{UNIT_LABELS[u]}</option>
