@@ -4,18 +4,22 @@ import { useDatabaseStore } from '../store/dbStore';
 import { getPendingCounts } from '../lib/offlineDB';
 
 export default function ConnectionStatus() {
-  const [isOnline, setIsOnline] = useState(true);
+  const [isOnline, setIsOnline] = useState<boolean | null>(null);
   const [pendingCounts, setPendingCounts] = useState({ sales: 0, movements: 0, closings: 0, transitConsumptions: 0 });
   const [isSyncing, setIsSyncing] = useState(false);
   const syncPendingData = useDatabaseStore((state) => state.syncPendingData);
 
   useEffect(() => {
-    setIsOnline(navigator.onLine);
+    const timeout = setTimeout(() => {
+      setIsOnline(navigator.onLine);
+    }, 1500);
+
     if (import.meta.env.DEV) {
       console.log('[ConnectionStatus] Initial isOnline:', navigator.onLine);
     }
 
     const handleOnline = () => {
+      clearTimeout(timeout);
       if (import.meta.env.DEV) {
         console.log('[ConnectionStatus] online event fired');
       }
@@ -24,6 +28,7 @@ export default function ConnectionStatus() {
     };
 
     const handleOffline = () => {
+      clearTimeout(timeout);
       if (import.meta.env.DEV) {
         console.log('[ConnectionStatus] offline event fired');
       }
@@ -34,6 +39,7 @@ export default function ConnectionStatus() {
     window.addEventListener('offline', handleOffline);
 
     return () => {
+      clearTimeout(timeout);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
@@ -72,7 +78,7 @@ export default function ConnectionStatus() {
   const pendingText = getPendingText();
   const isPlural = pendingText.includes(' y ') || pendingText.includes(', ') || (totalPending > 1 && !pendingText.includes('1 '));
 
-  if (isOnline && totalPending === 0) {
+  if (isOnline === null || (isOnline && totalPending === 0)) {
     return null;
   }
 
@@ -102,8 +108,8 @@ export default function ConnectionStatus() {
       )}
       
       <div className="flex flex-col">
-        <span className={`text-sm font-medium ${isOnline ? 'text-success' : 'text-warning'}`}>
-          {isOnline ? 'Conexión restaurada' : 'Modo offline'}
+        <span className={`text-sm font-medium ${isOnline === false ? 'text-warning' : 'text-success'}`}>
+          {isOnline === false ? 'Modo offline' : isOnline === true ? 'Conexión restaurada' : 'Verificando...'}
         </span>
         
         {totalPending > 0 && pendingText && (
