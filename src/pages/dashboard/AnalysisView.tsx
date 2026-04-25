@@ -47,12 +47,6 @@ export default function AnalysisView() {
       return m.product_id === auditProduct && mDate >= fromDate && mDate <= toDate;
     });
 
-    const stockInicial = movements
-      .filter(m => m.product_id === auditProduct && new Date(m.date) < fromDate)
-      .reduce((sum, m) => {
-        return m.type === 'ENTRADA' ? sum + Number(m.quantity) : sum - Number(m.quantity);
-      }, 0);
-
     const entradas = filteredMovements
       .filter(m => m.type === 'ENTRADA')
       .reduce((sum, m) => sum + Number(m.quantity), 0);
@@ -65,7 +59,7 @@ export default function AnalysisView() {
       .filter(m => m.type === 'MERMA')
       .reduce((sum, m) => sum + Number(m.quantity), 0);
 
-    const stockFinal = stockInicial + entradas - salidas - merma;
+    const stockFinal = entradas - salidas - merma;
 
     const chartData = filteredMovements.map(m => ({
       fecha: new Date(m.date).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' }),
@@ -75,7 +69,6 @@ export default function AnalysisView() {
 
     return {
       product,
-      stockInicial,
       entradas,
       salidas,
       merma,
@@ -279,11 +272,7 @@ export default function AnalysisView() {
 
         {auditData && (
           <>
-            <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-              <div className="rounded-lg bg-bg/50 border border-border/50 p-3 text-center">
-                <p className="text-xs text-text-secondary">Stock Inicial</p>
-                <p className="font-mono font-bold text-text mt-1">{auditData.stockInicial} {auditData.product.unit}</p>
-              </div>
+            <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               <div className="rounded-lg bg-success/10 border border-success/30 p-3 text-center">
                 <p className="text-xs text-success">Entradas</p>
                 <p className="font-mono font-bold text-success mt-1">+{auditData.entradas}</p>
