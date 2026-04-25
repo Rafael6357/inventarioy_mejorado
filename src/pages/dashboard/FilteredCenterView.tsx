@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
-import { Filter, Search, ArrowUpDown, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Filter, Search, ArrowUpDown, AlertTriangle, CheckCircle2, Settings2 } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 
@@ -44,9 +44,14 @@ export default function FilteredCenterView() {
     if (stockFilter !== 'ALL') {
       result = result.filter(p => {
         const physicalStock = Number(p.quantity) - (Number(p.in_transit) || 0);
-        if (stockFilter === 'LOW') return physicalStock <= p.rop;
-        if (stockFilter === 'NORMAL') return physicalStock > p.rop;
-        if (stockFilter === 'OVER') return physicalStock > (Number(p.rop) * 2);
+        const rop = Number(p.rop) || 0;
+        
+        // Si ROP no está configurado (0), exclude from LOW/OVER/NORMAL filters
+        if (rop === 0) return stockFilter === 'ALL';
+        
+        if (stockFilter === 'LOW') return physicalStock <= rop;
+        if (stockFilter === 'NORMAL') return physicalStock > rop && physicalStock <= rop * 2;
+        if (stockFilter === 'OVER') return physicalStock > rop * 2;
         return true;
       });
     }
@@ -197,8 +202,9 @@ export default function FilteredCenterView() {
                 </tr>
               ) : (
                 filteredAndSortedProducts.map((product) => {
-                  const isLow = product.quantity <= product.rop;
-                  const isOver = product.quantity > product.rop * 2;
+                  const isLow = (Number(product.rop) || 0) > 0 && product.quantity <= product.rop;
+                  const isOver = (Number(product.rop) || 0) > 0 && product.quantity > product.rop * 2;
+                  const noRopConfigured = (Number(product.rop) || 0) === 0;
                   const totalValue = product.quantity * product.cost;
 
                   return (
@@ -222,7 +228,11 @@ export default function FilteredCenterView() {
                         {product.quantity} <span className="text-xs text-text-secondary">{product.unit}</span>
                       </td>
                       <td className="px-4 py-3">
-                        {isLow ? (
+                        {noRopConfigured ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-text-secondary/10 px-2 py-1 text-xs font-medium text-text-secondary">
+                            <Settings2 className="h-3 w-3" /> Sin configurar
+                          </span>
+                        ) : isLow ? (
                           <span className="inline-flex items-center gap-1 rounded-full bg-danger/10 px-2 py-1 text-xs font-medium text-danger">
                             <AlertTriangle className="h-3 w-3" /> Bajo
                           </span>
