@@ -90,6 +90,12 @@ export default function InventoryView() {
     e.preventDefault();
     if (!user) return;
     
+    // Validar precio si es indivdual
+    if (newProduct.is_individual && (!newProduct.price || newProduct.price < 0.01)) {
+      toast.error('El precio de venta debe ser mayor a $0 para productos que se venden individualmente');
+      return;
+    }
+    
     try {
       await addProduct({
         ...newProduct,

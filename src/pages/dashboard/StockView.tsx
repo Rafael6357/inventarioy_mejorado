@@ -377,8 +377,8 @@ export default function StockView() {
 
       {editingProduct && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-border/50 bg-surface p-6 shadow-2xl">
-            <div className="mb-6 flex items-center justify-between">
+          <div className="w-full max-w-md rounded-2xl border border-border/50 bg-surface p-6 shadow-2xl max-h-[80vh] flex flex-col">
+            <div className="mb-6 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
                 <div className="rounded-lg bg-primary/10 p-2 text-primary">
                   <Settings2 className="h-5 w-5" />
@@ -396,7 +396,7 @@ export default function StockView() {
               </button>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-4 overflow-y-auto max-h-[50vh] pr-2">
               <div className="space-y-2">
                 <Label htmlFor="edit_rop">ROP (Punto de Reorden)</Label>
                 <Input
@@ -478,7 +478,7 @@ export default function StockView() {
                 </div>
               )}
 
-            <div className="mt-6 flex gap-3">
+            <div className="mt-6 flex gap-3 shrink-0">
               <Button 
                 variant="outline" 
                 className="flex-1"
