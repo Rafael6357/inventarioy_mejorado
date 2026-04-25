@@ -977,7 +977,10 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
   updateRecipe: async (id, updates) => {
     const { error } = await supabase
       .from('recipes')
-      .update({ name: capitalize(updates.name), selling_price: updates.selling_price })
+      .update({ 
+        name: updates.name ? capitalize(updates.name) : undefined, 
+        selling_price: updates.selling_price 
+      })
       .eq('id', id);
 
     if (error) {
