@@ -313,7 +313,7 @@ export default function SalesView() {
                   ${product.price.toFixed(2)}
                 </p>
                 <p className="mt-1 text-xs text-text-secondary">
-                  {product.is_recipe ? 'Receta' : `Stock: ${product.quantity} ${product.unit}`}
+                  {product.is_recipe ? 'Receta' : `En Tránsito: ${(product as any).in_transit || 0} ${product.unit}`}
                 </p>
               </button>
             ))}
