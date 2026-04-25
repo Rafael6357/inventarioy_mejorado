@@ -59,7 +59,7 @@ export default function AnalysisView() {
       .filter(m => m.type === 'MERMA')
       .reduce((sum, m) => sum + Number(m.quantity), 0);
 
-    const stockFinal = entradas - salidas - merma;
+    const stockFinal = Number(product.quantity);
 
     const chartData = filteredMovements.map(m => ({
       fecha: new Date(m.date).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' }),
@@ -288,7 +288,7 @@ export default function AnalysisView() {
                 </div>
               )}
               <div className={`rounded-lg border p-3 text-center ${auditData.stockFinal >= 0 ? 'bg-primary/10 border-primary/30' : 'bg-danger/10 border-danger/30'}`}>
-                <p className="text-xs text-text-secondary">Stock Final</p>
+                <p className="text-xs text-text-secondary">Stock Actual</p>
                 <p className={`font-mono font-bold mt-1 ${auditData.stockFinal >= 0 ? 'text-primary' : 'text-danger'}`}>
                   {auditData.stockFinal} {auditData.product.unit}
                 </p>
