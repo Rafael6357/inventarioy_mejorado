@@ -321,7 +321,7 @@ export default function InventoryView() {
               {newProduct.is_individual && (
                 <div className="space-y-2 sm:w-1/2">
                   <Label htmlFor="price">Precio de Venta *</Label>
-                  <Input id="price" type="number" min="0" step="0.01" required value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: Number(e.target.value)})} />
+                  <Input id="price" type="number" min="0.01" step="0.01" required value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: Number(e.target.value)})} />
                 </div>
               )}
             </div>

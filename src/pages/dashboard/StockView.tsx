@@ -19,6 +19,7 @@ export default function StockView() {
     lead_time: 0,
     order_cost: 0,
     holding_cost: 0,
+    price: 0,
   });
   
   const products = useDatabaseStore((state) => state.products);
@@ -86,24 +87,29 @@ export default function StockView() {
       lead_time: Number(product.lead_time) || 0,
       order_cost: Number(product.order_cost) || 0,
       holding_cost: Number(product.holding_cost) || 0,
+      price: Number(product.price) || 0,
     });
   };
 
   const closeEditModal = () => {
     setEditingProduct(null);
-    setEditParams({ rop: 0, eoq: 0, lead_time: 0, order_cost: 0, holding_cost: 0 });
+    setEditParams({ rop: 0, eoq: 0, lead_time: 0, order_cost: 0, holding_cost: 0, price: 0 });
   };
 
   const handleSaveParams = async () => {
     if (!editingProduct) return;
     
-    const updates = {
+    const updates: any = {
       rop: Math.max(0, editParams.rop),
       eoq: Math.max(0, editParams.eoq),
       lead_time: Math.max(0, editParams.lead_time),
       order_cost: Math.max(0, editParams.order_cost),
       holding_cost: Math.max(0, editParams.holding_cost),
     };
+
+    if (editingProduct.is_individual) {
+      updates.price = Math.max(0.01, editParams.price);
+    }
 
     try {
       await updateProduct(editingProduct.id, updates);
@@ -456,6 +462,21 @@ export default function StockView() {
                 <p className="text-xs text-text-secondary">Costo de guardar 1 unidad por año</p>
               </div>
             </div>
+
+              {editingProduct.is_individual && (
+                <div className="space-y-2">
+                  <Label htmlFor="edit_price">Precio de Venta ($)</Label>
+                  <Input
+                    id="edit_price"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={editParams.price}
+                    onChange={(e) => setEditParams({...editParams, price: Number(e.target.value)})}
+                  />
+                  <p className="text-xs text-text-secondary">Precio de venta por unidad</p>
+                </div>
+              )}
 
             <div className="mt-6 flex gap-3">
               <Button 

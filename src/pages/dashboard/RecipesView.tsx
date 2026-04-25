@@ -152,15 +152,15 @@ export default function RecipesView() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="sellingPrice">Precio de Venta ($) *</Label>
-                <Input 
+<Input 
                   id="sellingPrice" 
                   type="number" 
-                  min="0" 
+                  min="0.01" 
                   step="0.01" 
                   required 
                   value={selling_price || ''} 
                     onChange={e => setSellingPrice(Number(e.target.value))} 
-                  />
+                />
                 </div>
               </div>
 
