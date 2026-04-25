@@ -370,20 +370,23 @@ export default function RecipesView() {
                               onChange={(e) => setEditingPrice(Number(e.target.value))}
                               className="h-8 w-16 text-center font-mono text-primary text-sm"
                             />
-                            <button onClick={() => saveEditPrice(recipe.id)} className="text-success">
+                            <button onClick={() => saveEditPrice(recipe.id)} className="text-success hover:text-green-400">
                               <Check className="h-4 w-4" />
                             </button>
-                            <button onClick={cancelEditPrice} className="text-text-secondary">
+                            <button onClick={cancelEditPrice} className="text-text-secondary hover:text-text">
                               <X className="h-4 w-4" />
                             </button>
                           </div>
                         ) : (
                           <button 
                             onClick={() => startEditPrice(recipe)}
-                            className="w-full hover:text-primary"
-                            title="Editar precio"
+                            className="w-full hover:bg-primary/20 rounded-md p-1 transition-colors"
+                            title="Clic para editar precio de venta"
                           >
-                            <p className="text-xs text-text-secondary">Venta</p>
+                            <div className="flex items-center justify-center gap-1">
+                              <Pencil className="h-3 w-3 text-text-secondary" />
+                              <p className="text-xs text-text-secondary">Venta</p>
+                            </div>
                             <p className="font-mono font-medium text-primary">${recipe.selling_price.toFixed(2)}</p>
                           </button>
                         )}
