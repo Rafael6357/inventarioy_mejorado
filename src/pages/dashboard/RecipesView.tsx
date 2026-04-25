@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
 import { useAuthStore } from '../../store/authStore';
-import { ChefHat, Plus, Minus, Trash2, Search, UtensilsCrossed, AlertCircle } from 'lucide-react';
+import { ChefHat, Plus, Minus, Trash2, Search, UtensilsCrossed, AlertCircle, Pencil, X, Check } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
@@ -18,11 +18,13 @@ import {
 
 export default function RecipesView() {
   const { user } = useAuthStore();
-  const { products, recipes, addRecipe, deleteRecipe } = useDatabaseStore();
+  const { products, recipes, addRecipe, deleteRecipe, updateRecipe } = useDatabaseStore();
   
   const activeProducts = products.filter(p => p.is_active !== false);
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [editingRecipeId, setEditingRecipeId] = useState<string | null>(null);
+  const [editingPrice, setEditingPrice] = useState(0);
   
   // Recipe Form State
   const [recipeName, setRecipeName] = useState('');
@@ -46,6 +48,30 @@ export default function RecipesView() {
   }, [ingredients, products]);
 
   const profitMargin = selling_price > 0 ? ((selling_price - totalCost) / selling_price) * 100 : 0;
+
+  const startEditPrice = (recipe: any) => {
+    setEditingRecipeId(recipe.id);
+    setEditingPrice(Number(recipe.selling_price));
+  };
+
+  const cancelEditPrice = () => {
+    setEditingRecipeId(null);
+    setEditingPrice(0);
+  };
+
+  const saveEditPrice = async (recipeId: string) => {
+    if (!editingPrice || editingPrice < 0.01) {
+      toast.error('El precio debe ser mayor a $0');
+      return;
+    }
+    try {
+      await updateRecipe(recipeId, { selling_price: editingPrice });
+      toast.success('Precio actualizado');
+      cancelEditPrice();
+    } catch (err) {
+      toast.error((err as Error).message || 'Error al actualizar');
+    }
+  };
 
   const handleAddIngredient = (productId: string) => {
     if (!productId) return;
@@ -334,8 +360,33 @@ export default function RecipesView() {
                         <p className="font-mono font-medium">${cost.toFixed(2)}</p>
                       </div>
                       <div className="rounded-md bg-surface p-2 text-center">
-                        <p className="text-xs text-text-secondary">Venta</p>
-                        <p className="font-mono font-medium text-primary">${recipe.selling_price.toFixed(2)}</p>
+                        {editingRecipeId === recipe.id ? (
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              min="0.01"
+                              step="0.01"
+                              value={editingPrice}
+                              onChange={(e) => setEditingPrice(Number(e.target.value))}
+                              className="h-8 w-16 text-center font-mono text-primary text-sm"
+                            />
+                            <button onClick={() => saveEditPrice(recipe.id)} className="text-success">
+                              <Check className="h-4 w-4" />
+                            </button>
+                            <button onClick={cancelEditPrice} className="text-text-secondary">
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <button 
+                            onClick={() => startEditPrice(recipe)}
+                            className="w-full hover:text-primary"
+                            title="Editar precio"
+                          >
+                            <p className="text-xs text-text-secondary">Venta</p>
+                            <p className="font-mono font-medium text-primary">${recipe.selling_price.toFixed(2)}</p>
+                          </button>
+                        )}
                       </div>
                       <div className="rounded-md bg-surface p-2 text-center">
                         <p className="text-xs text-text-secondary">Margen</p>
