@@ -130,8 +130,7 @@ export default function Dashboard() {
   const handleLogout = async () => {
     console.log('handleLogout ejecutado');
     await logout();
-    console.log('logout completado, navegando...');
-    window.location.href = '/';
+    console.log('logout completado');
   };
 
   const bannerPadding = user?.isSubscriptionActive === false ? 'pt-16' : '';

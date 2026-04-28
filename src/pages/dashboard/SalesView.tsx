@@ -5,6 +5,7 @@ import { Plus, Minus, Trash2, ShoppingCart, CreditCard, Search, X, DollarSign } 
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
+import TicketView from './TicketView';
 
 export default function SalesView() {
   const { user } = useAuthStore();
@@ -26,6 +27,8 @@ export default function SalesView() {
   const [notes, setNotes] = useState('');
   const [showPreview, setShowPreview] = useState(false);
   const [showClosingModal, setShowClosingModal] = useState(false);
+  const [showTicket, setShowTicket] = useState(false);
+  const [ticketData, setTicketData] = useState<any>(null);
 
   const handleEmployeeChange = (id: string) => {
     setEmployeeId(id);
@@ -240,7 +243,29 @@ export default function SalesView() {
       setDiscount(0);
       setNotes('');
       setShowPreview(false);
-      toast.success(navigator.onLine ? 'Venta registrada exitosamente' : 'Venta guardada offline. Se sincronizará cuando haya conexión.');
+      
+      const successMessage = navigator.onLine ? 'Venta registrada exitosamente' : 'Venta guardada offline. Se sincronizará cuando haya conexión.';
+      toast.success(successMessage);
+
+      if (user?.generateTicket) {
+        const selectedEmployee = employees.find(e => e.id === employeeId);
+        const empName = selectedEmployee ? selectedEmployee.name : (user.name || 'Dueño');
+        
+        setTicketData({
+          items: cart.map(item => ({
+            name: item.name,
+            quantity: item.quantity,
+            unitPrice: item.price,
+            subtotal: item.price * item.quantity
+          })),
+          total: total,
+          employeeName: empName,
+          businessName: user.businessName || 'Mi Negocio',
+          ticketMessage: user.ticketMessage || '¡Gracias por su visita!',
+          date: new Date()
+        });
+        setShowTicket(true);
+      }
     } catch (err) {
       setShowPreview(false);
       toast.error((err as Error).message || 'Error al registrar la venta');
@@ -600,7 +625,14 @@ export default function SalesView() {
               </Button>
             </div>
           </div>
-        </div>
+</div>
+        )}
+      
+      {showTicket && ticketData && (
+        <TicketView
+          ticketData={ticketData}
+          onClose={() => setShowTicket(false)}
+        />
       )}
     </div>
   );

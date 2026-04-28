@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useAuthStore } from '../../store/authStore';
-import { Settings, Save, Building2, User, Shield } from 'lucide-react';
+import { Settings, Save, Building2, User, Shield, Printer, MessageSquare } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import { Switch } from '../../components/ui/switch';
 
 export default function SettingsView() {
   const { user, fetchUser } = useAuthStore();
@@ -13,6 +15,8 @@ export default function SettingsView() {
   const [formData, setFormData] = useState({
     name: user?.name || '',
     businessName: user?.businessName || '',
+    generateTicket: user?.generateTicket ?? false,
+    ticketMessage: user?.ticketMessage || '¡Gracias por su visita!',
   });
   const [isSaving, setIsSaving] = useState(false);
 
@@ -35,6 +39,8 @@ export default function SettingsView() {
       .update({
         name: formData.name,
         business_name: formData.businessName,
+        generate_ticket: formData.generateTicket,
+        ticket_message: formData.ticketMessage,
       })
       .eq('id', user.id);
 
@@ -139,6 +145,42 @@ export default function SettingsView() {
                   maxLength={100}
                   required
                 />
+              </div>
+
+              <div className="pt-6 border-t border-border mt-4">
+                <h3 className="text-lg font-semibold text-text mb-4 flex items-center gap-2">
+                  <Printer className="h-5 w-5" />
+                  Configuración de Ticket
+                </h3>
+                
+                <div className="flex items-center justify-between py-3 border-b border-border">
+                  <div className="space-y-0.5">
+                    <Label className="text-base">Generar ticket al vender</Label>
+                    <p className="text-sm text-text-secondary">
+                      Mostrará un ticket después de cada venta
+                    </p>
+                  </div>
+                  <Switch
+                    checked={formData.generateTicket}
+                    onCheckedChange={(checked) => setFormData({...formData, generateTicket: checked})}
+                  />
+                </div>
+
+                {formData.generateTicket && (
+                  <div className="space-y-2 pt-4">
+                    <Label htmlFor="ticketMessage" className="flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4" />
+                      Mensaje del ticket
+                    </Label>
+                    <Input 
+                      id="ticketMessage" 
+                      value={formData.ticketMessage}
+                      onChange={e => setFormData({...formData, ticketMessage: e.target.value})}
+                      maxLength={100}
+                      placeholder="¡Gracias por su visita!"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="pt-4 flex justify-end">

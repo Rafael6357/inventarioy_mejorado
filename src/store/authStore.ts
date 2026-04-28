@@ -14,6 +14,8 @@ export interface User {
     validUntil: string | null;
   };
   isSubscriptionActive: boolean;
+  generateTicket: boolean;
+  ticketMessage: string;
 }
 
 interface AuthState {
@@ -259,6 +261,8 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         createdAt: authUser.created_at,
         subscription,
         isSubscriptionActive: checkSubscriptionActive(authUser.email || '', subscription),
+        generateTicket: profile?.generate_ticket ?? false,
+        ticketMessage: profile?.ticket_message || '¡Gracias por su visita!',
       };
 
       console.log('Usuario cargado:', user.email, 'role:', user.role, 'subscriptionActive:', user.isSubscriptionActive);
@@ -327,15 +331,21 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   logout: async () => {
     console.log('Logout llamado...');
     try {
+      // 1. Limpiar estado primero
       _isInitializing = false;
       _authListenerSubscription = null;
+      set({ user: null, isAuthenticated: false, isLoading: false });
+      console.log('Estado limpiado');
+      
+      // 2. Luego hacer signOut
       await supabase.auth.signOut();
       console.log('SignOut exitoso');
     } catch (err) {
       console.error('Error en logout:', err);
     } finally {
-      set({ user: null, isAuthenticated: false, isLoading: false });
-      console.log('Estado de auth limpiado');
+      // 3. Forzar redirección
+      console.log('Redireccionando...');
+      window.location.href = '/';
     }
   },
 

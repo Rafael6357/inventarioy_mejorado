@@ -29,7 +29,6 @@ export default function SubscriptionBanner() {
 
   const handleLogout = async () => {
     await logout();
-    window.location.href = '/';
   };
 
   if (user?.isSubscriptionActive === false) {

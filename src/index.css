@@ -121,3 +121,52 @@
     text-shadow: 0 0 20px rgba(255, 193, 7, 0.5);
   }
 }
+
+@media print {
+  /* Eliminar cabeceras y pies de página del navegador (URL, fecha, título) */
+  @page {
+    margin: 0;
+  }
+
+  /* Ocultar todo el contenido de la página */
+  body {
+    visibility: hidden;
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Hacer visible SOLO el ticket y su contenido */
+  #ticket-container,
+  #ticket-container * {
+    visibility: visible;
+  }
+
+  /* Posicionar el ticket al inicio de la página impresa */
+  #ticket-container {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 20mm !important; /* Margen de seguridad para la impresora */
+    overflow: visible !important;
+  }
+
+  /* Ocultar elementos innecesarios del ticket al imprimir */
+  .print-hide,
+  button,
+  .no-print {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Asegurar que el fondo sea blanco y texto negro */
+  .bg-bg, .bg-surface, .bg-white {
+    background-color: white !important;
+  }
+  
+  .text-text, .text-text-secondary, .text-black {
+    color: black !important;
+  }
+}
