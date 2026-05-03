@@ -288,7 +288,7 @@ export default function AnalysisView() {
                 </div>
               )}
               <div className={`rounded-lg border p-3 text-center ${auditData.stockFinal >= 0 ? 'bg-primary/10 border-primary/30' : 'bg-danger/10 border-danger/30'}`}>
-                <p className="text-xs text-text-secondary">Stock Actual</p>
+                <p className="text-xs text-text-secondary">Almacén</p>
                 <p className={`font-mono font-bold mt-1 ${auditData.stockFinal >= 0 ? 'text-primary' : 'text-danger'}`}>
                   {auditData.stockFinal} {auditData.product.unit}
                 </p>

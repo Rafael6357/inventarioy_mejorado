@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
 import { useAuthStore } from '../../store/authStore';
-import { Plus, Minus, Trash2, ShoppingCart, CreditCard, Search, X, DollarSign } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingCart, CreditCard, Search, X, DollarSign, User, PlusCircle, Users, Loader2 } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
@@ -9,7 +9,7 @@ import TicketView from './TicketView';
 
 export default function SalesView() {
   const { user } = useAuthStore();
-  const { products, recipes, employees, sales, dailyClosings, addSale, createDailyClosing, getDailyClosings } = useDatabaseStore();
+  const { products, recipes, employees, sales, dailyClosings, pendingAccounts, addSale, createDailyClosing, getDailyClosings, createPendingAccount, addItemsToPendingAccount, chargePendingAccount, getPendingAccounts, togglePendingAccountType, logAction, forceRefreshData } = useDatabaseStore();
   
   const activeProducts = products.filter(p => p.is_active !== false);
 
@@ -29,6 +29,15 @@ export default function SalesView() {
   const [showClosingModal, setShowClosingModal] = useState(false);
   const [showTicket, setShowTicket] = useState(false);
   const [ticketData, setTicketData] = useState<any>(null);
+  const [isAccountHouse, setIsAccountHouse] = useState(false);
+  const [deliveryFee, setDeliveryFee] = useState(0);
+  const [selectedPendingAccount, setSelectedPendingAccount] = useState<string>('');
+  const [showNewPendingModal, setShowNewPendingModal] = useState(false);
+  const [newPendingName, setNewPendingName] = useState('');
+
+  useEffect(() => {
+    getPendingAccounts();
+  }, []);
 
   const handleEmployeeChange = (id: string) => {
     setEmployeeId(id);
@@ -41,10 +50,12 @@ export default function SalesView() {
   const [closingAmount, setClosingAmount] = useState(0);
   const [closingSales, setClosingSales] = useState<any[]>([]);
   const [closingLoading, setClosingLoading] = useState(false);
+  const [isProcessingSale, setIsProcessingSale] = useState(false);
+  const [isCreatingPending, setIsCreatingPending] = useState(false);
 
   const todaySales = sales.filter(s => {
     const saleDate = new Date(s.date).toISOString().split('T')[0];
-    return saleDate === closingDate;
+    return saleDate === closingDate && !s.is_account_house;
   });
 
   const todayTotal = todaySales.reduce((sum, s) => sum + (Number(s.total_amount) || 0), 0);
@@ -93,6 +104,14 @@ export default function SalesView() {
         created_by_name: selectedEmployee ? selectedEmployee.name : user.name
       });
       if (result.success) {
+        await logAction('closings', 'CREAR', {
+          closing_date: closingDate,
+          total_sales: todayTotal,
+          total_discounts: todayDiscounts,
+          total_refunds: todayRefunds,
+          closing_amount: closingAmount,
+          created_by_name: selectedEmployee ? selectedEmployee.name : user.name,
+        });
         toast.success(`Cierre de caja del ${closingDate} registrado`);
         setShowClosingModal(false);
         getDailyClosings();
@@ -208,6 +227,7 @@ export default function SalesView() {
       toast.error('El carrito está vacío');
       return;
     }
+    setIsProcessingSale(true);
     setShowPreview(true);
   };
 
@@ -229,6 +249,7 @@ export default function SalesView() {
         total_amount: total,
         date: closingDate,
         sale_type: saleType,
+        is_account_house: isAccountHouse,
         notes,
         discount
       });
@@ -243,9 +264,19 @@ export default function SalesView() {
       setDiscount(0);
       setNotes('');
       setShowPreview(false);
+      setIsProcessingSale(false);
       
       const successMessage = navigator.onLine ? 'Venta registrada exitosamente' : 'Venta guardada offline. Se sincronizará cuando haya conexión.';
       toast.success(successMessage);
+
+      const selectedEmployee = employees.find(e => e.id === employeeId);
+      await useDatabaseStore.getState().logAction('sales', 'VENTA', {
+        total: total,
+        items_count: cart.length,
+        sale_type: saleType,
+        employee: selectedEmployee?.name || user?.name || 'Dueño',
+        is_account_house: isAccountHouse
+      });
 
       if (user?.generateTicket) {
         const selectedEmployee = employees.find(e => e.id === employeeId);
@@ -258,16 +289,21 @@ export default function SalesView() {
             unitPrice: item.price,
             subtotal: item.price * item.quantity
           })),
-          total: total,
+          total: isAccountHouse ? 0 : total,
           employeeName: empName,
           businessName: user.businessName || 'Mi Negocio',
           ticketMessage: user.ticketMessage || '¡Gracias por su visita!',
-          date: new Date()
+          saleType: saleType,
+          isAccountHouse: isAccountHouse,
+          deliveryFee: deliveryFee,
+          employeeRole: selectedEmployee ? selectedEmployee.role : (user.name ? 'Dueño' : ''),
+          date: new Date(closingDate + 'T' + new Date().toTimeString().slice(0,8))
         });
         setShowTicket(true);
       }
     } catch (err) {
       setShowPreview(false);
+      setIsProcessingSale(false);
       toast.error((err as Error).message || 'Error al registrar la venta');
     }
   };
@@ -309,6 +345,16 @@ export default function SalesView() {
               <DollarSign className="h-4 w-4" />
               {isClosed ? 'Día Cerrado' : todaySales.length === 0 ? 'Sin ventas' : 'Cierre de Caja'}
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => forceRefreshData()}
+              className="gap-1 text-text-secondary hover:text-text"
+              title="Actualizar todos los datos del sistema"
+            >
+              <Loader2 className="h-3 w-3" />
+              Actualizar
+            </Button>
           </div>
         </div>
         <div className="relative flex items-center px-4 pt-3">
@@ -321,6 +367,115 @@ export default function SalesView() {
           />
         </div>
         <div className="flex-shrink-0 h-px bg-border/50 mx-4 mt-3" />
+        
+        {pendingAccounts && pendingAccounts.length > 0 && (
+          <div className="p-4 pb-2">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-warning flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Clientes Pendientes ({pendingAccounts.length})
+              </h3>
+            </div>
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {pendingAccounts.map(account => {
+                const accountItems = (account.items as any[]) || [];
+                return (
+                  <div key={account.id} className={`p-3 rounded-lg border ${(account as any).is_account_house ? 'bg-danger/10 border-danger/30' : 'bg-warning/5 border-warning/20'}`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-medium text-text text-sm">{account.client_name}</p>
+                          <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${(account as any).sale_type === 'DOMICILIO' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                            {(account as any).sale_type === 'DOMICILIO' ? 'DOMICILIO' : 'SALÓN'}
+                          </span>
+                          {(account as any).is_account_house && (
+                            <span className="text-xs px-1.5 py-0.5 bg-danger/20 text-danger rounded font-medium">CUENTA CASA</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-text-secondary">
+                          {accountItems.length} items - ${(account.total_amount || 0).toFixed(2)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const result = await togglePendingAccountType(account.id);
+                            if (result.success) {
+                              toast.success((account as any).is_account_house ? 'Cambiado a venta normal' : 'Cambiado a Cuenta Casa');
+                            } else {
+                              toast.error(result.error || 'Error al cambiar tipo de cuenta');
+                            }
+                          }}
+                          className={`text-xs px-2 py-0.5 rounded text-xs font-medium ${(account as any).is_account_house ? 'bg-danger/10 text-danger border border-danger/30' : 'bg-warning/10 text-warning border border-warning/30'}`}
+                          title={(account as any).is_account_house ? 'Cambiar a venta normal' : 'Cambiar a Cuenta Casa'}
+                        >
+                          CC
+                        </button>
+                        <Button
+                          size="sm"
+                          className="h-7 text-xs bg-success hover:bg-success/80"
+                          onClick={async () => {
+                            const selectedEmp = employees.find(e => e.id === employeeId);
+                            const result = await chargePendingAccount(
+                              account.id,
+                              employeeId || user?.id || '',
+                              selectedEmp ? selectedEmp.name : (user?.name || 'Vendedor'),
+                              closingDate
+                            );
+                            if (result.success) {
+                              toast.success('Cuenta cobrada');
+                              const isAccHouse = (account as any).is_account_house;
+                              await useDatabaseStore.getState().logAction('sales', 'COBRO', {
+                                client_name: account.client_name,
+                                total: account.total_amount || 0,
+                                is_account_house: isAccHouse
+                              });
+                              setTicketData({
+                                items: accountItems.map((item: any) => ({
+                                  name: item.product_name,
+                                  quantity: item.quantity,
+                                  unitPrice: item.unit_price,
+                                  subtotal: item.subtotal
+                                })),
+                                total: isAccHouse ? 0 : account.total_amount || 0,
+                                employeeName: selectedEmp ? selectedEmp.name : (user?.name || 'Vendedor'),
+                                businessName: user?.businessName || 'Mi Negocio',
+                                ticketMessage: user?.ticketMessage || '¡Gracias por su visita!',
+                                saleType: (account as any).sale_type || 'SALON',
+                                isAccountHouse: isAccHouse,
+                                date: new Date(closingDate + 'T' + new Date().toTimeString().slice(0,8))
+                              });
+                              setShowTicket(true);
+                            } else {
+                              toast.error(result.error || 'Error al cobrar');
+                            }
+                          }}
+                        >
+                          Cobrar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs text-danger hover:text-danger"
+                          onClick={async () => {
+                            if (confirm('¿Cancelar esta cuenta? No se descontará inventario.')) {
+                              const result = await useDatabaseStore.getState().deletePendingAccount(account.id);
+                              if (result.success) toast.success('Cuenta cancelada');
+                              else toast.error(result.error || 'Error');
+                            }
+                          }}
+                        >
+                          X
+                        </Button>
+                        </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
         
         <div className="flex-1 overflow-y-auto p-4">
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
@@ -407,8 +562,9 @@ export default function SalesView() {
           )}
         </div>
 
-        <div className="border-t border-border bg-bg/50 p-4 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+        <div className="border-t border-border bg-bg/50">
+          <div className="max-h-[280px] overflow-y-auto p-4 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="saleType" className="text-xs font-medium text-text-secondary block mb-1">Tipo de Venta</label>
               <select 
@@ -431,10 +587,44 @@ export default function SalesView() {
               >
                 <option value="">{user ? `Dueño: ${user.name}` : '(Yo)'}</option>
                 {employees.map(emp => (
-                  <option key={emp.id} value={emp.id}>{emp.name}</option>
+                  <option key={emp.id} value={emp.id}>{emp.role}: {emp.name}</option>
                 ))}
               </select>
             </div>
+          </div>
+
+          {saleType === 'DOMICILIO' && (
+            <div className="mt-3 p-3 rounded-lg bg-bg/50 border border-border/50">
+              <label className="text-xs font-medium text-text-secondary block mb-1">
+                Costo Domicilio (para el motorista)
+              </label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                className="w-full h-9 font-mono"
+                value={deliveryFee || ''}
+                onChange={e => setDeliveryFee(Number(e.target.value))}
+                placeholder="0.00"
+              />
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 mt-3">
+            <input
+              type="checkbox"
+              id="accountHouse"
+              checked={isAccountHouse}
+              disabled={selectedPendingAccount ? (pendingAccounts.find(a => a.id === selectedPendingAccount)?.items as any[] || []).length > 0 : false}
+              onChange={e => setIsAccountHouse(e.target.checked)}
+              className="w-4 h-4 rounded border-border text-primary focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            />
+            <label htmlFor="accountHouse" className={`text-sm ${selectedPendingAccount ? ((pendingAccounts.find(a => a.id === selectedPendingAccount)?.items as any[] || []).length > 0 ? 'text-text-secondary' : 'text-text') : 'text-text'}`}>
+              Cuenta Casa
+              {selectedPendingAccount && (pendingAccounts.find(a => a.id === selectedPendingAccount)?.items as any[] || []).length > 0 && (
+                <span className="text-xs ml-1 text-warning">(usar botón CC)</span>
+              )}
+            </label>
           </div>
 
           <div className="flex items-center justify-between text-sm">
@@ -458,14 +648,19 @@ export default function SalesView() {
             <span className="text-lg font-bold text-text">Total</span>
             <span className="text-2xl font-mono font-bold text-primary">${total.toFixed(2)}</span>
           </div>
+          </div>
 
           <Button 
             className="w-full h-12 text-base gap-2" 
             onClick={handleCheckout}
-            disabled={cart.length === 0 || isClosed}
+            disabled={cart.length === 0 || isClosed || isProcessingSale}
           >
-            <CreditCard className="h-5 w-5" />
-            {isClosed ? 'Día Cerrado' : 'Cobrar Venta'}
+            {isProcessingSale ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <CreditCard className="h-5 w-5" />
+            )}
+            {isProcessingSale ? 'Procesando...' : isClosed ? 'Día Cerrado' : 'Cobrar Venta'}
           </Button>
         </div>
       </div>
@@ -473,7 +668,7 @@ export default function SalesView() {
       {/* Checkout Preview Modal */}
       {showPreview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-border/50 bg-surface p-6 shadow-2xl">
+          <div className="w-full max-w-md max-h-[85vh] overflow-y-auto rounded-2xl border border-border/50 bg-surface p-6 shadow-2xl">
             <div className="mb-6 flex items-center justify-between">
               <h2 className="text-xl font-bold text-text">Resumen de Venta</h2>
               <button
@@ -516,18 +711,20 @@ export default function SalesView() {
               <div className="flex justify-between text-sm">
                 <span className="text-success">Ganancia:</span>
                 <span className="font-mono text-success">
-                  ${(total - cart.reduce((sum, item) => sum + (item.cost * item.quantity), 0)).toFixed(2)}
+                  {isAccountHouse ? '$0.00' : `$${(total - cart.reduce((sum, item) => sum + (item.cost * item.quantity), 0)).toFixed(2)}`}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-text-secondary">Margen:</span>
+                <span className="text-text-secondary">Margen de Ganancia:</span>
                 <span className="font-mono text-text-secondary">
-                  {total > 0 ? (((total - cart.reduce((sum, item) => sum + (item.cost * item.quantity), 0)) / total) * 100).toFixed(1) : 0}%
+                  {isAccountHouse ? '0%' : (total > 0 ? (((total - cart.reduce((sum, item) => sum + (item.cost * item.quantity), 0)) / total) * 100).toFixed(1) : 0) + '%'}
                 </span>
               </div>
               <div className="flex justify-between text-lg font-bold border-t border-border/50 pt-2">
                 <span className="text-text">Total a Cobrar:</span>
-                <span className="font-mono text-primary">${total.toFixed(2)}</span>
+                <span className="font-mono text-primary">
+                  {isAccountHouse ? '$0.00' : `$${total.toFixed(2)}`}
+                </span>
               </div>
             </div>
 
@@ -535,6 +732,144 @@ export default function SalesView() {
               <p><span className="font-medium text-text">Vendedor:</span> {sellerName}</p>
               <p><span className="font-medium text-text">Tipo:</span> {saleType === 'SALON' ? 'En Salón' : 'A Domicilio'}</p>
             </div>
+
+            <div className="mb-4 p-3 bg-surface-hover rounded-lg">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium text-text">Cliente:</label>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-primary hover:text-primary/80"
+                  onClick={() => setShowNewPendingModal(true)}
+                >
+                  <PlusCircle className="h-3 w-3 mr-1" />
+                  Nueva Cuenta
+                </Button>
+              </div>
+              <select
+                value={selectedPendingAccount}
+                onChange={e => setSelectedPendingAccount(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-border/50 bg-bg text-text text-sm"
+              >
+                <option value="">Nueva Venta</option>
+                {pendingAccounts.map(account => (
+                  <option key={account.id} value={account.id}>
+                    {account.client_name} (${(account.total_amount || 0).toFixed(2)})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {selectedPendingAccount && (() => {
+              const selectedAccount = pendingAccounts.find(a => a.id === selectedPendingAccount);
+              const accountItems = selectedAccount ? (selectedAccount.items as any[]) : [];
+              return selectedAccount && accountItems.length > 0 ? (
+                <div className="mb-4 p-3 bg-surface-hover rounded-lg border border-border/30">
+                  <p className="text-sm font-medium text-text mb-2">
+                    Pedidos de {selectedAccount.client_name}:
+                  </p>
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {accountItems.map((item: any, index: number) => (
+                      <div key={index} className="flex justify-between text-sm">
+                        <span className="text-text">{item.quantity}x {item.product_name}</span>
+                        <span className="font-mono text-text-secondary">${item.subtotal.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex justify-between font-bold text-text mt-2 pt-2 border-t border-border/50">
+                    <span>Total:</span>
+                    <span className="font-mono text-primary">${selectedAccount.total_amount.toFixed(2)}</span>
+                  </div>
+                </div>
+              ) : null;
+            })()}
+
+            {pendingAccounts && pendingAccounts.length > 0 && (
+              <div className="mb-4 p-3 bg-warning/10 rounded-lg border border-warning/30">
+                <p className="text-xs font-medium text-warning mb-2">Cuentas Pendientes</p>
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {pendingAccounts.map(account => {
+                    const accountItems = (account.items as any[]) || [];
+                    return (
+                      <div key={account.id} className="flex items-center justify-between text-xs p-2 bg-surface rounded">
+                        <div className="flex-1">
+                          <p className="font-medium text-text">{account.client_name}</p>
+                          <p className="text-text-secondary">
+                            {accountItems.length} items - ${(account.total_amount || 0).toFixed(2)}
+                          </p>
+                        </div>
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            className="h-6 text-xs bg-success hover:bg-success/80"
+                            onClick={async () => {
+                              const selectedEmp = employees.find(e => e.id === employeeId);
+                              const result = await chargePendingAccount(
+                                account.id,
+                                employeeId || user?.id || '',
+                                selectedEmp ? selectedEmp.name : (user?.name || 'Vendedor'),
+                                closingDate
+                              );
+                              if (result.success) {
+                                setSelectedPendingAccount('');
+                                toast.success('Cuenta cobrada exitosamente');
+                                const isAccHouse = (account as any).is_account_house;
+                                await useDatabaseStore.getState().logAction('sales', 'COBRO', {
+                                  client_name: account.client_name,
+                                  total: account.total_amount || 0,
+                                  is_account_house: isAccHouse
+                                });
+                                const accItems = (account as any).items || [];
+                                setTicketData({
+                                  items: accItems.map((item: any) => ({
+                                    name: item.product_name,
+                                    quantity: item.quantity,
+                                    unitPrice: item.unit_price,
+                                    subtotal: item.subtotal
+                                  })),
+                                  total: isAccHouse ? 0 : account.total_amount || 0,
+                                  employeeName: selectedEmp ? selectedEmp.name : (user?.name || 'Vendedor'),
+                                  businessName: user?.businessName || 'Mi Negocio',
+                                  ticketMessage: user?.ticketMessage || '¡Gracias por su visita!',
+                                  saleType: (account as any).sale_type || 'SALON',
+                                  isAccountHouse: isAccHouse,
+                                  date: new Date(closingDate + 'T' + new Date().toTimeString().slice(0,8))
+                                });
+                                setShowTicket(true);
+                              } else {
+                                toast.error(result.error || 'Error al cobrar');
+                              }
+                            }}
+                          >
+                            Cobrar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 text-xs text-danger border-danger hover:bg-danger/10"
+                            onClick={async () => {
+                              if (confirm('¿Cancelar esta cuenta? No se descontará inventario.')) {
+                                const result = await useDatabaseStore.getState().deletePendingAccount(account.id);
+                                if (result.success) {
+                                  if (selectedPendingAccount === account.id) {
+                                    setSelectedPendingAccount('');
+                                  }
+                                  toast.success('Cuenta cancelada');
+                                } else {
+                                  toast.error(result.error || 'Error al cancelar');
+                                }
+                              }
+                            }}
+                          >
+                            X
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div className="flex gap-3">
               <Button
@@ -544,13 +879,45 @@ export default function SalesView() {
               >
                 Cancelar
               </Button>
-              <Button
-                className="flex-1 gap-2"
-                onClick={confirmSale}
-              >
-                <CreditCard className="h-4 w-4" />
-                Confirmar Venta
-              </Button>
+              {selectedPendingAccount ? (
+                <Button
+                  className="flex-1 gap-2"
+                  onClick={async () => {
+                    if (cart.length === 0) {
+                      toast.error('Agregue productos al carrito');
+                      return;
+                    }
+                    const items = cart.map(item => ({
+                      product_id: item.product_id,
+                      product_name: item.name,
+                      quantity: item.quantity,
+                      unit_price: item.price,
+                      subtotal: item.price * item.quantity,
+                      is_recipe: item.is_recipe || false,
+                      recipe_snapshot: item.recipe_snapshot || null,
+                    }));
+                    const result = await addItemsToPendingAccount(selectedPendingAccount, items, isAccountHouse, saleType);
+                    if (result.success) {
+                      setCart([]);
+                      setShowPreview(false);
+                      toast.success('Productos agregados a la cuenta');
+                    } else {
+                      toast.error(result.error || 'Error al agregar productos');
+                    }
+                  }}
+                >
+                  <Plus className="h-4 w-4" />
+                  Agregar a Cuenta
+                </Button>
+              ) : (
+                <Button
+                  className="flex-1 gap-2"
+                  onClick={confirmSale}
+                >
+                  <CreditCard className="h-4 w-4" />
+                  Confirmar Venta
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -633,6 +1000,72 @@ export default function SalesView() {
           ticketData={ticketData}
           onClose={() => setShowTicket(false)}
         />
+      )}
+
+      {showNewPendingModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-border/50 bg-surface p-6 shadow-2xl">
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-text">Nueva Cuenta Pendiente</h2>
+                <p className="text-sm text-text-secondary">Ingrese el nombre del cliente</p>
+              </div>
+              <button
+                onClick={() => { setShowNewPendingModal(false); setNewPendingName(''); }}
+                className="rounded-full p-2 text-text-secondary hover:bg-surface-hover hover:text-text transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mb-6">
+              <label className="text-sm font-medium text-text mb-2 block">Nombre del Cliente</label>
+              <Input
+                value={newPendingName}
+                onChange={e => setNewPendingName(e.target.value)}
+                placeholder="Ej: Mesa 3, Juan Pérez, Cliente mostrador..."
+                autoFocus
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => { setShowNewPendingModal(false); setNewPendingName(''); }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                className="flex-1 gap-2"
+                disabled={isCreatingPending}
+                onClick={async () => {
+                  if (!newPendingName.trim()) {
+                    toast.error('Ingrese un nombre para el cliente');
+                    return;
+                  }
+                  setIsCreatingPending(true);
+                  try {
+                    const result = await createPendingAccount(newPendingName.trim());
+                    if (result.success) {
+                      setSelectedPendingAccount(result.accountId || '');
+                      setShowNewPendingModal(false);
+                      setNewPendingName('');
+                      toast.success('Cuenta creada');
+                    } else {
+                      toast.error(result.error || 'Error al crear cuenta');
+                    }
+                  } finally {
+                    setIsCreatingPending(false);
+                  }
+                }}
+              >
+                {isCreatingPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isCreatingPending ? 'Creando...' : 'Crear Cuenta'}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

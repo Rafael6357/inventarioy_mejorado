@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuthStore } from '../../store/authStore';
+import { useDatabaseStore } from '../../store/dbStore';
 import { Settings, Save, Building2, User, Shield, Printer, MessageSquare } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -8,6 +9,7 @@ import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Switch } from '../../components/ui/switch';
+import AccessPinsConfig from '../../components/AccessPinsConfig';
 
 export default function SettingsView() {
   const { user, fetchUser } = useAuthStore();
@@ -56,6 +58,9 @@ export default function SettingsView() {
       toast.error(errorMessage);
     } else {
       await fetchUser();
+      await useDatabaseStore.getState().logAction('settings', 'CONFIG', {
+        changes: Object.keys(formData).filter(k => formData[k as keyof typeof formData] !== (user as any)?.[k]).join(', ')
+      });
       toast.success('Configuración guardada exitosamente');
     }
     
@@ -101,7 +106,7 @@ export default function SettingsView() {
           </div>
         </div>
 
-        <div className="space-y-6 md:col-span-2">
+        <div className="space-y-6 md:col-span-1">
           <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(255,193,7,0.15)]">
             <h2 className="text-lg font-semibold text-text mb-6 flex items-center gap-2">
               <User className="h-5 w-5 text-primary drop-shadow-[0_0_5px_rgba(205,164,52,0.8)]" />
@@ -190,6 +195,12 @@ export default function SettingsView() {
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+
+        <div className="md:col-span-1">
+          <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(255,193,7,0.15)]">
+            <AccessPinsConfig />
           </div>
         </div>
       </div>

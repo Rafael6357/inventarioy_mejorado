@@ -73,10 +73,28 @@ export default function TicketView({ ticketData, onClose }: TicketViewProps) {
               </div>
             </div>
 
-            <div className="flex items-center gap-1 mb-4 text-xs">
+            <div className="flex items-center gap-1 mb-2 text-xs">
               <User className="h-3 w-3" />
-              {ticketData.employeeName || 'Dueño'}
+              {ticketData.employeeRole ? `${ticketData.employeeRole}: ${ticketData.employeeName}` : (ticketData.employeeName || 'Dueño')}
             </div>
+
+            {ticketData.saleType && (
+              <div className="mb-2 text-xs font-medium">
+                Tipo: {ticketData.saleType === 'DOMICILIO' ? 'A Domicilio' : 'En Salón'}
+              </div>
+            )}
+
+            {ticketData.isAccountHouse && (
+              <div className="mb-2 text-xs font-bold text-gray-900">
+                CUENTA CASA
+              </div>
+            )}
+
+            {ticketData.deliveryFee > 0 && (
+              <div className="mb-2 text-xs">
+                Costo Domicilio: {formatCurrency(ticketData.deliveryFee)}
+              </div>
+            )}
 
             <div className="space-y-1 mb-3">
               {ticketData.items.map((item, index) => (

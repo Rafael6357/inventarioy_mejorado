@@ -1,26 +1,18 @@
 import React, { useState, useMemo } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
-import { Search, Filter, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, RefreshCw, Calendar } from 'lucide-react';
+import { Search, Filter, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, Calendar } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
 
 export default function MovementsView() {
-  const { movements, products, recalculateStock } = useDatabaseStore();
+  const { movements, products, fetchMore } = useDatabaseStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [isRecalculating, setIsRecalculating] = useState(false);
-
-  const handleRecalculate = () => {
-    setIsRecalculating(true);
-    recalculateStock();
-    setTimeout(() => {
-      setIsRecalculating(false);
-      toast.success('Stock sincronizado exitosamente');
-    }, 1000);
-  };
+  const [hasMoreMovements, setHasMoreMovements] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const getProductName = (id: string) => products.find(p => p.id === id)?.name || 'Producto Eliminado';
 
@@ -82,15 +74,6 @@ export default function MovementsView() {
             Visualización cronológica completa de entradas, salidas y mermas
           </p>
         </div>
-        <Button 
-          onClick={handleRecalculate} 
-          disabled={isRecalculating}
-          className="flex items-center gap-2"
-          variant="outline"
-        >
-          <RefreshCw className={`h-4 w-4 ${isRecalculating ? 'animate-spin' : ''}`} />
-          {isRecalculating ? 'Sincronizando...' : 'Sincronizar Stock'}
-        </Button>
       </div>
 
       <div className="rounded-xl border border-border bg-surface p-4 shadow-sm">
@@ -213,6 +196,23 @@ export default function MovementsView() {
               )}
             </tbody>
           </table>
+
+          {hasMoreMovements && (
+            <div className="flex justify-center py-4">
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  setLoadingMore(true);
+                  const result = await fetchMore(50);
+                  setHasMoreMovements(result.hasMore);
+                  setLoadingMore(false);
+                }}
+                disabled={loadingMore}
+              >
+                {loadingMore ? 'Cargando...' : 'Ver más movimientos'}
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </div>

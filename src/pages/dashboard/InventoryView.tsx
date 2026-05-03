@@ -4,7 +4,7 @@ import { useAuthStore } from '../../store/authStore';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
-import { PackagePlus, ArrowRightLeft, Settings2 } from 'lucide-react';
+import { PackagePlus, ArrowRightLeft, Settings2, RefreshCw, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   convertUnit,
@@ -33,7 +33,7 @@ const DEFAULT_CATEGORIES = [
 
 export default function InventoryView() {
   const { user } = useAuthStore();
-  const { products, addProduct, addMovement } = useDatabaseStore();
+  const { products, addProduct, addMovement, logAction, forceRefreshData } = useDatabaseStore();
   
   const activeProducts = products.filter(p => p.is_active !== false);
 
@@ -85,6 +85,7 @@ export default function InventoryView() {
     reason: '',
     status: 'NORMAL' as 'NORMAL' | 'ANOMALIA' | 'JUSTIFICADO',
   });
+  const [isSubmittingMovement, setIsSubmittingMovement] = useState(false);
 
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,6 +101,13 @@ export default function InventoryView() {
       await addProduct({
         ...newProduct,
         is_active: true,
+      });
+      
+      await useDatabaseStore.getState().logAction('inventory', 'CREAR', {
+        product_name: newProduct.name,
+        category: newProduct.category,
+        quantity: newProduct.quantity,
+        unit: newProduct.unit
       });
       
       setNewProduct({
@@ -124,31 +132,37 @@ export default function InventoryView() {
 
   const handleAddMovement = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !movement.product_id) return;
+    
+    if (!user) return;
+    if (!movement.product_id) {
+      toast.error('Debe seleccionar un producto');
+      return;
+    }
 
+    const product = products.find(p => p.id === movement.product_id);
+    if (!product) {
+      toast.error('Producto no encontrado');
+      return;
+    }
+    
+    const baseUnit = normalizeUnit(product.unit);
+    const quantityInBase = convertUnit(movement.quantity, movement.displayUnit, baseUnit);
+    
+    if (quantityInBase <= 0) {
+      toast.error('La cantidad debe ser mayor a 0');
+      return;
+    }
+    
+    if (movement.type === 'SALIDA') {
+      const availableStock = Number(product.quantity) - (Number(product.in_transit) || 0);
+      if (quantityInBase > availableStock) {
+        toast.error(`La cantidad excede el stock disponible (${availableStock} ${baseUnit})`);
+        return;
+      }
+    }
+
+    setIsSubmittingMovement(true);
     try {
-      const product = products.find(p => p.id === movement.product_id);
-      if (!product) {
-        toast.error('Producto no encontrado');
-        return;
-      }
-      
-      const baseUnit = normalizeUnit(product.unit);
-      const quantityInBase = convertUnit(movement.quantity, movement.displayUnit, baseUnit);
-      
-      if (quantityInBase <= 0) {
-        toast.error('La cantidad debe ser mayor a 0');
-        return;
-      }
-      
-      if (movement.type === 'SALIDA') {
-        const availableStock = Number(product.quantity) - (Number(product.in_transit) || 0);
-        if (quantityInBase > availableStock) {
-          toast.error(`La cantidad excede el stock disponible (${availableStock} ${baseUnit})`);
-          return;
-        }
-      }
-      
       const isAnomaly = movement.type === 'SALIDA' && quantityInBase > (Number(product.quantity) * 0.5);
 
       const movementCost = movement.type === 'ENTRADA' 
@@ -168,6 +182,13 @@ export default function InventoryView() {
 
       await addMovement(movementData);
       
+      await useDatabaseStore.getState().logAction('movements', movement.type, {
+        product_name: product.name,
+        quantity: movement.quantity,
+        unit: movement.displayUnit,
+        reason: movement.reason
+      });
+      
       saveLastUsedUnit(movement.product_id, movement.displayUnit);
 
       setMovement({
@@ -183,7 +204,10 @@ export default function InventoryView() {
       });
       toast.success('Movimiento registrado exitosamente');
     } catch (error: any) {
+      console.error('Error al registrar movimiento:', error);
       toast.error(error.message || 'Error al registrar movimiento');
+    } finally {
+      setIsSubmittingMovement(false);
     }
   };
 
@@ -194,6 +218,15 @@ export default function InventoryView() {
         <p className="text-sm text-text-secondary">
           Alta de productos y registro de movimientos
         </p>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => forceRefreshData()}
+          className="gap-1 text-text-secondary hover:text-text mt-2"
+        >
+          <Loader2 className="h-3 w-3" />
+          Actualizar Datos
+        </Button>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -488,10 +521,18 @@ export default function InventoryView() {
 
             <Button 
               type="submit" 
-              className="mt-6 px-8"
+              className="mt-6 px-8 gap-2"
               variant={movement.type === 'MERMA' ? 'destructive' : 'default'}
+              disabled={isSubmittingMovement}
             >
-              {movement.type === 'ENTRADA' ? 'Registrar Entrada' : movement.type === 'SALIDA' ? 'Registrar Salida' : 'Registrar Merma'}
+              {isSubmittingMovement && <RefreshCw className="h-4 w-4 animate-spin" />}
+              {isSubmittingMovement 
+                ? 'Registrando...' 
+                : movement.type === 'ENTRADA' 
+                  ? 'Registrar Entrada' 
+                  : movement.type === 'SALIDA' 
+                    ? 'Registrar Salida' 
+                    : 'Registrar Merma'}
             </Button>
           </form>
         </div>

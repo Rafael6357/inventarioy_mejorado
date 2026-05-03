@@ -86,7 +86,7 @@ export default function PaymentsView() {
       console.log('Iniciando consulta a profiles...');
       const queryStart = Date.now();
       
-      const result = await fetchWithTimeout(8000);
+      const result = await fetchWithTimeout(20000);
       const { data, error } = result as any;
 
       console.log('Consulta completada en', Date.now() - queryStart, 'ms');

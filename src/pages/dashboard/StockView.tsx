@@ -20,12 +20,26 @@ export default function StockView() {
     order_cost: 0,
     holding_cost: 0,
     price: 0,
+    monthly_demand: 0,
   });
+  const [demandDetail, setDemandDetail] = useState<{transactions: number; range: string} | null>(null);
   
   const products = useDatabaseStore((state) => state.products);
   const movements = useDatabaseStore((state) => state.movements);
   const deleteProduct = useDatabaseStore((state) => state.deleteProduct);
   const updateProduct = useDatabaseStore((state) => state.updateProduct);
+  const accessPins = useDatabaseStore((state) => state.accessPins);
+  const logAction = useDatabaseStore((state) => state.logAction);
+
+  const canEdit = (): boolean => {
+    const activePin = accessPins?.find(p => p.is_active);
+    const sessionRole = typeof window !== 'undefined' 
+      ? localStorage.getItem('verifiedRole') 
+      : null;
+    
+    return (activePin && ['owner', 'economist'].includes(activePin.role)) ||
+           (sessionRole && ['owner', 'economist'].includes(sessionRole));
+  };
 
   const activeProducts = useMemo(() => {
     return products.filter(p => p.is_active !== false);
@@ -71,6 +85,10 @@ export default function StockView() {
     if (productToDelete) {
       try {
         await deleteProduct(productToDelete.id);
+        await logAction('stock', 'ELIMINAR', {
+          product_id: productToDelete.id,
+          product_name: productToDelete.name,
+        });
         toast.success('Producto eliminado exitosamente');
       } catch (err) {
         toast.error((err as Error).message || 'Error al eliminar el producto');
@@ -88,12 +106,39 @@ export default function StockView() {
       order_cost: Number(product.order_cost) || 0,
       holding_cost: Number(product.holding_cost) || 0,
       price: Number(product.price) || 0,
+      monthly_demand: 0,
     });
+    setDemandDetail(null);
   };
 
   const closeEditModal = () => {
     setEditingProduct(null);
-    setEditParams({ rop: 0, eoq: 0, lead_time: 0, order_cost: 0, holding_cost: 0, price: 0 });
+    setEditParams({ rop: 0, eoq: 0, lead_time: 0, order_cost: 0, holding_cost: 0, price: 0, monthly_demand: 0 });
+    setDemandDetail(null);
+  };
+
+  const calculateMonthlyDemand = (productId: string) => {
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    
+    const recentMovements = movements.filter(m => {
+      return m.product_id === productId && 
+             (m.type === 'SALIDA' || m.type === 'CONSUMO') &&
+             new Date(m.date) >= threeMonthsAgo;
+    });
+    
+    const totalConsumed = recentMovements.reduce((sum, m) => sum + (Number(m.quantity) || 0), 0);
+    const monthlyAverage = Math.round(totalConsumed / 3);
+    
+    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const startDate = `${months[threeMonthsAgo.getMonth()]} ${threeMonthsAgo.getFullYear()}`;
+    const endDate = `${months[new Date().getMonth()]} ${new Date().getFullYear()}`;
+    
+    return {
+      monthlyAverage,
+      totalTransactions: recentMovements.length,
+      dateRange: `${startDate} - ${endDate}`
+    };
   };
 
   const handleSaveParams = async () => {
@@ -113,6 +158,18 @@ export default function StockView() {
 
     try {
       await updateProduct(editingProduct.id, updates);
+      await logAction('stock', 'EDITAR_PARAMETROS', {
+        product_id: editingProduct.id,
+        product_name: editingProduct.name,
+        changes: {
+          rop: editParams.rop,
+          eoq: editParams.eoq,
+          lead_time: editParams.lead_time,
+          order_cost: editParams.order_cost,
+          holding_cost: editParams.holding_cost,
+          price: editingProduct.is_individual ? editParams.price : null,
+        },
+      });
       toast.success('Parámetros actualizados exitosamente');
       closeEditModal();
     } catch (err) {
@@ -142,7 +199,7 @@ export default function StockView() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-text">Stock Actual</h1>
+          <h1 className="text-2xl font-bold text-text">Almacén</h1>
           <p className="text-sm text-text-secondary">
             Vista rápida del inventario en tiempo real
           </p>
@@ -272,7 +329,7 @@ export default function StockView() {
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono">
+                      <td className={`px-4 py-3 text-right font-mono ${isLowStock ? 'text-red-600 font-bold' : ''}`}>
                         {Number(physicalStock).toFixed(4)}
                       </td>
                       <td className="px-4 py-3 text-right font-mono">
@@ -317,20 +374,24 @@ export default function StockView() {
                       </td>
                       <td className="px-4 py-3 text-center">
                         <div className="flex items-center justify-center gap-1">
-                          <button
-                            onClick={() => openEditModal(product)}
-                            className="rounded-lg p-2 text-text-secondary hover:bg-primary/10 hover:text-primary transition-colors"
-                            title="Editar parámetros (ROP, EOQ)"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => setProductToDelete({ id: product.id, name: product.name })}
-                            className="rounded-lg p-2 text-text-secondary hover:bg-danger/10 hover:text-danger transition-colors"
-                            title="Eliminar producto"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          {canEdit() && (
+                            <button
+                              onClick={() => openEditModal(product)}
+                              className="rounded-lg p-2 text-text-secondary hover:bg-primary/10 hover:text-primary transition-colors"
+                              title="Editar parámetros (ROP, EOQ)"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                          )}
+                          {canEdit() && (
+                            <button
+                              onClick={() => setProductToDelete({ id: product.id, name: product.name })}
+                              className="rounded-lg p-2 text-text-secondary hover:bg-danger/10 hover:text-danger transition-colors"
+                              title="Eliminar producto"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -412,15 +473,89 @@ export default function StockView() {
 
               <div className="space-y-2">
                 <Label htmlFor="edit_eoq">EOQ (Cantidad Económica)</Label>
-                <Input
-                  id="edit_eoq"
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={editParams.eoq}
-                  onChange={(e) => setEditParams({...editParams, eoq: Number(e.target.value)})}
-                />
-                <p className="text-xs text-text-secondary">Cantidad óptima por pedido</p>
+                <div className="flex gap-2">
+                  <Input
+                    id="edit_eoq"
+                    type="number"
+                    min="0"
+                    step="1"
+                    className="flex-1"
+                    value={editParams.eoq}
+                    onChange={(e) => setEditParams({...editParams, eoq: Number(e.target.value)})}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const monthlyDemand = editParams.monthly_demand || 0;
+                      const orderCost = editParams.order_cost || 0;
+                      const holdingCost = editParams.holding_cost || 0;
+                      
+                      if (monthlyDemand > 0 && orderCost > 0 && holdingCost > 0) {
+                        const annualDemand = monthlyDemand * 12;
+                        const eoq = Math.sqrt((2 * annualDemand * orderCost) / holdingCost);
+                        const calculatedEoq = Math.round(Math.max(1, eoq));
+                        setEditParams({...editParams, eoq: calculatedEoq});
+                        toast.success(`EOQ calculado: ${calculatedEoq} unidades`);
+                      } else {
+                        toast.error('Ingrese: Demanda mensual, Costo de pedido y Costo de almacenamiento');
+                      }
+                    }}
+                    title="Calcular EOQ automáticamente"
+                  >
+                    Calcular
+                  </Button>
+                </div>
+                <p className="text-xs text-text-secondary">Cantidad óptima por pedido (usando fórmula de Wilson)</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit_monthly_demand">Demanda Mensual Estimada</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="edit_monthly_demand"
+                    type="number"
+                    min="0"
+                    step="1"
+                    className="flex-1"
+                    value={editParams.monthly_demand || ''}
+                    onChange={(e) => {
+                      setEditParams({...editParams, monthly_demand: Number(e.target.value)});
+                      setDemandDetail(null);
+                    }}
+                    placeholder="Ej: 50"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (!editingProduct) return;
+                      const result = calculateMonthlyDemand(editingProduct.id);
+                      if (result.totalTransactions > 0) {
+                        setEditParams({...editParams, monthly_demand: result.monthlyAverage});
+                        setDemandDetail({
+                          transactions: result.totalTransactions,
+                          range: result.dateRange
+                        });
+                        toast.success(`Demanda calculada: ${result.monthlyAverage}/mes basado en ${result.totalTransactions} transacciones`);
+                      } else {
+                        toast.error('No hay datos de consumo en los últimos 3 meses');
+                      }
+                    }}
+                    title="Calcular demanda automáticamente desde movimientos"
+                  >
+                    Auto
+                  </Button>
+                </div>
+                {demandDetail ? (
+                  <p className="text-xs text-success">
+                    ✓ Calculado: {demandDetail.transactions} transacciones ({demandDetail.range})
+                  </p>
+                ) : (
+                  <p className="text-xs text-text-secondary">Consumo promedio mensual del producto</p>
+                )}
               </div>
 
               <div className="space-y-2">

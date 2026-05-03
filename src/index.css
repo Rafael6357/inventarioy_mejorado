@@ -165,6 +165,24 @@
   .bg-bg, .bg-surface, .bg-white {
     background-color: white !important;
   }
+
+  /* Soporte para ticket de cierre de caja */
+  #printable-ticket,
+  #printable-ticket * {
+    visibility: visible;
+  }
+
+  #printable-ticket {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 80mm !important;
+    margin: 0 !important;
+    padding: 10mm !important;
+    overflow: visible !important;
+    background: white !important;
+    color: black !important;
+  }
   
   .text-text, .text-text-secondary, .text-black {
     color: black !important;

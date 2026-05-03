@@ -19,12 +19,15 @@ import {
   X,
   History,
   ChevronRight,
-  DollarSign
+  DollarSign,
+  FileText,
+  LockOpen
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
-import { useDatabaseStore } from '../store/dbStore';
+import { useDatabaseStore, MODULE_ROLES } from '../store/dbStore';
 import InventarioYLogo from '../components/InventarioYLogo';
 import SubscriptionBanner from '../components/SubscriptionBanner';
+import PinModal from '../components/PinModal';
 import StockView from './dashboard/StockView';
 import InventoryView from './dashboard/InventoryView';
 import TransitView from './dashboard/TransitView';
@@ -38,6 +41,7 @@ import ConsumptionView from './dashboard/ConsumptionView';
 import FilteredCenterView from './dashboard/FilteredCenterView';
 import AIView from './dashboard/AIView';
 import SettingsView from './dashboard/SettingsView';
+import ActionLogsView from './dashboard/ActionLogsView';
 import PaymentsView from './dashboard/PaymentsView';
 import DailyClosingsView from './dashboard/DailyClosingsView';
 
@@ -48,11 +52,21 @@ export default function Dashboard() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, isLoading: authLoading, initialize } = useAuthStore();
-  const { fetchAll, isLoading: dbLoading } = useDatabaseStore();
+  const { fetchAll, isLoading: dbLoading, accessPins, verifiedRole, clearVerifiedRole, verifyPinSimple } = useDatabaseStore();
+  const [localVerifiedRole, setLocalVerifiedRole] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('verifiedRole');
+    }
+    return null;
+  });
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [showInitialPinModal, setShowInitialPinModal] = useState(false);
+  const [pendingModule, setPendingModule] = useState('');
+  const [moduleAllowed, setModuleAllowed] = useState<Record<string, boolean>>({});
 
   const baseNav = useMemo(() => [
     // INVENTARIO
-    { name: 'Stock Actual', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Almacén', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Inventario', href: '/dashboard/inventory', icon: Package },
     { name: 'Movimientos', href: '/dashboard/movements', icon: History },
     { name: 'Tránsito', href: '/dashboard/transit', icon: ArrowRightLeft },
@@ -71,6 +85,7 @@ export default function Dashboard() {
     { name: 'RRHH', href: '/dashboard/hr', icon: Users },
     // CONFIGURACIÓN
     { name: 'Configuración', href: '/dashboard/settings', icon: Settings },
+    { name: 'Registro de Acciones', href: '/dashboard/action-logs', icon: FileText, requiresOwnerPin: true },
   ], []);
 
   const navigation = useMemo(() => {
@@ -91,6 +106,60 @@ export default function Dashboard() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  useEffect(() => {
+    if (user && accessPins.length > 0 && !localVerifiedRole) {
+      setShowInitialPinModal(true);
+    }
+  }, [user, accessPins, localVerifiedRole]);
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // No limpiar el localStorage al recargar - permitir persistencia
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
+
+  useEffect(() => {
+    const currentPath = location.pathname.replace('/dashboard', '') || '/';
+    if (currentPath === '/') return;
+    
+    const requiredRoles = MODULE_ROLES[currentPath];
+    if (!requiredRoles || requiredRoles.length === 0) {
+      setModuleAllowed(prev => ({ ...prev, [currentPath]: true }));
+      return;
+    }
+
+    const anyPinExists = accessPins && accessPins.length > 0;
+    const hasOwnerPin = accessPins?.some(p => p.role === 'owner');
+    const isSettingsWithoutOwnerPin = currentPath === '/settings' && !hasOwnerPin;
+    
+    if (!anyPinExists || isSettingsWithoutOwnerPin) {
+      setModuleAllowed(prev => ({ ...prev, [currentPath]: true }));
+      return;
+    }
+
+    if (verifiedRole && requiredRoles.includes(verifiedRole)) {
+      setModuleAllowed(prev => ({ ...prev, [currentPath]: true }));
+      return;
+    }
+
+    const userPin = accessPins.find(p => p.is_active && requiredRoles.includes(p.role));
+    if (!userPin) {
+      setModuleAllowed(prev => ({ ...prev, [currentPath]: false }));
+      setPendingModule(currentPath);
+      setShowPinModal(true);
+      return;
+    }
+
+    if (moduleAllowed[currentPath] === undefined) {
+      setModuleAllowed(prev => ({ ...prev, [currentPath]: false }));
+      setPendingModule(currentPath);
+      setShowPinModal(true);
+    }
+  }, [location.pathname, accessPins, verifiedRole]);
 
   const handleSidebarMouseEnter = () => {
     setIsSidebarVisible(true);
@@ -129,6 +198,9 @@ export default function Dashboard() {
 
   const handleLogout = async () => {
     console.log('handleLogout ejecutado');
+    clearVerifiedRole();
+    localStorage.removeItem('verifiedRole');
+    setLocalVerifiedRole(null);
     await logout();
     console.log('logout completado');
   };
@@ -208,6 +280,28 @@ export default function Dashboard() {
                 {user.subscription.status === 'trialing' ? 'Prueba Gratis' : 'Plan Pro'}
               </div>
             </div>
+            {verifiedRole && (
+              <div className="mb-3 px-3">
+                <div className="flex items-center justify-between rounded-lg bg-warning/10 border border-warning/30 px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <LockOpen className="h-4 w-4 text-warning" />
+                    <span className="text-sm font-medium text-warning">
+                      Sesión: {verifiedRole === 'owner' ? 'Dueño/a' : verifiedRole === 'economist' ? 'Económico/a' : verifiedRole === 'admin' ? 'Administrador/a' : verifiedRole === 'supervisor' ? 'Supervisor/a' : 'Dependiente/a'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      clearVerifiedRole();
+                      setLocalVerifiedRole(null);
+                    }}
+                    className="text-xs text-text-secondary hover:text-warning"
+                    title="Cerrar sesión de PIN"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            )}
             <button
               onClick={handleLogout}
               className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-danger hover:bg-danger/10 transition-colors"
@@ -248,11 +342,47 @@ export default function Dashboard() {
             <Route path="/filtered" element={<FilteredCenterView />} />
             <Route path="/ai" element={<AIView />} />
             <Route path="/settings" element={<SettingsView />} />
+            <Route path="/action-logs" element={<ActionLogsView />} />
             {user.role === 'admin' && (
               <Route path="/payments" element={<PaymentsView />} />
             )}
           </Routes>
         </main>
+
+        <PinModal
+          isOpen={showPinModal}
+          moduleName={pendingModule}
+          onSuccess={() => {
+            setShowPinModal(false);
+            setLocalVerifiedRole(localStorage.getItem('verifiedRole'));
+            setModuleAllowed(prev => ({ ...prev, [pendingModule]: true }));
+          }}
+          onCancel={() => {
+            setShowPinModal(false);
+            navigate('/dashboard');
+          }}
+        />
+
+        <PinModal
+          isOpen={showInitialPinModal}
+          moduleName="/"
+          isInitialVerification={true}
+          onSuccess={() => {
+            setShowInitialPinModal(false);
+            setLocalVerifiedRole(localStorage.getItem('verifiedRole'));
+          }}
+          onCancel={() => {
+            logout();
+          }}
+        />
+
+        {!moduleAllowed[location.pathname.replace('/dashboard', '') || '/'] && location.pathname !== '/dashboard' && (
+          <div className="fixed inset-0 z-40 bg-surface/80 flex items-center justify-center">
+            <div className="text-center">
+              <p className="text-text-secondary">Verificando acceso...</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

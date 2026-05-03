@@ -18,7 +18,12 @@ import {
 
 export default function RecipesView() {
   const { user } = useAuthStore();
-  const { products, recipes, addRecipe, deleteRecipe, updateRecipe } = useDatabaseStore();
+  const { products, recipes, addRecipe, deleteRecipe, updateRecipe, logAction, accessPins } = useDatabaseStore();
+
+  const canEdit = (): boolean => {
+    const activePin = accessPins.find(p => p.is_active);
+    return activePin && ['owner', 'economist'].includes(activePin.role);
+  };
   
   const activeProducts = products.filter(p => p.is_active !== false);
 
@@ -66,6 +71,10 @@ export default function RecipesView() {
     }
     try {
       await updateRecipe(recipeId, { selling_price: editingPrice });
+      await useDatabaseStore.getState().logAction('recipes', 'MODIFICAR', {
+        recipe_id: recipeId,
+        new_price: editingPrice
+      });
       toast.success('Precio actualizado');
       cancelEditPrice();
     } catch (err) {
@@ -131,6 +140,11 @@ export default function RecipesView() {
         name: recipeName,
         selling_price,
         ingredients: convertedIngredients
+      });
+      await useDatabaseStore.getState().logAction('recipes', 'CREAR', {
+        recipe_name: recipeName,
+        selling_price,
+        ingredients_count: convertedIngredients.length
       });
       setRecipeName('');
       setSellingPrice(0);
@@ -340,6 +354,10 @@ export default function RecipesView() {
                         if(window.confirm('¿Seguro que deseas eliminar esta receta?')) {
                           try {
                             await deleteRecipe(recipe.id);
+                            await useDatabaseStore.getState().logAction('recipes', 'ELIMINAR', {
+                              recipe_name: recipe.name,
+                              recipe_id: recipe.id
+                            });
                             toast.success('Receta eliminada exitosamente');
                           } catch (err) {
                             toast.error((err as Error).message || 'Error al eliminar la receta');
@@ -377,7 +395,7 @@ export default function RecipesView() {
                               <X className="h-4 w-4" />
                             </button>
                           </div>
-                        ) : (
+                        ) : canEdit() ? (
                           <button 
                             onClick={() => startEditPrice(recipe)}
                             className="w-full hover:bg-primary/20 rounded-md p-1 transition-colors"
@@ -389,10 +407,15 @@ export default function RecipesView() {
                             </div>
                             <p className="font-mono font-medium text-primary">${recipe.selling_price.toFixed(2)}</p>
                           </button>
+                        ) : (
+                          <div className="w-full rounded-md p-1">
+                            <p className="text-xs text-text-secondary">Venta</p>
+                            <p className="font-mono font-medium text-primary">${recipe.selling_price.toFixed(2)}</p>
+                          </div>
                         )}
                       </div>
                       <div className="rounded-md bg-surface p-2 text-center">
-                        <p className="text-xs text-text-secondary">Margen</p>
+                        <p className="text-xs text-text-secondary">Margen de Ganancia</p>
                         <p className={`font-mono font-medium ${margin < 30 ? 'text-danger' : 'text-success'}`}>
                           {margin.toFixed(0)}%
                         </p>

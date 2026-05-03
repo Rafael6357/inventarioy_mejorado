@@ -1,7 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
 import { useAuthStore } from '../../store/authStore';
-import { Users, UserPlus, Trash2, Mail, Phone, Briefcase, DollarSign, FileText, Upload, Download, X, FolderOpen, BookOpen, ShieldCheck, Paperclip, Eye, ChevronDown } from 'lucide-react';
+import { Users, UserPlus, Trash2, Mail, Phone, Briefcase, DollarSign, FileText, Upload, Download, X, FolderOpen, BookOpen, ShieldCheck, Paperclip, Eye, ChevronDown, Building2, Calculator, Settings, RefreshCw, Save, Edit, FileSpreadsheet } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
@@ -229,30 +229,87 @@ function EmployeeDocumentsPanel({ employeeId, employeeName }: { employeeId: stri
 
 export default function HRView() {
   const { user } = useAuthStore();
-  const { employees, addEmployee, deleteEmployee, hrDocuments, uploadHRDocument, fetchHRDocuments, deleteHRDocument } = useDatabaseStore();
+  const { 
+    employees, departments, addEmployee, deleteEmployee, 
+    hrDocuments, uploadHRDocument, fetchHRDocuments, deleteHRDocument,
+    payrollConfig, payrollEntries, calculatePayroll, getPayrollEntries, 
+    updatePayrollConfig, updatePayrollEntry, logAction, forceRefreshData,
+    getEmployeesCount, getDepartmentsCount, getPayrollEntriesCount
+  } = useDatabaseStore();
 
-  const [activeTab, setActiveTab] = useState<'personal' | 'documentos'>('personal');
-  const [newEmployee, setNewEmployee] = useState({
-    name: '',
-    role: '',
-    salary: 0,
-    phone: '',
-    email: '',
-  });
+  const [activeTab, setActiveTab] = useState<'personal' | 'departamentos' | 'nomina' | 'configuracion' | 'documentos'>('personal');
   const [expandedEmployee, setExpandedEmployee] = useState<string | null>(null);
   const [uploadDocType, setUploadDocType] = useState<'MANUAL' | 'REGLAMENTO' | 'PNO'>('MANUAL');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedEmployeeDoc, setSelectedEmployeeDoc] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
+  const [newEmployee, setNewEmployee] = useState({
+    name: '', role: '', salary: 0, phone: '', email: '', nit_id: '', category: '',
+  });
+  const [newDepartment, setNewDepartment] = useState('');
+  const [editingDepartment, setEditingDepartment] = useState<{id: string, name: string} | null>(null);
+  const [payrollMonth, setPayrollMonth] = useState(() => {
+    const now = new Date();
+    return { month: now.getMonth() + 1, year: now.getFullYear() };
+  });
+  const [isCalculatingPayroll, setIsCalculatingPayroll] = useState(false);
+  const [isCreatingDepartment, setIsCreatingDepartment] = useState(false);
+  const [isCreatingEmployee, setIsCreatingEmployee] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<string | null>(null);
+  const [editingEarnedSalary, setEditingEarnedSalary] = useState<number>(0);
+  const [editingVacations, setEditingVacations] = useState<number>(0);
+
+  const [departmentsPage, setDepartmentsPage] = useState(1);
+  const [departmentsTotal, setDepartmentsTotal] = useState(0);
+  const [employeesPage, setEmployeesPage] = useState(1);
+  const [employeesTotal, setEmployeesTotal] = useState(0);
+  const [payrollPage, setPayrollPage] = useState(1);
+  const [payrollTotal, setPayrollTotal] = useState(0);
+
+  const [configBaseExenta, setConfigBaseExenta] = useState(0);
+  const [configImpuesto, setConfigImpuesto] = useState(0);
+  const [configContribucion, setConfigContribucion] = useState(0);
+
+  useEffect(() => {
+    if (payrollConfig) {
+      setConfigBaseExenta(payrollConfig.tax_exemption_base);
+      setConfigImpuesto(payrollConfig.tax_rate);
+      setConfigContribucion(payrollConfig.special_contribution_rate);
+    }
+  }, [payrollConfig]);
+
+  useEffect(() => {
+    const store = useDatabaseStore.getState();
+    store.getEmployeesCount(employeeSearchTerm || undefined).then(count => {
+      setEmployeesTotal(count);
+    });
+  }, [employeeSearchTerm]);
+
+  useEffect(() => {
+    const store = useDatabaseStore.getState();
+    store.getDepartmentsCount().then(count => {
+      setDepartmentsTotal(count);
+    });
+  }, []);
+
+  useEffect(() => {
+    const store = useDatabaseStore.getState();
+    if (payrollMonth.month && payrollMonth.year) {
+      store.getPayrollEntriesCount(payrollMonth.month, payrollMonth.year).then(count => {
+        setPayrollTotal(count);
+      });
+    }
+  }, [payrollMonth]);
 
   const handleAddEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
     try {
-      await addEmployee({ ...newEmployee });
-      setNewEmployee({ name: '', role: '', salary: 0, phone: '', email: '' });
+      await addEmployee({ name: newEmployee.name, role: newEmployee.role, salary: newEmployee.salary, phone: newEmployee.phone, email: newEmployee.email, nit_id: newEmployee.nit_id, category: newEmployee.category });
+      setNewEmployee({ name: '', role: '', salary: 0, phone: '', email: '', nit_id: '', category: '' });
       toast.success('Empleado agregado exitosamente');
     } catch (err) {
       toast.error((err as Error).message || 'Error al agregar el empleado');
@@ -313,6 +370,39 @@ export default function HRView() {
           >
             <Users className="h-4 w-4" />
             Personal
+          </button>
+          <button
+            onClick={() => setActiveTab('departamentos')}
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all whitespace-nowrap ${
+              activeTab === 'departamentos'
+                ? 'bg-primary text-white shadow-sm'
+                : 'text-text-secondary hover:text-text'
+            }`}
+          >
+            <Building2 className="h-4 w-4" />
+            Departamentos
+          </button>
+          <button
+            onClick={() => setActiveTab('nomina')}
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all whitespace-nowrap ${
+              activeTab === 'nomina'
+                ? 'bg-primary text-white shadow-sm'
+                : 'text-text-secondary hover:text-text'
+            }`}
+          >
+            <Calculator className="h-4 w-4" />
+            Nómina
+          </button>
+          <button
+            onClick={() => setActiveTab('configuracion')}
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all whitespace-nowrap ${
+              activeTab === 'configuracion'
+                ? 'bg-primary text-white shadow-sm'
+                : 'text-text-secondary hover:text-text'
+            }`}
+          >
+            <Settings className="h-4 w-4" />
+            Configuración
           </button>
           <button
             onClick={() => setActiveTab('documentos')}
@@ -393,7 +483,34 @@ export default function HRView() {
                 />
               </div>
 
-              <Button type="submit" className="mt-6 px-8 w-full">
+              <div className="space-y-2">
+                <Label htmlFor="nit_id">NIT / Carnet de Identidad</Label>
+                <Input
+                  id="nit_id"
+                  placeholder="Ej: 0102030405"
+                  value={newEmployee.nit_id}
+                  onChange={e => setNewEmployee({ ...newEmployee, nit_id: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="category">Departamento *</Label>
+                <select
+                  id="category"
+                  required
+                  className="flex h-10 w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  value={newEmployee.category}
+                  onChange={e => setNewEmployee({ ...newEmployee, category: e.target.value })}
+                >
+                  <option value="">Seleccionar departamento...</option>
+                  {departments.map(dept => (
+                    <option key={dept.id} value={dept.id}>{dept.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <Button type="submit" className="mt-6 px-8 w-full gap-2">
+                <UserPlus className="h-4 w-4" />
                 Registrar Empleado
               </Button>
             </form>
@@ -410,13 +527,22 @@ export default function HRView() {
               </span>
             </div>
 
+            <div className="mb-4">
+              <Input
+                placeholder="Buscar empleado por nombre..."
+                value={employeeSearchTerm}
+                onChange={(e) => setEmployeeSearchTerm(e.target.value)}
+                className="h-9"
+              />
+            </div>
+
             <div className="space-y-3">
-              {employees.length === 0 ? (
+              {(employeeSearchTerm ? employees.filter(e => e.name.toLowerCase().includes(employeeSearchTerm.toLowerCase())) : employees).length === 0 ? (
                 <div className="col-span-full py-12 text-center text-text-secondary">
                   No hay empleados registrados.
                 </div>
               ) : (
-                employees.map(employee => (
+                (employeeSearchTerm ? employees.filter(e => e.name.toLowerCase().includes(employeeSearchTerm.toLowerCase())) : employees).map(employee => (
                   <div key={employee.id} className="rounded-xl border border-border bg-bg transition-colors hover:border-primary/30">
                     <div className="flex items-center justify-between p-4">
                       <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -484,180 +610,494 @@ export default function HRView() {
                       <EmployeeDocumentsPanel employeeId={employee.id} employeeName={employee.name} />
                     )}
                   </div>
-                ))
+))
               )}
             </div>
+
+            {departmentsTotal > 10 && (
+              <div className="flex items-center justify-center gap-2 mt-6">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={departmentsPage === 1}
+                  onClick={() => setDepartmentsPage(p => Math.max(1, p - 1))}
+                >
+                  ← Anterior
+                </Button>
+                <span className="text-sm text-text-secondary px-3">
+                  Página {departmentsPage} de {Math.ceil(departmentsTotal / 10)}
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={departmentsPage >= Math.ceil(departmentsTotal / 10)}
+                  onClick={() => setDepartmentsPage(p => p + 1)}
+                >
+                  Siguiente →
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {activeTab === 'documentos' && (
+      {activeTab === 'departamentos' && (
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="rounded-xl border border-border bg-surface p-6 shadow-sm lg:col-span-1 h-fit">
+            <div className="mb-6 flex items-center gap-3 border-b border-border pb-4">
+              <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                <Building2 className="h-5 w-5" />
+              </div>
+              <h2 className="text-lg font-semibold text-text">Nuevo Departamento</h2>
+            </div>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (!newDepartment.trim()) return;
+              if (departments.some(d => d.name.toLowerCase() === newDepartment.trim().toLowerCase())) {
+                toast.error('Ya existe un departamento con ese nombre');
+                return;
+              }
+              setIsCreatingDepartment(true);
+              try {
+                const { addDepartment } = useDatabaseStore.getState();
+                await addDepartment(newDepartment);
+                setNewDepartment('');
+                toast.success('Departamento creado');
+              } catch (err) {
+                toast.error((err as Error).message);
+              } finally {
+                setIsCreatingDepartment(false);
+              }
+            }} className="space-y-4">
+              <div className="space-y-2">
+                <Label>Nombre del Departamento *</Label>
+                <Input
+                  placeholder="Ej: Cocina, Limpieza..."
+                  value={newDepartment}
+                  onChange={e => setNewDepartment(e.target.value)}
+                />
+              </div>
+              <Button type="submit" disabled={isCreatingDepartment} className="w-full gap-2">
+                {isCreatingDepartment ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Building2 className="h-4 w-4" />}
+                {isCreatingDepartment ? 'Creando...' : 'Crear'}
+              </Button>
+            </form>
+          </div>
+          <div className="rounded-xl border border-border bg-surface p-6 shadow-sm lg:col-span-2">
+            <div className="mb-6 flex items-center gap-3 border-b border-border pb-4">
+              <h2 className="text-lg font-semibold text-text">Lista de Departamentos</h2>
+              <span className="ml-auto bg-surface-hover px-2.5 py-0.5 text-xs font-medium text-text-secondary rounded-full">
+                {departments.length}
+              </span>
+            </div>
+            <div className="space-y-3">
+              {departments.length === 0 ? (
+                <div className="py-12 text-center text-text-secondary">No hay departamentos</div>
+              ) : (
+                departments.map(dept => {
+                  const empCount = employees.filter(e => e.category === dept.id).length;
+                  return (
+                    <div key={dept.id} className="flex items-center justify-between p-4 rounded-xl border border-border bg-bg hover:border-primary/30">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold">
+                          {dept.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          {editingDepartment?.id === dept.id ? (
+                            <div className="flex items-center gap-2">
+                              <Input
+                                value={editingDepartment.name}
+                                onChange={e => setEditingDepartment({ ...editingDepartment, name: e.target.value })}
+                                className="h-8 w-48"
+                              />
+                              <Button size="sm" onClick={async () => {
+                                const { updateDepartment } = useDatabaseStore.getState();
+                                await updateDepartment(dept.id, editingDepartment.name);
+                                setEditingDepartment(null);
+                              }}><Save className="h-4 w-4" /></Button>
+                              <Button size="sm" variant="ghost" onClick={() => setEditingDepartment(null)}><X className="h-4 w-4" /></Button>
+                            </div>
+                          ) : (
+                            <>
+                              <h3 className="font-semibold text-text">{dept.name}</h3>
+                              <p className="text-xs text-text-secondary">{empCount} empleado{empCount !== 1 ? 's' : ''}</p>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      {editingDepartment?.id !== dept.id && (
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="ghost" onClick={() => setEditingDepartment({ id: dept.id, name: dept.name })}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={async () => {
+                            if (empCount > 0) { toast.error(`Hay ${empCount} empleados en este departamento`); return; }
+                            if (!confirm('¿Eliminar?')) return;
+                            const { deleteDepartment } = useDatabaseStore.getState();
+                            await deleteDepartment(dept.id);
+                          }} className="text-danger hover:text-danger"><Trash2 className="h-4 w-4" /></Button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {departmentsTotal > 10 && (
+              <div className="flex items-center justify-center gap-2 mt-6">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={departmentsPage === 1}
+                  onClick={() => setDepartmentsPage(p => Math.max(1, p - 1))}
+                >
+                  ← Anterior
+                </Button>
+                <span className="text-sm text-text-secondary px-3">
+                  Página {departmentsPage} de {Math.ceil(departmentsTotal / 10)}
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={departmentsPage >= Math.ceil(departmentsTotal / 10)}
+                  onClick={() => setDepartmentsPage(p => p + 1)}
+                >
+                  Siguiente →
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'nomina' && (
         <div className="space-y-6">
+          <div className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                  <Calculator className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-text">Generar Nómina</h2>
+                  <p className="text-sm text-text-secondary">Calcula automáticamente el salario de todos los empleados</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <select
+                  className="h-10 rounded-lg border border-border bg-bg px-3 py-2 text-sm"
+                  value={payrollMonth.month}
+                  onChange={e => setPayrollMonth({ ...payrollMonth, month: Number(e.target.value) })}
+                >
+                  {Array.from({ length: 12 }, (_, i) => (
+                    <option key={i + 1} value={i + 1}>
+                      {new Date(0, i).toLocaleString('es', { month: 'long' }).charAt(0).toUpperCase() + new Date(0, i).toLocaleString('es', { month: 'long' }).slice(1)}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className="h-10 rounded-lg border border-border bg-bg px-3 py-2 text-sm"
+                  value={payrollMonth.year}
+                  onChange={e => setPayrollMonth({ ...payrollMonth, year: Number(e.target.value) })}
+                >
+                  {Array.from({ length: 67 }, (_, i) => 2024 + i).map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+                <Button onClick={async () => {
+                  const toastId = toast.loading('Calculando nómina...', { duration: 30000 });
+                  setIsCalculatingPayroll(true);
+                  try {
+                    await calculatePayroll(payrollMonth.month, payrollMonth.year);
+                    await getPayrollEntries(payrollMonth.month, payrollMonth.year);
+                    toast.success('Nómina calculada exitosamente');
+                  } catch (err) {
+                    toast.error((err as Error).message || 'Error al calcular nómina');
+                  } finally {
+                    setIsCalculatingPayroll(false);
+                    toast.dismiss(toastId);
+                  }
+                }} disabled={isCalculatingPayroll} className="gap-2 min-w-[140px]">
+                  {isCalculatingPayroll ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Calculator className="h-4 w-4" />}
+                  {isCalculatingPayroll ? 'Calculando...' : 'Generar Nómina'}
+                </Button>
+                {payrollEntries.length > 0 && (
+                  <Button variant="outline" onClick={() => {
+                    const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+                    const csvContent = [
+                      ['EMPLEADO', 'CARGO/OCUPACIÓN', 'NIT/CARNET', 'SALARIO BASE', 'SALARIO DEVENGADO', 'VACACIONES (DÍAS)', 'BASE EXENTA', 'BASE IMPONIBLE', 'RETENCIONES', 'NETO A COBRAR'].join(','),
+                      ...payrollEntries.map(entry => {
+                        const employee = employees.find(e => e.id === entry.employee_id);
+                        return [
+                          entry.employee_name,
+                          employee?.role || '',
+                          employee?.nit_id || '',
+                          entry.base_salary.toFixed(2),
+                          entry.earned_salary.toFixed(2),
+                          (entry.vacation_days || 0).toString(),
+                          entry.exemption_base.toFixed(2),
+                          entry.taxable_base.toFixed(2),
+                          (entry.tax_amount + entry.special_contribution).toFixed(2),
+                          entry.net_salary.toFixed(2)
+                        ].join(',');
+                      }),
+                      ['', '', '', '', '', '', '', '', 'TOTAL GENERAL:', '', payrollEntries.reduce((sum, e) => sum + e.net_salary, 0).toFixed(2)].join(',')
+                    ].join('\n');
+                    
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = `Nomina_${monthNames[payrollMonth.month - 1]}_${payrollMonth.year}.csv`;
+                    link.click();
+                    toast.success('Nómina exportada correctamente');
+                  }} className="gap-2">
+                    <FileSpreadsheet className="h-4 w-4" />
+                    Exportar Excel
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {payrollEntries.length > 0 ? (
+            <div className="space-y-4">
+              {Object.entries(payrollEntries.reduce((acc, entry) => {
+                if (!acc[entry.employee_category]) acc[entry.employee_category] = [];
+                acc[entry.employee_category].push(entry);
+                return acc;
+              }, {} as Record<string, typeof payrollEntries>)).map(([category, entries]) => {
+                const categoryTotal = entries.reduce((sum, e) => sum + e.net_salary, 0);
+                return (
+                  <div key={category} className="rounded-xl border border-border bg-surface overflow-hidden">
+                    <div className="bg-primary/5 border-b px-6 py-3 flex justify-between">
+                      <h3 className="font-semibold">{category}</h3>
+                      <span className="text-sm">Total: <span className="font-bold text-primary">${categoryTotal.toFixed(2)}</span></span>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-bg text-text-secondary">
+                          <tr>
+                            <th className="px-4 py-2 text-left">Empleado</th>
+                            <th className="px-4 py-2 text-left">Cargo/Ocupación</th>
+                            <th className="px-4 py-2 text-left">NIT/Carnet</th>
+                            <th className="px-4 py-2 text-right">Salario Base</th>
+                            <th className="px-4 py-2 text-right">Salario Devengado</th>
+                            <th className="px-4 py-2 text-right">Vacaciones (Días)</th>
+                            <th className="px-4 py-2 text-right">Base Exenta</th>
+                            <th className="px-4 py-2 text-right">Base Imponible</th>
+                            <th className="px-4 py-2 text-right">Retenciones</th>
+                            <th className="px-4 py-2 text-right">Neto a Cobrar</th>
+                            <th className="px-4 py-2 text-center">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {entries.map(entry => {
+                            const employee = employees.find(e => e.id === entry.employee_id);
+                            return (
+                            <tr key={entry.id} className="hover:bg-bg/50">
+                              <td className="px-4 py-2 font-medium">{entry.employee_name}</td>
+                              <td className="px-4 py-2 text-text-secondary">{employee?.role || '-'}</td>
+                              <td className="px-4 py-2 text-text-secondary">{employee?.nit_id || '-'}</td>
+                              <td className="px-4 py-2 text-right text-text-secondary">${entry.base_salary.toFixed(2)}</td>
+                              <td className="px-4 py-2 text-right">
+                                {editingEntry === entry.id ? (
+                                  <div className="flex items-center justify-end gap-1">
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      value={editingEarnedSalary}
+                                      onChange={e => setEditingEarnedSalary(Number(e.target.value))}
+                                      className="w-24 h-7 text-right text-sm"
+                                      autoFocus
+                                    />
+                                    <Button size="sm" className="h-7" onClick={async () => {
+                                      try {
+                                        await updatePayrollEntry(entry.id, { earned_salary: editingEarnedSalary });
+                                        await getPayrollEntries(payrollMonth.month, payrollMonth.year);
+                                        setEditingEntry(null);
+                                        toast.success('Salario actualizado');
+                                      } catch (err) {
+                                        toast.error((err as Error).message);
+                                      }
+                                    }}><Save className="h-3 w-3" /></Button>
+                                    <Button size="sm" variant="ghost" className="h-7" onClick={() => setEditingEntry(null)}><X className="h-3 w-3" /></Button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center justify-end gap-1 cursor-pointer hover:text-primary" onClick={() => {
+                                    setEditingEntry(entry.id);
+                                    setEditingEarnedSalary(entry.earned_salary);
+                                  }}>
+                                    <span className={entry.is_custom ? 'text-warning font-medium' : ''}>${entry.earned_salary.toFixed(2)}</span>
+                                    <Edit className="h-3 w-3 opacity-50" />
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-4 py-2 text-center">
+                                {editingEntry === entry.id + '_vacations' ? (
+                                  <div className="flex items-center justify-center gap-1">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      max="30"
+                                      value={editingVacations}
+                                      onChange={e => setEditingVacations(Number(e.target.value))}
+                                      className="w-16 h-7 text-center text-sm"
+                                      autoFocus
+                                    />
+                                    <Button size="sm" className="h-7" onClick={async () => {
+                                      try {
+                                        const { updatePayrollEntry } = useDatabaseStore.getState();
+                                        await updatePayrollEntry(entry.id, { vacation_days: editingVacations });
+                                        await getPayrollEntries(payrollMonth.month, payrollMonth.year);
+                                        setEditingEntry(null);
+                                        toast.success('Vacaciones actualizadas');
+                                      } catch (err) {
+                                        toast.error((err as Error).message);
+                                      }
+                                    }}><Save className="h-3 w-3" /></Button>
+                                    <Button size="sm" variant="ghost" className="h-7" onClick={() => setEditingEntry(null)}><X className="h-3 w-3" /></Button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center justify-center gap-1 cursor-pointer hover:text-primary" onClick={() => {
+                                    setEditingEntry(entry.id + '_vacations');
+                                    setEditingVacations((entry as any).vacation_days || 0);
+                                  }}>
+                                    <span>{(entry as any).vacation_days || 0}</span>
+                                    <Edit className="h-3 w-3 opacity-50" />
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-4 py-2 text-right text-text-secondary">-${entry.exemption_base.toFixed(2)}</td>
+                              <td className="px-4 py-2 text-right text-text-secondary">${entry.taxable_base.toFixed(2)}</td>
+                              <td className="px-4 py-2 text-right text-danger">${(entry.tax_amount + entry.special_contribution).toFixed(2)}</td>
+                              <td className="px-4 py-2 text-right font-bold text-success">${entry.net_salary.toFixed(2)}</td>
+                              <td className="px-4 py-2 text-center">
+                                {entry.is_custom && (
+                                  <button
+                                    onClick={async () => {
+                                      try {
+                                        await useDatabaseStore.getState().regeneratePayrollEntry(entry.id);
+                                        await getPayrollEntries(payrollMonth.month, payrollMonth.year);
+                                        toast.success('Valores regenerados');
+                                      } catch (err) {
+                                        toast.error((err as Error).message);
+                                      }
+                                    }}
+                                    className="flex items-center justify-center h-7 w-7 rounded-lg text-text-secondary hover:text-primary hover:bg-primary/10 transition-colors"
+                                    title="Regenerar valores por defecto"
+                                  >
+                                    <RefreshCw className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {payrollTotal > 20 && (
+                <div className="flex items-center justify-center gap-2 mt-6">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={payrollPage === 1}
+                    onClick={() => setPayrollPage(p => Math.max(1, p - 1))}
+                  >
+                    ← Anterior
+                  </Button>
+                  <span className="text-sm text-text-secondary px-3">
+                    Página {payrollPage} de {Math.ceil(payrollTotal / 20)}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={payrollPage >= Math.ceil(payrollTotal / 20)}
+                    onClick={() => setPayrollPage(p => p + 1)}
+                  >
+                    Siguiente →
+                  </Button>
+                </div>
+              )}
+
+              <div className="rounded-xl border border-primary bg-primary/5 p-4 flex justify-between">
+                <span className="font-semibold">Total General Nómina</span>
+                <span className="text-xl font-bold text-primary">
+                  ${payrollEntries.reduce((sum, e) => sum + e.net_salary, 0).toFixed(2)}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-border bg-surface p-12 text-center">
+              <Calculator className="h-12 w-12 text-text-secondary mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No hay nómina generada</h3>
+              <p className="text-text-secondary">Selecciona el mes y año, luego haz clic en "Generar Nómina"</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'configuracion' && (
+        <div className="max-w-2xl">
           <div className="rounded-xl border border-border bg-surface p-6 shadow-sm">
             <div className="mb-6 flex items-center gap-3 border-b border-border pb-4">
               <div className="rounded-lg bg-primary/10 p-2 text-primary">
-                <Upload className="h-5 w-5" />
+                <Settings className="h-5 w-5" />
               </div>
-              <div>
-                <h2 className="text-lg font-semibold text-text">Subir Nuevo Documento</h2>
-                <p className="text-xs text-text-secondary">Manuales, reglamentos internos y PNOs disponibles para todo el personal</p>
-              </div>
+              <h2 className="text-lg font-semibold text-text">Parámetros de Nómina</h2>
             </div>
-
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 items-end">
-              <div className="lg:col-span-2 space-y-1.5">
-                <Label className="text-xs font-medium text-text-secondary">Tipo de documento</Label>
-                <select
-                  className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none"
-                  value={uploadDocType}
-                  onChange={e => setUploadDocType(e.target.value as typeof uploadDocType)}
-                  title="Selecciona la categoría del documento"
-                >
-                  <option value="MANUAL">Manual de Bienvenida</option>
-                  <option value="REGLAMENTO">Reglamento Interno</option>
-                  <option value="PNO">PNO (Procedimiento)</option>
-                </select>
-              </div>
-
-              <div className="col-span-2 space-y-1.5">
-                <Label className="text-xs font-medium text-text-secondary">Archivo (PDF, Word, imagen)</Label>
-                <div
-                  className="flex items-center gap-2 rounded-lg border border-border bg-bg px-3 py-2 cursor-pointer hover:border-primary/50 transition-colors"
-                  onClick={() => fileInputRef.current?.click()}
-                  title="Arrastra un archivo o haz clic para seleccionar"
-                >
-                  <FileText className="h-4 w-4 text-text-secondary shrink-0" />
-                  {selectedFile ? (
-                    <span className="text-sm text-success truncate">{selectedFile.name}</span>
-                  ) : (
-                    <span className="text-sm text-text-secondary truncate">Seleccionar archivo...</span>
-                  )}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                    className="hidden"
-                    onChange={e => {
-                      const file = e.target.files?.[0];
-                      if (file) setSelectedFile(file);
+            {payrollConfig ? (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Base Exenta Mensual ($)</Label>
+                  <Input
+                    type="number"
+                    value={configBaseExenta}
+                    onChange={e => setConfigBaseExenta(Number(e.target.value))}
+                    onBlur={e => {
+                      const { updatePayrollConfig } = useDatabaseStore.getState();
+                      updatePayrollConfig({ tax_exemption_base: Number(e.target.value) });
+                      toast.success('Base exenta actualizada', { duration: 1500 });
+                    }}
+                  />
+                  <p className="text-xs text-text-secondary">Monto que se descuenta antes del 3% de impuesto</p>
+                </div>
+                <div className="space-y-2">
+                  <Label>% Impuesto sobre Renta</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={configImpuesto}
+                    onChange={e => setConfigImpuesto(Number(e.target.value))}
+                    onBlur={e => {
+                      const { updatePayrollConfig } = useDatabaseStore.getState();
+                      updatePayrollConfig({ tax_rate: Number(e.target.value) });
+                      toast.success('Porcentaje de impuesto actualizado', { duration: 1500 });
+                    }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>% Contribución Especial</Label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={configContribucion}
+                    onChange={e => setConfigContribucion(Number(e.target.value))}
+                    onBlur={e => {
+                      const { updatePayrollConfig } = useDatabaseStore.getState();
+                      updatePayrollConfig({ special_contribution_rate: Number(e.target.value) });
+                      toast.success('Contribución especial actualizada', { duration: 1500 });
                     }}
                   />
                 </div>
               </div>
-            </div>
-
-            <div className="mt-4 flex gap-3">
-              <Button onClick={handleUploadDoc} disabled={!selectedFile || isUploading} className="gap-2" title="Guardar documento en la biblioteca">
-                {isUploading ? (
-                  'Subiendo...'
-                ) : (
-                  <>
-                    <Upload className="h-4 w-4" />
-                    Subir Documento
-                  </>
-                )}
-              </Button>
-              {selectedFile && (
-                <Button variant="outline" onClick={() => setSelectedFile(null)} size="sm">
-                  <X className="h-4 w-4 mr-1" /> Quitar
-                </Button>
-              )}
-            </div>
+            ) : (
+              <div className="flex justify-center py-8"><RefreshCw className="h-6 w-6 animate-spin text-primary" /></div>
+            )}
           </div>
-
-          {(['MANUAL', 'REGLAMENTO', 'PNO'] as const).map(type => {
-            const docs = groupedDocs[type] || [];
-            const Icon = DOC_TYPE_ICONS[type];
-            const label = DOC_TYPE_LABELS[type];
-            const pluralLabel = DOC_TYPE_PLURALS[type] || `${label}s`;
-
-            const sectionStyles: Record<string, string> = {
-              MANUAL: 'border-success/30 bg-success/5 [&_.section-icon]:bg-success/10 [&_.section-icon]:text-success',
-              REGLAMENTO: 'border-primary/30 bg-primary/5 [&_.section-icon]:bg-primary/10 [&_.section-icon]:text-primary',
-              PNO: 'border-warning/30 bg-warning/5 [&_.section-icon]:bg-warning/10 [&_.section-icon]:text-warning',
-            };
-
-            return (
-              <div key={type} className={`rounded-xl border p-6 shadow-sm ${sectionStyles[type]}`}>
-                <div className="mb-4 flex items-center gap-3 border-b border-border/50 pb-4">
-                  <div className={`section-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-lg`}>
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-text">{pluralLabel}</h3>
-                    <p className="text-xs text-text-secondary">
-                      {docs.length === 0
-                        ? 'No hay documentos cargados'
-                        : `${docs.length} documento${docs.length !== 1 ? 's' : ''} disponible${docs.length !== 1 ? 's' : ''}`}
-                    </p>
-                  </div>
-                </div>
-
-                {docs.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border bg-surface/50 py-10 text-center">
-                    <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-surface">
-                      <Icon className="h-6 w-6 text-text-secondary/40" />
-                    </div>
-                    <p className="text-sm text-text-secondary">
-                      No hay {label.toLowerCase()} cargados.
-                    </p>
-                    <p className="text-xs text-text-secondary/70 mt-1">
-                      Sube uno usando el formulario de arriba.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {docs.map(doc => (
-                      <div
-                        key={doc.id}
-                        className="group relative flex items-start gap-3 rounded-xl border border-border/50 bg-surface p-4 transition-all hover:border-primary/40 hover:shadow-sm"
-                      >
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                          <Icon className="h-5 w-5 text-primary" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold text-text truncate pr-6">{doc.name}</p>
-                          <p className="mt-0.5 flex items-center gap-2 text-xs text-text-secondary">
-                            <span>{formatFileSize(doc.file_size || 0)}</span>
-                            <span>·</span>
-                            <span>{new Date(doc.created_at).toLocaleDateString('es-ES')}</span>
-                          </p>
-                          <div className="mt-3 flex items-center gap-1.5">
-                            <a
-                              href={doc.file_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
-                              title="Abrir documento en nueva pestaña"
-                            >
-                              <Eye className="h-3 w-3" />
-                              Ver
-                            </a>
-                            <a
-                              href={doc.file_url}
-                              download={doc.file_name}
-                              className="inline-flex items-center gap-1.5 rounded-lg bg-success/10 px-3 py-1.5 text-xs font-medium text-success hover:bg-success/20 transition-colors"
-                              title="Guardar documento en tu dispositivo"
-                            >
-                              <Download className="h-3 w-3" />
-                              Descargar
-                            </a>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => handleDeleteDoc(doc)}
-                          className="absolute right-3 top-3 flex items-center justify-center h-7 w-7 rounded-lg text-text-secondary hover:text-danger hover:bg-danger/10 transition-colors opacity-0 group-hover:opacity-100"
-                          title="Eliminar documento"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
         </div>
       )}
     </div>

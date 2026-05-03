@@ -169,7 +169,7 @@ export default function FilteredCenterView() {
                 </th>
                 <th className="px-4 py-3 font-medium">Categoría</th>
                 <th className="px-4 py-3 font-medium cursor-pointer hover:bg-surface-hover transition-colors" onClick={() => toggleSort('stock')}>
-                  <div className="flex items-center">Stock Actual <SortIcon field="stock" /></div>
+                  <div className="flex items-center">Almacén <SortIcon field="stock" /></div>
                 </th>
                 <th className="px-4 py-3 font-medium">Estado</th>
                 <th className="px-4 py-3 font-medium cursor-pointer hover:bg-surface-hover transition-colors" onClick={() => toggleSort('price')}>
