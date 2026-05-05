@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
 import { useAuthStore } from '../../store/authStore';
-import { Plus, Minus, Trash2, ShoppingCart, CreditCard, Search, X, DollarSign, User, PlusCircle, Users, Loader2 } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingCart, CreditCard, Search, X, DollarSign, User, PlusCircle, Users, Loader2, Printer } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
@@ -16,7 +16,7 @@ export default function SalesView() {
   const today = new Date().toISOString().split('T')[0];
   const [closingDate, setClosingDate] = useState(today);
   const [searchTerm, setSearchTerm] = useState('');
-  const [saleType, setSaleType] = useState<'SALON' | 'DOMICILIO'>('SALON');
+  const [saleType, setSaleType] = useState<'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA'>('SALON');
   const [employeeId, setEmployeeId] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('lastEmployeeId') || '';
@@ -34,6 +34,14 @@ export default function SalesView() {
   const [selectedPendingAccount, setSelectedPendingAccount] = useState<string>('');
   const [showNewPendingModal, setShowNewPendingModal] = useState(false);
   const [newPendingName, setNewPendingName] = useState('');
+  const [salePaymentMethod, setSalePaymentMethod] = useState({
+    efectivo: 0,
+    transferencia: 0,
+    usd: 0,
+    eur: 0,
+  });
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [paymentWarning, setPaymentWarning] = useState<string | null>(null);
 
   useEffect(() => {
     getPendingAccounts();
@@ -52,11 +60,60 @@ export default function SalesView() {
   const [closingLoading, setClosingLoading] = useState(false);
   const [isProcessingSale, setIsProcessingSale] = useState(false);
   const [isCreatingPending, setIsCreatingPending] = useState(false);
+  const [showPreticket, setShowPreticket] = useState(false);
+  const [preticketData, setPreticketData] = useState<any>(null);
+  const [currencyBreakdown, setCurrencyBreakdown] = useState({
+    cupEfectivo: 0,
+    cupTransfer: 0,
+    usd: 0,
+    eur: 0,
+  });
+  const [showChargeMixModal, setShowChargeMixModal] = useState(false);
+  const [selectedAccountForCharge, setSelectedAccountForCharge] = useState<any>(null);
+  const [chargeBreakdown, setChargeBreakdown] = useState({
+    efectivo: 0,
+    transferencia: 0,
+    usd: 0,
+    eur: 0,
+  });
+  const [cancelJustification, setCancelJustification] = useState('');
+  const [showCancelJustModal, setShowCancelJustModal] = useState(false);
+  const [selectedAccountForCancel, setSelectedAccountForCancel] = useState<any>(null);
+  const [showClosingWarning, setShowClosingWarning] = useState(false);
+  const [closingWarningData, setClosingWarningData] = useState<{breakdown: number; expected: number} | null>(null);
+
+  // Función helper para operaciones seguras que siempre limpian el estado
+  const safeExecute = async (
+    operation: () => Promise<any>,
+    setLoading: (val: boolean) => void,
+    onSuccess?: () => void,
+    successMessage?: string
+  ) => {
+    // La prevención de múltiples clics ya está en cada botón individual
+    setLoading(true);
+    try {
+      const result = await operation();
+      if (result?.success) {
+        if (successMessage) toast.success(successMessage);
+        onSuccess?.();
+      } else {
+        toast.error(result?.error || 'Error en la operación');
+      }
+    } catch (error: any) {
+      console.error('Error en operación:', error);
+      toast.error('Error de conexión. Intenta de nuevo.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const todaySales = sales.filter(s => {
     const saleDate = new Date(s.date).toISOString().split('T')[0];
     return saleDate === closingDate && !s.is_account_house;
   });
+
+  const todayQuickSales = todaySales.filter(s => s.sale_type === 'VENTA_RAPIDA').length;
+  const nextQuickSaleNumber = todayQuickSales + 1;
 
   const todayTotal = todaySales.reduce((sum, s) => sum + (Number(s.total_amount) || 0), 0);
   const todayDiscounts = todaySales.reduce((sum, s) => sum + (Number(s.discount) || 0), 0);
@@ -75,18 +132,105 @@ export default function SalesView() {
       saleType: s.sale_type,
       date: s.created_at
     }));
+    
+    // Calcular desglose de monedas desde las ventas del día
+    let cupEfectivo = 0;
+    let cupTransfer = 0;
+    let usd = 0;
+    let eur = 0;
+    
+    todaySales.forEach(sale => {
+      // Usar campos numéricos si existen, sino usar fallback con parsing
+      if (sale.efectivo !== undefined && sale.efectivo !== null) {
+        cupEfectivo += Number(sale.efectivo) || 0;
+      } else {
+        // Fallback: parsear desde payment_method (ventas históricas)
+        const parsed = parsePaymentMethodLegacy(sale.payment_method);
+        cupEfectivo += parsed.efectivo;
+      }
+      
+      if (sale.transferencia !== undefined && sale.transferencia !== null) {
+        cupTransfer += Number(sale.transferencia) || 0;
+      } else {
+        const parsed = parsePaymentMethodLegacy(sale.payment_method);
+        cupTransfer += parsed.transferencia;
+      }
+      
+      if (sale.usd !== undefined && sale.usd !== null) {
+        usd += Number(sale.usd) || 0;
+      } else {
+        const parsed = parsePaymentMethodLegacy(sale.payment_method);
+        usd += parsed.usd;
+      }
+      
+      if (sale.eur !== undefined && sale.eur !== null) {
+        eur += Number(sale.eur) || 0;
+      } else {
+        const parsed = parsePaymentMethodLegacy(sale.payment_method);
+        eur += parsed.eur;
+      }
+    });
+    
+    setCurrencyBreakdown({
+      cupEfectivo,
+      cupTransfer,
+      usd,
+      eur
+    });
+    
     setClosingSales(items);
     setClosingAmount(todayTotal - todayDiscounts);
     setClosingNotes('');
     setShowClosingModal(true);
   };
+  
+  // Función helper para parsear payment_method legacy (ventas históricas)
+  const parsePaymentMethodLegacy = (paymentMethod: string | null | undefined) => {
+    const result = { efectivo: 0, transferencia: 0, usd: 0, eur: 0 };
+    if (!paymentMethod) return result;
+    
+    // Parsear efectivo
+    const efectivoMatch = paymentMethod.match(/Efectivo:\s*([\d.]+)/);
+    if (efectivoMatch) result.efectivo = parseFloat(efectivoMatch[1]) || 0;
+    
+    // Parsear transferencia
+    const transferMatch = paymentMethod.match(/Transfer:\s*([\d.]+)/);
+    if (transferMatch) result.transferencia = parseFloat(transferMatch[1]) || 0;
+    
+    // Parsear USD
+    const usdMatch = paymentMethod.match(/USD:\s*([\d.]+)/);
+    if (usdMatch) result.usd = parseFloat(usdMatch[1]) || 0;
+    
+    // Parsear EUR
+    const eurMatch = paymentMethod.match(/EUR:\s*([\d.]+)/);
+    if (eurMatch) result.eur = parseFloat(eurMatch[1]) || 0;
+    
+    return result;
+  };
 
-  const confirmClosing = async () => {
-    if (!user) return;
+  const confirmClosing = async (skipValidation = false) => {
+    if (!user) return { success: false, error: 'No autenticado' };
     
     if (todaySales.length === 0) {
       toast.error('No hay ventas en la fecha seleccionada');
-      return;
+      return { success: false, error: 'No hay ventas en la fecha seleccionada' };
+    }
+
+    // Validar que el desglose cuadre con el total (solo si no se saltó la validación)
+    if (!skipValidation) {
+      const usdConverted = user?.usdEnabled ? currencyBreakdown.usd * (user?.usdRate || 0) : 0;
+      const eurConverted = user?.eurEnabled ? currencyBreakdown.eur * (user?.eurRate || 0) : 0;
+      const totalBreakdown = currencyBreakdown.cupEfectivo + currencyBreakdown.cupTransfer + usdConverted + eurConverted;
+      const expectedTotal = todayTotal - todayDiscounts;
+      
+      if (Math.abs(totalBreakdown - expectedTotal) > 1) {
+        setClosingWarningData({
+          breakdown: totalBreakdown,
+          expected: expectedTotal
+        });
+        setShowClosingWarning(true);
+        return { success: false, error: 'El desglose no cuadra con el total' };
+      }
     }
     
     setClosingLoading(true);
@@ -101,7 +245,11 @@ export default function SalesView() {
         closing_amount: closingAmount,
         notes: closingNotes,
         created_by: employeeId || user.id,
-        created_by_name: selectedEmployee ? selectedEmployee.name : user.name
+        created_by_name: selectedEmployee ? selectedEmployee.name : user.name,
+        cup_efectivo: currencyBreakdown.cupEfectivo,
+        cup_transfer: currencyBreakdown.cupTransfer,
+        usd: currencyBreakdown.usd,
+        eur: currencyBreakdown.eur,
       });
       if (result.success) {
         await logAction('closings', 'CREAR', {
@@ -115,11 +263,14 @@ export default function SalesView() {
         toast.success(`Cierre de caja del ${closingDate} registrado`);
         setShowClosingModal(false);
         getDailyClosings();
+        return { success: true };
       } else {
         toast.error(result.error || 'Error al registrar cierre');
+        return { success: false, error: result.error || 'Error al registrar cierre' };
       }
     } catch (err) {
       toast.error((err as Error).message);
+      return { success: false, error: (err as Error).message };
     } finally {
       setClosingLoading(false);
     }
@@ -227,12 +378,62 @@ export default function SalesView() {
       toast.error('El carrito está vacío');
       return;
     }
-    setIsProcessingSale(true);
+    setIsProcessingSale(false);
     setShowPreview(true);
   };
 
   const confirmSale = async () => {
     if (!user) return;
+    if (isProcessingSale) return;
+
+    // Validar método de pago si no es cuenta casa
+    if (!isAccountHouse) {
+      const usdConverted = user?.usdEnabled ? salePaymentMethod.usd * (user?.usdRate || 0) : 0;
+      const eurConverted = user?.eurEnabled ? salePaymentMethod.eur * (user?.eurRate || 0) : 0;
+      const totalPaid = salePaymentMethod.efectivo + (user?.cupTransferEnabled ? salePaymentMethod.transferencia : 0) + usdConverted + eurConverted;
+      
+      if (totalPaid < total) {
+        const missingAmount = total - totalPaid;
+        if (totalPaid === 0) {
+          setPaymentError('Debe especificar el desglose de pago para procesar la venta');
+        } else {
+          setPaymentError(`Falta por pagar: $${missingAmount.toFixed(2)} CUP`);
+        }
+        setPaymentWarning(null);
+        setIsProcessingSale(false);
+        return;
+      }
+      
+      // Detectar sobrepago
+      if (totalPaid > total) {
+        const overpaidAmount = totalPaid - total;
+        setPaymentWarning(`Sobrepago: $${overpaidAmount.toFixed(2)} CUP de vuelto`);
+      } else {
+        setPaymentWarning(null);
+      }
+    } else {
+      setPaymentWarning(null);
+    }
+
+    const saleNotes = saleType === 'VENTA_RAPIDA' 
+      ? `Venta rápida ${nextQuickSaleNumber}${notes ? ' - ' + notes : ''}`
+      : notes;
+
+    // Construir método de pago convertido a CUP
+    const usdConverted = user?.usdEnabled ? salePaymentMethod.usd * (user?.usdRate || 0) : 0;
+    const eurConverted = user?.eurEnabled ? salePaymentMethod.eur * (user?.eurRate || 0) : 0;
+    const paymentMethod = isAccountHouse 
+      ? 'Cuenta Casa' 
+      : `Efectivo: ${salePaymentMethod.efectivo}${user?.cupTransferEnabled ? `, Transfer: ${salePaymentMethod.transferencia}` : ''}${usdConverted > 0 ? `, USD: ${usdConverted}` : ''}${eurConverted > 0 ? `, EUR: ${eurConverted}` : ''}`;
+
+    const timeoutId = setTimeout(() => {
+      setIsProcessingSale(false);
+      setShowPreview(false);
+      setPaymentError(null);
+      setPaymentWarning(null);
+      setSalePaymentMethod({ efectivo: 0, transferencia: 0, usd: 0, eur: 0 });
+      toast.error('Tiempo de espera agotado. Intenta de nuevo.');
+    }, 15000);
 
     try {
       const result = await addSale({
@@ -250,38 +451,72 @@ export default function SalesView() {
         date: closingDate,
         sale_type: saleType,
         is_account_house: isAccountHouse,
-        notes,
-        discount
+        notes: saleNotes,
+        discount,
+        payment_method: paymentMethod,
+        efectivo: isAccountHouse ? 0 : (Number(salePaymentMethod.efectivo) || 0),
+        transferencia: isAccountHouse ? 0 : (user?.cupTransferEnabled ? (Number(salePaymentMethod.transferencia) || 0) : 0),
+        usd: isAccountHouse ? 0 : (user?.usdEnabled ? (Number(salePaymentMethod.usd) || 0) : 0),
+        eur: isAccountHouse ? 0 : (user?.eurEnabled ? (Number(salePaymentMethod.eur) || 0) : 0),
       });
 
       if (!result.success) {
         setShowPreview(false);
+        setPaymentError(null);
+        setPaymentWarning(null);
         toast.error(result.error || 'No se pudo completar la venta');
         return;
       }
 
+      // Limpiar estados de venta exitosa
       setCart([]);
       setDiscount(0);
       setNotes('');
       setShowPreview(false);
-      setIsProcessingSale(false);
+      setPaymentError(null);
+      setPaymentWarning(null);
+      setSalePaymentMethod({ efectivo: 0, transferencia: 0, usd: 0, eur: 0 });
       
       const successMessage = navigator.onLine ? 'Venta registrada exitosamente' : 'Venta guardada offline. Se sincronizará cuando haya conexión.';
       toast.success(successMessage);
 
-      const selectedEmployee = employees.find(e => e.id === employeeId);
-      await useDatabaseStore.getState().logAction('sales', 'VENTA', {
-        total: total,
-        items_count: cart.length,
-        sale_type: saleType,
-        employee: selectedEmployee?.name || user?.name || 'Dueño',
-        is_account_house: isAccountHouse
-      });
+      // Intentamos registrar la acción pero no bloqueamos laUI
+      try {
+        const selectedEmployee = employees.find(e => e.id === employeeId);
+        await useDatabaseStore.getState().logAction('sales', 'VENTA', {
+          total: total,
+          items_count: cart.length,
+          sale_type: saleType,
+          sale_name: saleType === 'VENTA_RAPIDA' ? `Venta rápida ${nextQuickSaleNumber}` : null,
+          employee: selectedEmployee?.name || user?.name || 'Dueño',
+          is_account_house: isAccountHouse
+        });
+      } catch (logError) {
+        console.warn('Error logging action:', logError);
+      }
 
+      // Generar ticket si está habilitado
       if (user?.generateTicket) {
         const selectedEmployee = employees.find(e => e.id === employeeId);
         const empName = selectedEmployee ? selectedEmployee.name : (user.name || 'Dueño');
+        const saleLabel = saleType === 'VENTA_RAPIDA' ? `Venta rápida ${nextQuickSaleNumber}` : (saleType === 'SALON' ? 'Salón' : saleType === 'DOMICILIO' ? 'Domicilio' : saleType === 'BAR' ? 'Bar' : 'Venta');
         
+        setPreticketData({
+          items: cart.map(item => ({
+            name: item.name,
+            quantity: item.quantity,
+            unitPrice: item.price,
+            subtotal: item.price * item.quantity
+          })),
+          total: isAccountHouse ? 0 : total,
+          employeeName: empName,
+          businessName: user.businessName || 'Mi Negocio',
+          saleLabel: saleLabel,
+          isPreticket: true,
+          date: new Date(closingDate + 'T' + new Date().toTimeString().slice(0,8))
+        });
+        setShowPreticket(true);
+
         setTicketData({
           items: cart.map(item => ({
             name: item.name,
@@ -299,12 +534,20 @@ export default function SalesView() {
           employeeRole: selectedEmployee ? selectedEmployee.role : (user.name ? 'Dueño' : ''),
           date: new Date(closingDate + 'T' + new Date().toTimeString().slice(0,8))
         });
-        setShowTicket(true);
+setShowTicket(true);
       }
     } catch (err) {
       setShowPreview(false);
-      setIsProcessingSale(false);
+      setPaymentError(null);
+      setPaymentWarning(null);
       toast.error((err as Error).message || 'Error al registrar la venta');
+    } finally {
+      setIsProcessingSale(false);
+      setShowPreview(false);
+      setPaymentError(null);
+      setPaymentWarning(null);
+      setSalePaymentMethod({ efectivo: 0, transferencia: 0, usd: 0, eur: 0 });
+      clearTimeout(timeoutId);
     }
   };
 
@@ -344,16 +587,6 @@ export default function SalesView() {
             >
               <DollarSign className="h-4 w-4" />
               {isClosed ? 'Día Cerrado' : todaySales.length === 0 ? 'Sin ventas' : 'Cierre de Caja'}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => forceRefreshData()}
-              className="gap-1 text-text-secondary hover:text-text"
-              title="Actualizar todos los datos del sistema"
-            >
-              <Loader2 className="h-3 w-3" />
-              Actualizar
             </Button>
           </div>
         </div>
@@ -415,41 +648,10 @@ export default function SalesView() {
                         <Button
                           size="sm"
                           className="h-7 text-xs bg-success hover:bg-success/80"
-                          onClick={async () => {
-                            const selectedEmp = employees.find(e => e.id === employeeId);
-                            const result = await chargePendingAccount(
-                              account.id,
-                              employeeId || user?.id || '',
-                              selectedEmp ? selectedEmp.name : (user?.name || 'Vendedor'),
-                              closingDate
-                            );
-                            if (result.success) {
-                              toast.success('Cuenta cobrada');
-                              const isAccHouse = (account as any).is_account_house;
-                              await useDatabaseStore.getState().logAction('sales', 'COBRO', {
-                                client_name: account.client_name,
-                                total: account.total_amount || 0,
-                                is_account_house: isAccHouse
-                              });
-                              setTicketData({
-                                items: accountItems.map((item: any) => ({
-                                  name: item.product_name,
-                                  quantity: item.quantity,
-                                  unitPrice: item.unit_price,
-                                  subtotal: item.subtotal
-                                })),
-                                total: isAccHouse ? 0 : account.total_amount || 0,
-                                employeeName: selectedEmp ? selectedEmp.name : (user?.name || 'Vendedor'),
-                                businessName: user?.businessName || 'Mi Negocio',
-                                ticketMessage: user?.ticketMessage || '¡Gracias por su visita!',
-                                saleType: (account as any).sale_type || 'SALON',
-                                isAccountHouse: isAccHouse,
-                                date: new Date(closingDate + 'T' + new Date().toTimeString().slice(0,8))
-                              });
-                              setShowTicket(true);
-                            } else {
-                              toast.error(result.error || 'Error al cobrar');
-                            }
+                          onClick={() => {
+                            setSelectedAccountForCharge(account);
+                            setChargeBreakdown({ efectivo: 0, transferencia: 0, usd: 0, eur: 0 });
+                            setShowChargeMixModal(true);
                           }}
                         >
                           Cobrar
@@ -458,12 +660,10 @@ export default function SalesView() {
                           size="sm"
                           variant="ghost"
                           className="h-7 text-xs text-danger hover:text-danger"
-                          onClick={async () => {
-                            if (confirm('¿Cancelar esta cuenta? No se descontará inventario.')) {
-                              const result = await useDatabaseStore.getState().deletePendingAccount(account.id);
-                              if (result.success) toast.success('Cuenta cancelada');
-                              else toast.error(result.error || 'Error');
-                            }
+                          onClick={() => {
+                            setSelectedAccountForCancel(account);
+                            setCancelJustification('');
+                            setShowCancelJustModal(true);
                           }}
                         >
                           X
@@ -573,8 +773,10 @@ export default function SalesView() {
                 value={saleType}
                 onChange={e => setSaleType(e.target.value as any)}
               >
-                <option value="SALON">En Salón</option>
-                <option value="DOMICILIO">A Domicilio</option>
+                <option value="SALON">Salón</option>
+                <option value="DOMICILIO">Domicilio</option>
+                <option value="BAR">Bar</option>
+                <option value="VENTA_RAPIDA">Venta Rápida</option>
               </select>
             </div>
             <div>
@@ -660,7 +862,7 @@ export default function SalesView() {
             ) : (
               <CreditCard className="h-5 w-5" />
             )}
-            {isProcessingSale ? 'Procesando...' : isClosed ? 'Día Cerrado' : 'Cobrar Venta'}
+            {isProcessingSale ? 'Procesando...' : isClosed ? 'Día Cerrado' : 'Agregar Venta'}
           </Button>
         </div>
       </div>
@@ -672,7 +874,12 @@ export default function SalesView() {
             <div className="mb-6 flex items-center justify-between">
               <h2 className="text-xl font-bold text-text">Resumen de Venta</h2>
               <button
-                onClick={() => setShowPreview(false)}
+                onClick={() => {
+                  setShowPreview(false);
+                  setPaymentError(null);
+                  setPaymentWarning(null);
+                  setSalePaymentMethod({ efectivo: 0, transferencia: 0, usd: 0, eur: 0 });
+                }}
                 className="rounded-full p-2 text-text-secondary hover:bg-surface-hover hover:text-text transition-colors"
               >
                 <X className="h-5 w-5" />
@@ -727,6 +934,99 @@ export default function SalesView() {
                 </span>
               </div>
             </div>
+
+            {!isAccountHouse && (
+            <div className="mb-4 p-4 rounded-xl bg-bg/50 border border-border/30">
+              <h4 className="text-sm font-semibold text-text mb-3 flex items-center gap-2">
+                Método de Pago <span className="text-danger">*</span>
+              </h4>
+              <p className="text-xs text-text-secondary mb-3">Especifique el desglose del pago realizado por el cliente</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-text-secondary block mb-1">Efectivo (CUP)</label>
+                  <Input
+                    type="number"
+                    min="0"
+                    className="font-mono"
+                    value={salePaymentMethod.efectivo || ''}
+                    onChange={e => {
+                      setSalePaymentMethod({...salePaymentMethod, efectivo: Number(e.target.value)});
+                      setPaymentError(null);
+                      setPaymentWarning(null);
+                    }}
+                    placeholder="0.00"
+                  />
+                </div>
+                {user?.cupTransferEnabled && (
+                <div>
+                  <label className="text-xs text-text-secondary block mb-1">Transferencia (CUP)</label>
+                  <Input
+                    type="number"
+                    min="0"
+                    className="font-mono"
+                    value={salePaymentMethod.transferencia || ''}
+                    onChange={e => {
+                      setSalePaymentMethod({...salePaymentMethod, transferencia: Number(e.target.value)});
+                      setPaymentError(null);
+                      setPaymentWarning(null);
+                    }}
+                    placeholder="0.00"
+                  />
+                </div>
+                )}
+                {user?.usdEnabled && (
+                <div>
+                  <label className="text-xs text-text-secondary block mb-1">USD (1 USD = {user.usdRate} CUP)</label>
+                  <Input
+                    type="number"
+                    min="0"
+                    className="font-mono"
+                    value={salePaymentMethod.usd || ''}
+                    onChange={e => {
+                      setSalePaymentMethod({...salePaymentMethod, usd: Number(e.target.value)});
+                      setPaymentError(null);
+                      setPaymentWarning(null);
+                    }}
+                    placeholder="0.00"
+                  />
+                </div>
+                )}
+                {user?.eurEnabled && (
+                <div>
+                  <label className="text-xs text-text-secondary block mb-1">EUR (1 EUR = {user.eurRate} CUP)</label>
+                  <Input
+                    type="number"
+                    min="0"
+                    className="font-mono"
+                    value={salePaymentMethod.eur || ''}
+                    onChange={e => {
+                      setSalePaymentMethod({...salePaymentMethod, eur: Number(e.target.value)});
+                      setPaymentError(null);
+                      setPaymentWarning(null);
+                    }}
+                    placeholder="0.00"
+                  />
+                </div>
+                )}
+              </div>
+              {paymentError && (
+                <div className="mt-3 p-3 rounded-lg bg-danger/10 border border-danger/30">
+                  <p className="text-sm text-danger font-medium">{paymentError}</p>
+                </div>
+              )}
+              {paymentWarning && (
+                <div className="mt-3 p-3 rounded-lg bg-warning/10 border border-warning/30">
+                  <p className="text-sm text-warning font-medium">{paymentWarning}</p>
+                </div>
+              )}
+              <div className="mt-3 pt-2 border-t border-border/30 flex justify-between text-sm">
+                <span className="text-text-secondary">Total registrado:</span>
+                <span className="font-mono text-text">
+                  ${((Number(user?.usdEnabled ? salePaymentMethod.usd : 0) || 0) * (Number(user?.usdRate) || 0) + (Number(user?.eurEnabled ? salePaymentMethod.eur : 0) || 0) * (Number(user?.eurRate) || 0) + (Number(salePaymentMethod.efectivo) || 0) + (Number(user?.cupTransferEnabled ? salePaymentMethod.transferencia : 0) || 0)).toFixed(2)}
+                </span>
+              </div>
+            </div>
+            )}
 
             <div className="mb-6 text-sm text-text-secondary bg-surface-hover p-3 rounded-lg">
               <p><span className="font-medium text-text">Vendedor:</span> {sellerName}</p>
@@ -875,7 +1175,12 @@ export default function SalesView() {
               <Button
                 variant="outline"
                 className="flex-1"
-                onClick={() => setShowPreview(false)}
+                onClick={() => {
+                  setShowPreview(false);
+                  setPaymentError(null);
+                  setPaymentWarning(null);
+                  setSalePaymentMethod({ efectivo: 0, transferencia: 0, usd: 0, eur: 0 });
+                }}
               >
                 Cancelar
               </Button>
@@ -900,6 +1205,9 @@ export default function SalesView() {
                     if (result.success) {
                       setCart([]);
                       setShowPreview(false);
+                      setPaymentError(null);
+                      setPaymentWarning(null);
+                      setSalePaymentMethod({ efectivo: 0, transferencia: 0, usd: 0, eur: 0 });
                       toast.success('Productos agregados a la cuenta');
                     } else {
                       toast.error(result.error || 'Error al agregar productos');
@@ -964,6 +1272,62 @@ export default function SalesView() {
             </div>
 
             <div className="mb-4">
+              <h3 className="text-sm font-semibold text-text mb-3">Desgloce por Moneda</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-text-secondary block mb-1">CUP Efectivo</label>
+                  <Input
+                    type="number"
+                    min="0"
+                    className="font-mono"
+                    value={currencyBreakdown.cupEfectivo || ''}
+                    onChange={e => setCurrencyBreakdown({...currencyBreakdown, cupEfectivo: Number(e.target.value)})}
+                    placeholder="0.00"
+                  />
+                </div>
+                {user?.cupTransferEnabled && (
+                <div>
+                  <label className="text-xs text-text-secondary block mb-1">CUP Transferencia</label>
+                  <Input
+                    type="number"
+                    min="0"
+                    className="font-mono"
+                    value={currencyBreakdown.cupTransfer || ''}
+                    onChange={e => setCurrencyBreakdown({...currencyBreakdown, cupTransfer: Number(e.target.value)})}
+                    placeholder="0.00"
+                  />
+                </div>
+                )}
+                {user?.usdEnabled && (
+                <div>
+                  <label className="text-xs text-text-secondary block mb-1">USD</label>
+                  <Input
+                    type="number"
+                    min="0"
+                    className="font-mono"
+                    value={currencyBreakdown.usd || ''}
+                    onChange={e => setCurrencyBreakdown({...currencyBreakdown, usd: Number(e.target.value)})}
+                    placeholder="0.00"
+                  />
+                </div>
+                )}
+                {user?.eurEnabled && (
+                <div>
+                  <label className="text-xs text-text-secondary block mb-1">EUR</label>
+                  <Input
+                    type="number"
+                    min="0"
+                    className="font-mono"
+                    value={currencyBreakdown.eur || ''}
+                    onChange={e => setCurrencyBreakdown({...currencyBreakdown, eur: Number(e.target.value)})}
+                    placeholder="0.00"
+                  />
+                </div>
+                )}
+              </div>
+            </div>
+
+            <div className="mb-4">
               <label className="text-xs font-medium text-text-secondary block mb-1">Notas (opcional)</label>
               <textarea
                 className="w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none resize-none"
@@ -984,7 +1348,18 @@ export default function SalesView() {
               </Button>
               <Button
                 className="flex-1 gap-2"
-                onClick={confirmClosing}
+                onClick={() => {
+                  if (closingLoading) return;
+                  safeExecute(
+                    () => confirmClosing(false),
+                    setClosingLoading,
+                    () => {
+                      setShowClosingModal(false);
+                      getDailyClosings();
+                    },
+                    `Cierre de caja del ${closingDate} registrado`
+                  );
+                }}
                 disabled={closingLoading}
               >
                 <DollarSign className="h-4 w-4" />
@@ -999,6 +1374,14 @@ export default function SalesView() {
         <TicketView
           ticketData={ticketData}
           onClose={() => setShowTicket(false)}
+        />
+      )}
+
+      {showPreticket && preticketData && (
+        <TicketView
+          ticketData={preticketData}
+          onClose={() => setShowPreticket(false)}
+          isPreticket={true}
         />
       )}
 
@@ -1044,17 +1427,24 @@ export default function SalesView() {
                     toast.error('Ingrese un nombre para el cliente');
                     return;
                   }
+                  if (isCreatingPending) return;
+                  
                   setIsCreatingPending(true);
                   try {
                     const result = await createPendingAccount(newPendingName.trim());
                     if (result.success) {
-                      setSelectedPendingAccount(result.accountId || '');
+                      if (result.accountId) {
+                        setSelectedPendingAccount(result.accountId);
+                      }
                       setShowNewPendingModal(false);
                       setNewPendingName('');
                       toast.success('Cuenta creada');
                     } else {
                       toast.error(result.error || 'Error al crear cuenta');
                     }
+                  } catch (error: any) {
+                    console.error('Error:', error);
+                    toast.error('Error de conexión. Intenta de nuevo.');
                   } finally {
                     setIsCreatingPending(false);
                   }
@@ -1062,6 +1452,286 @@ export default function SalesView() {
               >
                 {isCreatingPending && <Loader2 className="h-4 w-4 animate-spin" />}
                 {isCreatingPending ? 'Creando...' : 'Crear Cuenta'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Cobro Mixto */}
+      {showChargeMixModal && selectedAccountForCharge && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-border/50 bg-surface p-6 shadow-2xl">
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-text">Cobrar Cuenta</h2>
+                <p className="text-sm text-text-secondary">{selectedAccountForCharge.client_name}</p>
+              </div>
+              <button
+                onClick={() => setShowChargeMixModal(false)}
+                className="rounded-full p-2 text-text-secondary hover:bg-surface-hover hover:text-text transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mb-4 p-4 rounded-xl bg-bg/50">
+              <div className="flex justify-between text-lg font-bold">
+                <span className="text-text">Total a cobrar:</span>
+                <span className="font-mono text-primary">${(selectedAccountForCharge.total_amount || 0).toFixed(2)}</span>
+              </div>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="text-sm text-text-secondary block mb-1">Efectivo (CUP)</label>
+                <Input
+                  type="number"
+                  min="0"
+                  className="font-mono"
+                  value={chargeBreakdown.efectivo || ''}
+                  onChange={e => setChargeBreakdown({...chargeBreakdown, efectivo: Number(e.target.value)})}
+                  placeholder="0.00"
+                />
+              </div>
+              {user?.cupTransferEnabled && (
+              <div>
+                <label className="text-sm text-text-secondary block mb-1">Transferencia (CUP)</label>
+                <Input
+                  type="number"
+                  min="0"
+                  className="font-mono"
+                  value={chargeBreakdown.transferencia || ''}
+                  onChange={e => setChargeBreakdown({...chargeBreakdown, transferencia: Number(e.target.value)})}
+                  placeholder="0.00"
+                />
+              </div>
+              )}
+              {user?.usdEnabled && (
+              <div>
+                <label className="text-sm text-text-secondary block mb-1">USD (1 USD = {user.usdRate} CUP)</label>
+                <Input
+                  type="number"
+                  min="0"
+                  className="font-mono"
+                  value={chargeBreakdown.usd || ''}
+                  onChange={e => setChargeBreakdown({...chargeBreakdown, usd: Number(e.target.value)})}
+                  placeholder="0.00"
+                />
+              </div>
+              )}
+              {user?.eurEnabled && (
+              <div>
+                <label className="text-sm text-text-secondary block mb-1">EUR (1 EUR = {user.eurRate} CUP)</label>
+                <Input
+                  type="number"
+                  min="0"
+                  className="font-mono"
+                  value={chargeBreakdown.eur || ''}
+                  onChange={e => setChargeBreakdown({...chargeBreakdown, eur: Number(e.target.value)})}
+                  placeholder="0.00"
+                />
+              </div>
+              )}
+              <div className="pt-2 border-t border-border">
+                <div className="flex justify-between text-sm">
+                  <span className="text-text-secondary">Total registrado:</span>
+                  <span className="font-mono text-text">${((Number(user?.usdEnabled ? chargeBreakdown.usd : 0) || 0) * (Number(user?.usdRate) || 0) + (Number(user?.eurEnabled ? chargeBreakdown.eur : 0) || 0) * (Number(user?.eurRate) || 0) + (Number(chargeBreakdown.efectivo) || 0) + (Number(user?.cupTransferEnabled ? chargeBreakdown.transferencia : 0) || 0)).toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setShowChargeMixModal(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                className="flex-1 gap-2"
+                onClick={async () => {
+                  const totalPaid = chargeBreakdown.efectivo + 
+                    (user?.cupTransferEnabled ? chargeBreakdown.transferencia : 0) + 
+                    (user?.usdEnabled ? chargeBreakdown.usd * (user?.usdRate || 0) : 0) +
+                    (user?.eurEnabled ? chargeBreakdown.eur * (user?.eurRate || 0) : 0);
+                  const accountTotal = selectedAccountForCharge.total_amount || 0;
+                  if (totalPaid < accountTotal) {
+                    toast.error('El total pagado es menor al total de la cuenta');
+                    return;
+                  }
+                  const selectedEmp = employees.find(e => e.id === employeeId);
+                  const usdConverted = user?.usdEnabled ? chargeBreakdown.usd * (user?.usdRate || 0) : 0;
+                  const eurConverted = user?.eurEnabled ? chargeBreakdown.eur * (user?.eurRate || 0) : 0;
+                  const paymentMethodStr = `Efectivo: ${chargeBreakdown.efectivo}${user?.cupTransferEnabled ? `, Transfer: ${chargeBreakdown.transferencia}` : ''}${user?.usdEnabled ? `, USD: ${usdConverted}` : ''}${user?.eurEnabled ? `, EUR: ${eurConverted}` : ''}`;
+                  const result = await chargePendingAccount(
+                    selectedAccountForCharge.id,
+                    employeeId || user?.id || '',
+                    selectedEmp ? selectedEmp.name : (user?.name || 'Vendedor'),
+                    closingDate,
+                    paymentMethodStr
+                  );
+                  if (result.success) {
+                    toast.success('Cuenta cobrada');
+                    const isAccHouse = selectedAccountForCharge.is_account_house;
+                    await useDatabaseStore.getState().logAction('sales', 'COBRO', {
+                      client_name: selectedAccountForCharge.client_name,
+                      total: accountTotal,
+                      payment_method: paymentMethodStr,
+                      is_account_house: isAccHouse
+                    });
+                    setTicketData({
+                      items: ((selectedAccountForCharge.items as any[]) || []).map((item: any) => ({
+                        name: item.product_name,
+                        quantity: item.quantity,
+                        unitPrice: item.unit_price,
+                        subtotal: item.subtotal
+                      })),
+                      total: isAccHouse ? 0 : accountTotal,
+                      employeeName: selectedEmp ? selectedEmp.name : (user?.name || 'Vendedor'),
+                      businessName: user?.businessName || 'Mi Negocio',
+                      ticketMessage: user?.ticketMessage || '¡Gracias por su visita!',
+                      saleType: selectedAccountForCharge.sale_type || 'SALON',
+                      isAccountHouse: isAccHouse,
+                      paymentBreakdown: chargeBreakdown,
+                      date: new Date(closingDate + 'T' + new Date().toTimeString().slice(0,8))
+                    });
+                    setShowTicket(true);
+                    setShowChargeMixModal(false);
+                  } else {
+                    toast.error(result.error || 'Error al cobrar');
+                  }
+                }}
+              >
+                Confirmar Cobro
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Justificación para Cancelar */}
+      {showCancelJustModal && selectedAccountForCancel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-border/50 bg-surface p-6 shadow-2xl">
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-text">Cancelar Cuenta</h2>
+                <p className="text-sm text-text-secondary">{selectedAccountForCancel.client_name}</p>
+              </div>
+              <button
+                onClick={() => setShowCancelJustModal(false)}
+                className="rounded-full p-2 text-text-secondary hover:bg-surface-hover hover:text-text transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mb-4 p-4 rounded-xl bg-danger/10 border border-danger/30">
+              <p className="text-sm text-danger">
+                La cuenta será cancelada y no se descontará del inventario.
+              </p>
+            </div>
+
+            <div className="mb-6">
+              <label className="text-sm font-medium text-text mb-2 block">Motivo de cancelación *</label>
+              <textarea
+                className="w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none resize-none"
+                rows={3}
+                value={cancelJustification}
+                onChange={e => setCancelJustification(e.target.value)}
+                placeholder="Ej: Cliente no pagó, Deuda condonada, Cliente se fue del país..."
+                required
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setShowCancelJustModal(false)}
+              >
+                Volver
+              </Button>
+              <Button
+                className="flex-1 gap-2 bg-danger hover:bg-danger/80"
+                disabled={!cancelJustification.trim()}
+                onClick={async () => {
+                  const result = await useDatabaseStore.getState().deletePendingAccount(selectedAccountForCancel.id);
+                  if (result.success) {
+                    await useDatabaseStore.getState().logAction('sales', 'CANCELAR_CUENTA', {
+                      client_name: selectedAccountForCancel.client_name,
+                      total: selectedAccountForCancel.total_amount || 0,
+                      justification: cancelJustification
+                    });
+                    toast.success('Cuenta cancelada');
+                    setShowCancelJustModal(false);
+                  } else {
+                    toast.error(result.error || 'Error');
+                  }
+                }}
+              >
+                Cancelar Cuenta
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Advertencia de Cierre - Diseño Profesional */}
+      {showClosingWarning && closingWarningData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-warning/50 bg-surface p-6 shadow-2xl">
+            <div className="mb-6 flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-warning/20">
+                <span className="text-2xl">⚠️</span>
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-text">Desgloce No Cuadra</h2>
+                <p className="text-sm text-text-secondary">Diferencia en el cierre de caja</p>
+              </div>
+            </div>
+
+            <div className="mb-6 rounded-xl bg-bg/50 p-4 space-y-3">
+              <div className="flex justify-between">
+                <span className="text-text-secondary">Total en desglose:</span>
+                <span className="font-mono font-medium text-text">${closingWarningData.breakdown.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-text-secondary">Total de ventas:</span>
+                <span className="font-mono font-medium text-text">${closingWarningData.expected.toFixed(2)}</span>
+              </div>
+              <div className="border-t border-border pt-2 flex justify-between">
+                <span className="text-text font-medium">Diferencia:</span>
+                <span className="font-mono font-bold text-danger">${Math.abs(closingWarningData.breakdown - closingWarningData.expected).toFixed(2)} CUP</span>
+              </div>
+            </div>
+
+            <p className="text-sm text-text-secondary mb-6 text-center">
+              El total del desglose no coincide con las ventas del día. ¿Desea continuar de todos modos?
+            </p>
+
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setShowClosingWarning(false);
+                  setClosingWarningData(null);
+                }}
+              >
+                Corregir
+              </Button>
+              <Button
+                className="flex-1 gap-2 bg-warning hover:bg-warning/80 text-black"
+                onClick={() => {
+                  setShowClosingWarning(false);
+                  setClosingWarningData(null);
+                  confirmClosing(true); // Skip validation since el usuario ya aceptó la advertencia
+                }}
+              >
+                Continuar Así
               </Button>
             </div>
           </div>

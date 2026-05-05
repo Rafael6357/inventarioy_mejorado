@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Search, Calendar, FileText } from 'lucide-react';
+import { Search, Calendar, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { useDatabaseStore, ROLE_LABELS } from '../../store/dbStore';
@@ -88,6 +88,8 @@ export default function ActionLogsView() {
   const [searchTerm, setSearchTerm] = useState('');
   const [hasMoreLogs, setHasMoreLogs] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(15);
 
   useEffect(() => {
     getActionLogs();
@@ -131,6 +133,15 @@ export default function ActionLogsView() {
       return matchesSearch && matchesRole && matchesStartDate && matchesEndDate;
     });
   }, [actionLogs, searchTerm, roleFilter, startDate, endDate, accessPins]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, roleFilter, startDate, endDate]);
+
+  const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedLogs = filteredLogs.slice(startIndex, endIndex);
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '-';
@@ -180,6 +191,18 @@ export default function ActionLogsView() {
     field: 'Campo',
     old_value: 'Valor anterior',
     new_value: 'Nuevo valor',
+    // Campos de nómina / RRHH
+    earned_salary: 'Salario Devengado',
+    base_salary: 'Salario Básico',
+    vacation_days: 'Días de Vacación',
+    exemption_base: 'Base Exenta',
+    taxable_base: 'Base Imponible',
+    tax_amount: 'Impuesto',
+    special_contribution: 'Contribución Especial',
+    net_salary: 'Salario Neto',
+    salary: 'Salario',
+    justification: 'Justificación',
+    payment_method: 'Método de Pago',
   };
 
   const formatDetails = (details: Record<string, any>, module: string, action: string) => {
@@ -303,14 +326,14 @@ export default function ActionLogsView() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filteredLogs.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-text-secondary">
-                    No hay acciones registradas
-                  </td>
-                </tr>
-              ) : (
-                filteredLogs.map(log => (
+{paginatedLogs.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-4 py-12 text-center text-text-secondary">
+                  No se encontraron registros de acciones.
+                </td>
+              </tr>
+            ) : (
+              paginatedLogs.map(log => (
                   <tr key={log.id} className="hover:bg-surface-hover transition-colors">
                     <td className="px-4 py-3 text-sm text-text-secondary whitespace-nowrap">
                       {formatDate(log.created_at)}
@@ -358,9 +381,34 @@ export default function ActionLogsView() {
         </div>
       </div>
 
-      <div className="text-sm text-text-secondary text-center">
-        Total de registros: {filteredLogs.length} {startDate || endDate ? `(filtrados de ${(actionLogs || []).length})` : ''}
-      </div>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between py-4 px-4 border-t border-border">
+          <div className="text-sm text-text-secondary">
+            Mostrando {startIndex + 1}-{Math.min(endIndex, filteredLogs.length)} de {filteredLogs.length} registros
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm text-text-secondary px-2">
+              Página {currentPage} de {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

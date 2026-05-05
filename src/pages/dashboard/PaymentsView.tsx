@@ -42,6 +42,14 @@ export default function PaymentsView() {
   const [deletingPaymentId, setDeletingPaymentId] = useState<string | null>(null);
   const [subscriptionDays, setSubscriptionDays] = useState<30 | 365>(30);
   const isMountedRef = useRef(true);
+  
+  // Paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(15);
+  const [totalProfiles, setTotalProfiles] = useState(0);
+  
+  // Filtro por estado de suscripción
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'trialing' | 'past_due' | 'canceled'>('all');
 
   const getDaysRemaining = (profile: ProfilePayment): number => {
     if (profile.subscription_status === 'active' && profile.valid_until) {
@@ -55,7 +63,7 @@ export default function PaymentsView() {
     return 0;
   };
 
-  const fetchProfiles = useCallback(async () => {
+  const fetchProfiles = useCallback(async (page = 1) => {
     if (!isMountedRef.current) return;
     setLoading(true);
     
@@ -63,19 +71,30 @@ export default function PaymentsView() {
     let isCancelled = false;
 
     const fetchWithTimeout = async (ms: number) => {
-      const promise = supabase
+      // Primero obtener el total de perfiles
+      const countPromise = supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true });
+      
+      // Luego obtener los perfiles de la página actual
+      const offset = (page - 1) * itemsPerPage;
+      const dataPromise = supabase
         .from('profiles')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(offset, offset + itemsPerPage - 1);
       
       const timeoutPromise = new Promise((_, reject) => {
         timeoutId = setTimeout(() => reject(new Error('Timeout')), ms);
       });
 
       try {
-        const result = await Promise.race([promise, timeoutPromise]);
+        const [countResult, dataResult] = await Promise.all([
+          Promise.race([countPromise, timeoutPromise]),
+          Promise.race([dataPromise, timeoutPromise])
+        ]);
         clearTimeout(timeoutId);
-        return result;
+        return { count: countResult, data: dataResult };
       } catch (err) {
         clearTimeout(timeoutId);
         throw err;
@@ -83,13 +102,22 @@ export default function PaymentsView() {
     };
 
     try {
-      console.log('Iniciando consulta a profiles...');
+      console.log('Iniciando consulta a profiles... página', page);
       const queryStart = Date.now();
       
-      const result = await fetchWithTimeout(20000);
-      const { data, error } = result as any;
+      const result = await fetchWithTimeout(20000) as { count?: { count: number | null }; data?: { data: ProfilePayment[]; error: Error | null } };
+      
+      // Extraer correctamente los datos de la respuesta
+      const countResponse = result?.count;
+      const dataResponse = result?.data;
+      
+      const profilesData = dataResponse?.data || [];
+      const countValue = countResponse?.count ?? null;
+      const error = dataResponse?.error;
 
       console.log('Consulta completada en', Date.now() - queryStart, 'ms');
+      console.log('Perfiles obtenidos:', profilesData);
+      console.log('Total count:', countValue);
 
       if (isCancelled) return;
 
@@ -98,17 +126,20 @@ export default function PaymentsView() {
         toast.error('Error al cargar los perfiles: ' + error.message);
         setLoading(false);
       } else {
-        console.log('Perfiles obtenidos:', data);
-        if (!data || data.length === 0) {
+        // Usar fallback: si count es null, usar la longitud de los datos obtidos
+        const totalCount = countValue !== null ? countValue : (profilesData?.length || 0);
+        setTotalProfiles(totalCount);
+        
+        if (!profilesData || profilesData.length === 0) {
           console.log('No se encontraron perfiles en la base de datos');
           toast.info('No hay usuarios registrados');
           setProfiles([]);
           setPayments({});
           setLoading(false);
         } else {
-          setProfiles(data || []);
+          setProfiles(profilesData);
           const allPayments: Record<string, Payment[]> = {};
-          for (const p of (data || [])) {
+          for (const p of profilesData) {
             const { data: pmt } = await supabase
               .from('payments')
               .select('*')
@@ -141,13 +172,13 @@ export default function PaymentsView() {
       return;
     }
     
-    console.log('PaymentsView - Llamando fetchProfiles');
-    fetchProfiles();
+    console.log('PaymentsView - Llamando fetchProfiles página', currentPage);
+    fetchProfiles(currentPage);
     
     return () => {
       isMountedRef.current = false;
     };
-  }, [user, fetchProfiles]);
+  }, [user, fetchProfiles, currentPage]);
 
   const handleStatusChange = async (profile: ProfilePayment, newStatus: ProfilePayment['subscription_status'], validUntil?: string | null) => {
     if (!isMountedRef.current) return;
@@ -226,14 +257,17 @@ export default function PaymentsView() {
     setSavingStatus(false);
   };
 
-  const filteredProfiles = profiles.filter(p => 
-    p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (p.business_name || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredProfiles = profiles.filter(p => {
+    const matchesSearch = 
+      p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (p.business_name || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || p.subscription_status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   const stats = {
-    total: profiles.length,
+    total: totalProfiles,
     active: profiles.filter(p => p.subscription_status === 'active').length,
     trialing: profiles.filter(p => p.subscription_status === 'trialing').length,
     inactive: profiles.filter(p => ['past_due', 'canceled'].includes(p.subscription_status)).length,
@@ -360,18 +394,76 @@ export default function PaymentsView() {
 
       {/* Users Table */}
       <div className="rounded-xl border border-border bg-surface shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-border flex items-center justify-between gap-4">
+        <div className="p-4 border-b border-border flex items-center justify-between gap-4 flex-wrap">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary" />
             <Input
               placeholder="Buscar por nombre, email o negocio..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
               className="pl-9"
             />
           </div>
+          
+          {/* Filtros por estado de suscripción */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setStatusFilter('all'); setCurrentPage(1); }}
+              className={`px-3 py-1.5 text-xs rounded-full transition-colors ${
+                statusFilter === 'all' 
+                  ? 'bg-primary text-black' 
+                  : 'bg-bg text-text-secondary hover:bg-surface-hover'
+              }`}
+            >
+              Todos
+            </button>
+            <button
+              onClick={() => { setStatusFilter('active'); setCurrentPage(1); }}
+              className={`px-3 py-1.5 text-xs rounded-full transition-colors flex items-center gap-1 ${
+                statusFilter === 'active' 
+                  ? 'bg-success text-white' 
+                  : 'bg-success/10 text-success hover:bg-success/20'
+              }`}
+            >
+              <CheckCircle2 className="h-3 w-3" /> Activos
+            </button>
+            <button
+              onClick={() => { setStatusFilter('trialing'); setCurrentPage(1); }}
+              className={`px-3 py-1.5 text-xs rounded-full transition-colors flex items-center gap-1 ${
+                statusFilter === 'trialing' 
+                  ? 'bg-warning text-black' 
+                  : 'bg-warning/10 text-warning hover:bg-warning/20'
+              }`}
+            >
+              <AlertCircle className="h-3 w-3" /> Prueba
+            </button>
+            <button
+              onClick={() => { setStatusFilter('past_due'); setCurrentPage(1); }}
+              className={`px-3 py-1.5 text-xs rounded-full transition-colors flex items-center gap-1 ${
+                statusFilter === 'past_due' 
+                  ? 'bg-danger text-white' 
+                  : 'bg-danger/10 text-danger hover:bg-danger/20'
+              }`}
+            >
+              Vencidos
+            </button>
+            <button
+              onClick={() => { setStatusFilter('canceled'); setCurrentPage(1); }}
+              className={`px-3 py-1.5 text-xs rounded-full transition-colors flex items-center gap-1 ${
+                statusFilter === 'canceled' 
+                  ? 'bg-text-secondary text-white' 
+                  : 'bg-bg text-text-secondary hover:bg-surface-hover'
+              }`}
+            >
+              <XCircle className="h-3 w-3" /> Cancelados
+            </button>
+          </div>
+          
           <span className="text-sm text-text-secondary shrink-0">
-            {filteredProfiles.length} negocio{filteredProfiles.length !== 1 ? 's' : ''}
+            {filteredProfiles.length} / {totalProfiles} negocio{totalProfiles !== 1 ? 's' : ''}
           </span>
         </div>
         
@@ -433,6 +525,46 @@ export default function PaymentsView() {
             </tbody>
           </table>
         </div>
+        
+        {/* Paginación */}
+        {totalProfiles > itemsPerPage && (
+          <div className="p-4 border-t border-border flex items-center justify-between">
+            <div className="text-sm text-text-secondary">
+              Página {currentPage} de {Math.ceil(totalProfiles / itemsPerPage)}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                Anterior
+              </Button>
+              {Array.from({ length: Math.min(5, Math.ceil(totalProfiles / itemsPerPage)) }, (_, i) => {
+                const page = i + 1;
+                return (
+                  <Button
+                    key={page}
+                    variant={currentPage === page ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setCurrentPage(page)}
+                  >
+                    {page}
+                  </Button>
+                );
+              })}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.min(Math.ceil(totalProfiles / itemsPerPage), p + 1))}
+                disabled={currentPage >= Math.ceil(totalProfiles / itemsPerPage)}
+              >
+                Siguiente
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Payment & History Modal */}

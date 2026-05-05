@@ -97,10 +97,15 @@ export interface Sale {
   }[];
   total_amount: number;
   date: string;
-  sale_type: 'SALON' | 'DOMICILIO';
+  sale_type: 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA';
   is_account_house: boolean;
   notes?: string;
   discount: number;
+  payment_method?: string;
+  efectivo?: number;
+  transferencia?: number;
+  usd?: number;
+  eur?: number;
   created_at: string;
 }
 
@@ -124,7 +129,7 @@ export interface PendingAccount {
   items: PendingItem[];
   total_amount: number;
   is_account_house: boolean;
-  sale_type: 'SALON' | 'DOMICILIO';
+  sale_type: 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA';
   status: 'pending' | 'paid' | 'cancelled';
   created_at: string;
   updated_at: string;
@@ -215,7 +220,11 @@ export interface DailyClosing {
   notes?: string;
   created_by?: string;
   created_by_name?: string;
-  created_at: string;
+  created_at?: string;
+  cup_efectivo?: number;
+  cup_transfer?: number;
+  usd?: number;
+  eur?: number;
 }
 
 export interface HRDocument {
@@ -422,13 +431,13 @@ interface DatabaseState {
   uploadEmployeeDocument: (file: File, employeeId: string, docType: 'CONTRATO' | 'IDENTIFICACION' | 'OTRO', name?: string) => Promise<{ success: boolean; error?: string }>;
 
   createPendingAccount: (clientName: string) => Promise<{ success: boolean; error?: string; accountId?: string }>;
-addItemsToPendingAccount: (accountId: string, items: { product_id: string; product_name: string; quantity: number; unit_price: number; subtotal: number }[], isAccountHouse?: boolean, saleType?: 'SALON' | 'DOMICILIO')
+addItemsToPendingAccount: (accountId: string, items: { product_id: string; product_name: string; quantity: number; unit_price: number; subtotal: number }[], isAccountHouse?: boolean, saleType?: 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA')
     => Promise<{ success: boolean; error?: string }>;
   updatePendingAccount: (accountId: string, updates: Partial<PendingAccount>) => Promise<{ success: boolean; error?: string }>;
   togglePendingAccountType: (accountId: string) => Promise<{ success: boolean; error?: string }>;
   deletePendingAccount: (accountId: string) => Promise<{ success: boolean; error?: string }>;
   getPendingAccounts: () => Promise<void>;
-  chargePendingAccount: (accountId: string, employeeId: string, employeeName: string, saleDate?: string) => Promise<{ success: boolean; error?: string }>;
+  chargePendingAccount: (accountId: string, employeeId: string, employeeName: string, saleDate?: string, paymentMethod?: string) => Promise<{ success: boolean; error?: string }>;
 
   saveAccessPin: (role: string, pin: string) => Promise<{ success: boolean; error?: string }>;
   toggleAccessPin: (pinId: string, isActive: boolean) => Promise<{ success: boolean; error?: string }>;
@@ -463,6 +472,9 @@ addItemsToPendingAccount: (accountId: string, items: { product_id: string; produ
 
   syncPendingData: () => Promise<void>;
   forceRefreshData: () => Promise<void>;
+  
+  // Logging de acciones
+  logAction: (module: string, action: string, details?: Record<string, any>) => Promise<void>;
 }
 
 export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
@@ -936,10 +948,15 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
             items: sale.items,
             total_amount: sale.total_amount,
             date: sale.date,
-            sale_type: sale.sale_type,
+sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
             is_account_house: sale.is_account_house || false,
             notes: sale.notes,
             discount: sale.discount,
+            payment_method: sale.payment_method,
+            efectivo: sale.efectivo || 0,
+            transferencia: sale.transferencia || 0,
+            usd: sale.usd || 0,
+            eur: sale.eur || 0,
           },
         });
 
@@ -974,6 +991,11 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
         is_account_house: sale.is_account_house || false,
         notes: sale.notes,
         discount: sale.discount,
+        payment_method: sale.payment_method || null,
+        efectivo: sale.efectivo || 0,
+        transferencia: sale.transferencia || 0,
+        usd: sale.usd || 0,
+        eur: sale.eur || 0,
       })
       .select()
       .single();
@@ -1359,7 +1381,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     return { success: true, accountId: data.id };
   },
 
-  addItemsToPendingAccount: async (accountId: string, items: { product_id: string; product_name: string; quantity: number; unit_price: number; subtotal: number }[], isAccountHouse: boolean = false, saleType: 'SALON' | 'DOMICILIO' = 'SALON') => {
+  addItemsToPendingAccount: async (accountId: string, items: { product_id: string; product_name: string; quantity: number; unit_price: number; subtotal: number }[], isAccountHouse: boolean = false, saleType: 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA' = 'SALON') => {
     const account = get().pendingAccounts.find(a => a.id === accountId);
     if (!account) return { success: false, error: 'Cuenta no encontrada' };
 
@@ -1525,7 +1547,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     return { success: true };
   },
 
-  chargePendingAccount: async (accountId: string, employeeId: string, employeeName: string, saleDate?: string) => {
+  chargePendingAccount: async (accountId: string, employeeId: string, employeeName: string, saleDate?: string, paymentMethod?: string) => {
     const user = useAuthStore.getState().user;
     if (!user) return { success: false, error: 'No hay usuario autenticado' };
 
@@ -1576,6 +1598,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       is_account_house: isAccountHouse,
       notes: `Cobro de cuenta pendiente: ${account.client_name}`,
       discount: 0,
+      payment_method: paymentMethod || 'Cobro de cuenta pendiente',
     });
 
     if (!result.success) {

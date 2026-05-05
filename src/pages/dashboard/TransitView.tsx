@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
-import { Search, Clock, Package, TrendingDown, RefreshCw, RotateCcw, X, AlertTriangle } from 'lucide-react';
+import { useAuthStore } from '../../store/authStore';
+import { Package, Search, Plus, Check, Loader2, AlertCircle, ArrowRight, ArrowLeft, Box, ChevronLeft, ChevronRight, TrendingDown, RefreshCw, Clock, AlertTriangle, RotateCcw, X } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
@@ -138,6 +139,18 @@ export default function TransitView() {
   const groupedArray = Object.values(groupedByProduct).sort(
     (a, b) => new Date(b.oldestDate).getTime() - new Date(a.oldestDate).getTime()
   );
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  const totalPages = Math.ceil(groupedArray.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedGroups = groupedArray.slice(startIndex, endIndex);
 
   const totalInTransit = transitItems.reduce((sum, t) => sum + t.remaining, 0);
   const totalSent = transitItems.reduce((sum, t) => sum + t.quantity, 0);
@@ -367,6 +380,35 @@ export default function TransitView() {
                 </div>
               );
             })}
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between py-4 px-4 border-t border-border mt-4">
+              <div className="text-sm text-text-secondary">
+                Mostrando {startIndex + 1}-{Math.min(endIndex, groupedArray.length)} de {groupedArray.length} productos
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm text-text-secondary px-2">
+                  Página {currentPage} de {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
           </div>
           )}
       </div>

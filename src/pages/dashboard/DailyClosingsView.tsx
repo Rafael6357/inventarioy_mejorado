@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { DollarSign, Calendar, Search, X, Eye, ArrowUpDown, ArrowDown, ArrowUp, Printer, ChevronDown, ChevronUp } from 'lucide-react';
+import { DollarSign, Calendar, Search, X, Eye, ArrowUpDown, ArrowDown, ArrowUp, Printer, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useDatabaseStore } from '../../store/dbStore';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
@@ -13,9 +13,17 @@ export default function DailyClosingsView() {
   const [endDate, setEndDate] = useState('');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
   const [employeeFilter, setEmployeeFilter] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [showPreview, setShowPreview] = useState(false);
   const [verifiedRole, setVerifiedRole] = useState<string | null>(null);
   const [expandedClosing, setExpandedClosing] = useState<string | null>(null);
+  const [currencyBreakdown, setCurrencyBreakdown] = useState({
+    cupEfectivo: 0,
+    cupTransfer: 0,
+    usd: 0,
+    eur: 0,
+  });
 
   useEffect(() => {
     const stored = localStorage.getItem('verifiedRole');
@@ -67,6 +75,10 @@ export default function DailyClosingsView() {
     return result;
   }, [dailyClosings, searchTerm, startDate, endDate, sortOrder, employeeFilter]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, startDate, endDate, employeeFilter, sortOrder]);
+
   const getSalesForDate = (closingDate: string) => {
     return sales.filter(s => {
       const saleDate = new Date(s.date).toISOString().split('T')[0];
@@ -96,10 +108,14 @@ export default function DailyClosingsView() {
     
     const salonSales = allSalesForDate.filter(s => s.sale_type === 'SALON' && !s.is_account_house);
     const domicilioSales = allSalesForDate.filter(s => s.sale_type === 'DOMICILIO' && !s.is_account_house);
+    const barSales = allSalesForDate.filter(s => s.sale_type === 'BAR' && !s.is_account_house);
+    const ventaRapidaSales = allSalesForDate.filter(s => s.sale_type === 'VENTA_RAPIDA' && !s.is_account_house);
     const cuentaCasaSales = allSalesForDate.filter(s => s.is_account_house === true);
     
     const salonTotal = salonSales.reduce((sum, s) => sum + Number(s.total_amount || 0), 0);
     const domicilioTotal = domicilioSales.reduce((sum, s) => sum + Number(s.total_amount || 0), 0);
+    const barTotal = barSales.reduce((sum, s) => sum + Number(s.total_amount || 0), 0);
+    const ventaRapidaTotal = ventaRapidaSales.reduce((sum, s) => sum + Number(s.total_amount || 0), 0);
     const cuentaCasaTotal = cuentaCasaSales.reduce((sum, s) => {
       const items = (s as any).sale_items || [];
       const itemsTotal = items.reduce((itemSum: number, item: any) => itemSum + Number(item.subtotal || 0), 0);
@@ -109,8 +125,10 @@ export default function DailyClosingsView() {
     return {
       salon: salonTotal,
       domicilio: domicilioTotal,
+      bar: barTotal,
+      venta_rapida: ventaRapidaTotal,
       cuenta_casa: cuentaCasaTotal,
-      total: salonTotal + domicilioTotal
+      total: salonTotal + domicilioTotal + barTotal + ventaRapidaTotal
     };
   };
 
@@ -127,6 +145,14 @@ export default function DailyClosingsView() {
 
   const totalCuentaCasaHistorico = filteredClosings.reduce((sum, c) => {
     return sum + calculateClosingTotals(c.closing_date.split('T')[0]).cuenta_casa;
+  }, 0);
+
+  const totalBarHistorico = filteredClosings.reduce((sum, c) => {
+    return sum + calculateClosingTotals(c.closing_date.split('T')[0]).bar;
+  }, 0);
+
+  const totalVentaRapidaHistorico = filteredClosings.reduce((sum, c) => {
+    return sum + calculateClosingTotals(c.closing_date.split('T')[0]).venta_rapida;
   }, 0);
 
   const clearFilters = () => {
@@ -148,6 +174,8 @@ export default function DailyClosingsView() {
       salon: {} as Record<string, { quantity: number; subtotal: number; name: string }>,
       domicilio: {} as Record<string, { quantity: number; subtotal: number; name: string }>,
       cuenta_casa: {} as Record<string, { quantity: number; subtotal: number; name: string }>,
+      bar: {} as Record<string, { quantity: number; subtotal: number; name: string }>,
+      venta_rapida: {} as Record<string, { quantity: number; subtotal: number; name: string }>,
     };
 
     const getProductName = (item: any) => {
@@ -160,12 +188,16 @@ export default function DailyClosingsView() {
 
     allSalesForDate.forEach(sale => {
       const items = sale.items || [];
-      let groupKey: 'salon' | 'domicilio' | 'cuenta_casa';
+      let groupKey: 'salon' | 'domicilio' | 'cuenta_casa' | 'bar' | 'venta_rapida';
 
       if (sale.is_account_house) {
         groupKey = 'cuenta_casa';
       } else if (sale.sale_type === 'DOMICILIO') {
         groupKey = 'domicilio';
+      } else if (sale.sale_type === 'BAR') {
+        groupKey = 'bar';
+      } else if (sale.sale_type === 'VENTA_RAPIDA') {
+        groupKey = 'venta_rapida';
       } else {
         groupKey = 'salon';
       }
@@ -215,11 +247,19 @@ export default function DailyClosingsView() {
             <p className="text-xs text-text-secondary">Cuenta Casa</p>
             <p className="font-mono font-bold text-text">${totalCuentaCasaHistorico.toFixed(2)}</p>
           </div>
+          <div className="bg-bg/50 rounded-lg px-4 py-2 border border-border/50">
+            <p className="text-xs text-text-secondary">Bar</p>
+            <p className="font-mono font-bold text-text">${totalBarHistorico.toFixed(2)}</p>
+          </div>
+          <div className="bg-bg/50 rounded-lg px-4 py-2 border border-border/50">
+            <p className="text-xs text-text-secondary">Venta Rápida</p>
+            <p className="font-mono font-bold text-text">${totalVentaRapidaHistorico.toFixed(2)}</p>
+          </div>
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-        <div className="relative">
+      <div className="flex flex-wrap gap-3 items-center">
+        <div className="relative min-w-[200px] flex-1 max-w-xs">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary" />
           <Input
             placeholder="Buscar por fecha o nota..."
@@ -234,7 +274,7 @@ export default function DailyClosingsView() {
             type="date"
             value={startDate}
             onChange={e => setStartDate(e.target.value)}
-            className="h-10 text-sm"
+            className="h-10 text-sm w-36"
           />
         </div>
         <div className="flex items-center gap-2">
@@ -243,14 +283,14 @@ export default function DailyClosingsView() {
             type="date"
             value={endDate}
             onChange={e => setEndDate(e.target.value)}
-            className="h-10 text-sm"
+            className="h-10 text-sm w-36"
           />
         </div>
         <div className="flex items-center gap-2">
           <select
             value={employeeFilter}
             onChange={e => setEmployeeFilter(e.target.value)}
-            className="h-10 rounded-md border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="h-10 rounded-md border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary min-w-[160px]"
           >
             <option value="">Todos los empleados</option>
             {uniqueEmployees.map(emp => (
@@ -258,7 +298,7 @@ export default function DailyClosingsView() {
             ))}
           </select>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 ml-auto">
           <Button
             variant="outline"
             size="sm"
@@ -291,7 +331,15 @@ export default function DailyClosingsView() {
         </div>
       ) : (
         <div className="space-y-3">
-          {filteredClosings.map(closing => (
+          {(() => {
+            const totalPages = Math.ceil(filteredClosings.length / itemsPerPage);
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const endIndex = startIndex + itemsPerPage;
+            const paginatedClosings = filteredClosings.slice(startIndex, endIndex);
+            
+            return (
+              <>
+          {paginatedClosings.map(closing => (
             <div
               key={closing.id}
               className="rounded-xl border border-border/50 bg-surface/80 p-4 transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_15px_-3px_rgba(205,164,52,0.15)]"
@@ -378,7 +426,10 @@ export default function DailyClosingsView() {
                                 <span className="text-text">
                                   {sale.is_account_house 
                                     ? 'Cuenta Casa' 
-                                    : sale.sale_type === 'SALON' ? 'Salón' : 'Domicilio'}
+                                    : sale.sale_type === 'SALON' ? 'Salón' 
+                                    : sale.sale_type === 'DOMICILIO' ? 'Domicilio'
+                                    : sale.sale_type === 'BAR' ? 'Bar'
+                                    : sale.sale_type === 'VENTA_RAPIDA' ? 'Venta Rápida' : 'Otro'}
                                 </span>
                                 <span className="text-text-secondary ml-2">• {sale.items?.length || 0} items</span>
                               </div>
@@ -393,6 +444,43 @@ export default function DailyClosingsView() {
               </div>
             </div>
           ))}
+          
+          {/* Paginación */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-4 border-t border-border/50 mt-4">
+              <div className="text-sm text-text-secondary">
+                Mostrando {startIndex + 1}-{Math.min(endIndex, filteredClosings.length)} de {filteredClosings.length} cierres
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="gap-1"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Anterior
+                </Button>
+                <span className="text-sm text-text-secondary px-2">
+                  Página {currentPage} de {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="gap-1"
+                >
+                  Siguiente
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+              </>
+            );
+          })()}
         </div>
       )}
 
@@ -404,7 +492,7 @@ export default function DailyClosingsView() {
               <div>
                 <h2 className="text-xl font-bold text-text">Detalle de Cierre</h2>
                 <p className="text-sm text-text-secondary">
-                  {new Date(selectedClosing.closing_date).toLocaleDateString('es-CO', {
+                  {new Date(selectedClosing.closing_date + 'T12:00:00').toLocaleDateString('es-CO', {
                     weekday: 'long',
                     year: 'numeric',
                     month: 'long',
@@ -437,6 +525,14 @@ export default function DailyClosingsView() {
                 <span className="text-text-secondary">Cuenta Casa:</span>
                 <span className="font-mono text-text">${calculateClosingTotals(selectedClosing.closing_date.split('T')[0]).cuenta_casa.toFixed(2)}</span>
               </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-text-secondary">Bar:</span>
+                <span className="font-mono text-text">${calculateClosingTotals(selectedClosing.closing_date.split('T')[0]).bar.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-text-secondary">Venta Rápida:</span>
+                <span className="font-mono text-text">${calculateClosingTotals(selectedClosing.closing_date.split('T')[0]).venta_rapida.toFixed(2)}</span>
+              </div>
               <div className="flex justify-between text-sm border-t border-border/50 pt-2">
                 <span className="text-text-secondary">Ventas brutas:</span>
                 <span className="font-mono text-text">${Number(selectedClosing.total_sales || 0).toFixed(2)}</span>
@@ -459,6 +555,68 @@ export default function DailyClosingsView() {
                   <p className="text-sm text-text">{selectedClosing.notes}</p>
                 </div>
               )}
+              
+              {/* Desglose de Monedas */}
+              {(() => {
+                const closingDateStr = selectedClosing.closing_date.split('T')[0];
+                const daySales = sales.filter(s => {
+                  const saleDate = new Date(s.date).toISOString().split('T')[0];
+                  return saleDate === closingDateStr && !s.is_account_house;
+                });
+                
+                let cupEfectivo = 0;
+                let cupTransfer = 0;
+                let usd = 0;
+                let eur = 0;
+                
+                daySales.forEach(sale => {
+                  if (sale.efectivo !== undefined && sale.efectivo !== null) {
+                    cupEfectivo += Number(sale.efectivo) || 0;
+                  }
+                  if (sale.transferencia !== undefined && sale.transferencia !== null) {
+                    cupTransfer += Number(sale.transferencia) || 0;
+                  }
+                  if (sale.usd !== undefined && sale.usd !== null) {
+                    usd += Number(sale.usd) || 0;
+                  }
+                  if (sale.eur !== undefined && sale.eur !== null) {
+                    eur += Number(sale.eur) || 0;
+                  }
+                });
+                
+                const hasAnyCurrency = cupEfectivo > 0 || cupTransfer > 0 || usd > 0 || eur > 0;
+                if (!hasAnyCurrency) return null;
+                
+                return (
+                  <div className="mt-3 pt-3 border-t border-border/50">
+                    <p className="text-xs font-medium text-text-secondary mb-2">Desglose de Monedas:</p>
+                    {cupEfectivo > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-text-secondary">CUP Efectivo:</span>
+                        <span className="font-mono text-text">${cupEfectivo.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {cupTransfer > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-text-secondary">CUP Transferencia:</span>
+                        <span className="font-mono text-text">${cupTransfer.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {usd > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-text-secondary">USD:</span>
+                        <span className="font-mono text-text">${usd.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {eur > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-text-secondary">EUR:</span>
+                        <span className="font-mono text-text">${eur.toFixed(2)}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="flex gap-2 mt-4">
@@ -502,7 +660,7 @@ export default function DailyClosingsView() {
               <div className="text-center border-b-2 border-dashed border-gray-400 pb-2 mb-3">
                 <p className="font-bold text-sm">RESUMEN DE VENTAS</p>
                 <p className="text-xs mt-1">
-                  {new Date(selectedClosing.closing_date).toLocaleDateString('es-CO', {
+                  {new Date(selectedClosing.closing_date + 'T12:00:00').toLocaleDateString('es-CO', {
                     weekday: 'long',
                     year: 'numeric',
                     month: 'long',
@@ -530,11 +688,15 @@ export default function DailyClosingsView() {
                 const salonItems = Object.entries(grouped.salon);
                 const domicilioItems = Object.entries(grouped.domicilio);
                 const cuentaCasaItems = Object.entries(grouped.cuenta_casa);
+                const barItems = Object.entries(grouped.bar);
+                const ventaRapidaItems = Object.entries(grouped.venta_rapida);
 
                 const salonTotal = salonItems.reduce((sum, [, v]) => sum + v.subtotal, 0);
                 const domicilioTotal = domicilioItems.reduce((sum, [, v]) => sum + v.subtotal, 0);
                 const cuentaCasaTotal = cuentaCasaItems.reduce((sum, [, v]) => sum + v.subtotal, 0);
-                const totalDia = salonTotal + domicilioTotal + cuentaCasaTotal;
+                const barTotal = barItems.reduce((sum, [, v]) => sum + v.subtotal, 0);
+                const ventaRapidaTotal = ventaRapidaItems.reduce((sum, [, v]) => sum + v.subtotal, 0);
+                const totalDia = salonTotal + domicilioTotal + barTotal + ventaRapidaTotal;
 
                 return (
                   <>
@@ -574,7 +736,31 @@ export default function DailyClosingsView() {
                       </div>
                     )}
 
-                    {salonItems.length === 0 && domicilioItems.length === 0 && cuentaCasaItems.length === 0 && (
+                    {barItems.length > 0 && (
+                      <div className="mb-3">
+                        <p className="font-bold border-b border-gray-300 mb-1">--- BAR ---</p>
+                        {barItems.map(([name, data]) => (
+                          <p key={name}>{formatItem(name, data.quantity, data.subtotal)}</p>
+                        ))}
+                        <p className="font-bold mt-1 border-t border-gray-300 pt-1">
+                          {formatTotal('TOTAL BAR:', barTotal)}
+                        </p>
+                      </div>
+                    )}
+
+                    {ventaRapidaItems.length > 0 && (
+                      <div className="mb-3">
+                        <p className="font-bold border-b border-gray-300 mb-1">--- VENTA RAPIDA ---</p>
+                        {ventaRapidaItems.map(([name, data]) => (
+                          <p key={name}>{formatItem(name, data.quantity, data.subtotal)}</p>
+                        ))}
+                        <p className="font-bold mt-1 border-t border-gray-300 pt-1">
+                          {formatTotal('TOTAL V.RAPIDA:', ventaRapidaTotal)}
+                        </p>
+                      </div>
+                    )}
+
+                    {salonItems.length === 0 && domicilioItems.length === 0 && cuentaCasaItems.length === 0 && barItems.length === 0 && ventaRapidaItems.length === 0 && (
                       <p className="text-center text-gray-500">Sin ventas en este cierre</p>
                     )}
 
@@ -583,6 +769,57 @@ export default function DailyClosingsView() {
                         {formatTotal('TOTAL DEL DIA:', totalDia)}
                       </p>
                     </div>
+                    
+                    {/* Desglose de Monedas */}
+                    {(() => {
+                      const closingDateStr = selectedClosing.closing_date.split('T')[0];
+                      const daySales = sales.filter(s => {
+                        const saleDate = new Date(s.date).toISOString().split('T')[0];
+                        return saleDate === closingDateStr && !s.is_account_house;
+                      });
+                      
+                      let cupEfectivo = 0;
+                      let cupTransfer = 0;
+                      let usd = 0;
+                      let eur = 0;
+                      
+                      daySales.forEach(sale => {
+                        if (sale.efectivo !== undefined && sale.efectivo !== null) {
+                          cupEfectivo += Number(sale.efectivo) || 0;
+                        }
+                        if (sale.transferencia !== undefined && sale.transferencia !== null) {
+                          cupTransfer += Number(sale.transferencia) || 0;
+                        }
+                        if (sale.usd !== undefined && sale.usd !== null) {
+                          usd += Number(sale.usd) || 0;
+                        }
+                        if (sale.eur !== undefined && sale.eur !== null) {
+                          eur += Number(sale.eur) || 0;
+                        }
+                      });
+                      
+                      const hasAnyCurrency = cupEfectivo > 0 || cupTransfer > 0 || usd > 0 || eur > 0;
+                      
+                      if (!hasAnyCurrency) return null;
+                      
+                      return (
+                        <div className="mt-3 pt-2 border-t border-gray-300">
+                          <p className="font-bold text-xs border-b border-gray-300 mb-1">--- DESGLOSE DE MONEDAS ---</p>
+                          {cupEfectivo > 0 && (
+                            <p className="text-xs">{formatTotal('CUP Efectivo:', cupEfectivo)}</p>
+                          )}
+                          {cupTransfer > 0 && (
+                            <p className="text-xs">{formatTotal('CUP Transfer:', cupTransfer)}</p>
+                          )}
+                          {usd > 0 && (
+                            <p className="text-xs">{formatTotal('USD:', usd)}</p>
+                          )}
+                          {eur > 0 && (
+                            <p className="text-xs">{formatTotal('EUR:', eur)}</p>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </>
                 );
               })()}

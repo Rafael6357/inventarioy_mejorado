@@ -16,14 +16,21 @@ interface TicketData {
   businessName: string;
   ticketMessage: string;
   date: Date;
+  saleLabel?: string;
+  isPreticket?: boolean;
+  saleType?: 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA';
+  isAccountHouse?: boolean;
+  deliveryFee?: number;
+  employeeRole?: string;
 }
 
 interface TicketViewProps {
   ticketData: TicketData;
   onClose: () => void;
+  isPreticket?: boolean;
 }
 
-export default function TicketView({ ticketData, onClose }: TicketViewProps) {
+export default function TicketView({ ticketData, onClose, isPreticket = false }: TicketViewProps) {
   const printRef = useRef<HTMLDivElement>(null);
 
   const handlePrint = () => {
@@ -49,7 +56,7 @@ export default function TicketView({ ticketData, onClose }: TicketViewProps) {
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" id="ticket-container">
       <div className="bg-bg rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="p-4 border-b border-border flex items-center justify-between print-hide">
-          <h2 className="text-lg font-semibold text-text">Ticket</h2>
+          <h2 className="text-lg font-semibold text-text">{isPreticket || ticketData.isPreticket ? 'Preticket' : 'Ticket'}</h2>
           <Button variant="ghost" size="icon" onClick={onClose} className="print-hide">
             <X className="h-5 w-5" />
           </Button>
@@ -78,9 +85,9 @@ export default function TicketView({ ticketData, onClose }: TicketViewProps) {
               {ticketData.employeeRole ? `${ticketData.employeeRole}: ${ticketData.employeeName}` : (ticketData.employeeName || 'Dueño')}
             </div>
 
-            {ticketData.saleType && (
+            {(ticketData.saleType || ticketData.saleLabel) && (
               <div className="mb-2 text-xs font-medium">
-                Tipo: {ticketData.saleType === 'DOMICILIO' ? 'A Domicilio' : 'En Salón'}
+                Tipo: {ticketData.saleLabel || (ticketData.saleType === 'DOMICILIO' ? 'Domicilio' : ticketData.saleType === 'BAR' ? 'Bar' : ticketData.saleType === 'VENTA_RAPIDA' ? 'Venta Rápida' : 'Salón')}
               </div>
             )}
 

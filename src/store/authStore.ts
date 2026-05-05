@@ -16,6 +16,11 @@ export interface User {
   isSubscriptionActive: boolean;
   generateTicket: boolean;
   ticketMessage: string;
+  usdEnabled: boolean;
+  usdRate: number;
+  eurEnabled: boolean;
+  eurRate: number;
+  cupTransferEnabled: boolean;
 }
 
 interface AuthState {
@@ -148,7 +153,30 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         if (session?.user) {
           await get().fetchUser();
         } else {
-          set({ isLoading: false });
+          // Intentar login automático con credenciales guardadas
+          const savedCredentials = localStorage.getItem('saved_credentials');
+          if (savedCredentials) {
+            try {
+              const creds = JSON.parse(atob(savedCredentials));
+              const { error: signInError } = await supabase.auth.signInWithPassword({
+                email: creds.email,
+                password: creds.password,
+              });
+              if (!signInError) {
+                await get().fetchUser();
+              } else {
+                // Credenciales inválidas, limpiar
+                localStorage.removeItem('saved_credentials');
+                localStorage.removeItem('saved_email');
+                set({ isLoading: false });
+              }
+            } catch (autoLoginErr) {
+              console.warn('Login automático falló:', autoLoginErr);
+              set({ isLoading: false });
+            }
+          } else {
+            set({ isLoading: false });
+          }
         }
       } catch (abortErr: any) {
         clearTimeout(timeoutId);
@@ -263,6 +291,11 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         isSubscriptionActive: checkSubscriptionActive(authUser.email || '', subscription),
         generateTicket: profile?.generate_ticket ?? false,
         ticketMessage: profile?.ticket_message || '¡Gracias por su visita!',
+        usdEnabled: profile?.usd_enabled ?? false,
+        usdRate: profile?.usd_rate ?? 320,
+        eurEnabled: profile?.eur_enabled ?? false,
+        eurRate: profile?.eur_rate ?? 350,
+        cupTransferEnabled: profile?.cup_transfer_enabled ?? false,
       };
 
       console.log('Usuario cargado:', user.email, 'role:', user.role, 'subscriptionActive:', user.isSubscriptionActive);
@@ -284,6 +317,11 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     }
 
     if (data.user) {
+      // Guardar credenciales para sesión persistente
+      const credentials = btoa(JSON.stringify({ email, password }));
+      localStorage.setItem('saved_credentials', credentials);
+      localStorage.setItem('saved_email', email);
+      
       await get().fetchUser();
       return { success: true };
     }
@@ -331,19 +369,23 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   logout: async () => {
     console.log('Logout llamado...');
     try {
-      // 1. Limpiar estado primero
+      // 1. Limpiar credenciales guardadas
+      localStorage.removeItem('saved_credentials');
+      localStorage.removeItem('saved_email');
+      
+      // 2. Limpiar estado primero
       _isInitializing = false;
       _authListenerSubscription = null;
       set({ user: null, isAuthenticated: false, isLoading: false });
       console.log('Estado limpiado');
       
-      // 2. Luego hacer signOut
+      // 3. Luego hacer signOut
       await supabase.auth.signOut();
       console.log('SignOut exitoso');
     } catch (err) {
       console.error('Error en logout:', err);
     } finally {
-      // 3. Forzar redirección
+      // 4. Forzar redirección
       console.log('Redireccionando...');
       window.location.href = '/';
     }

@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
-import { Search, Filter, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, Calendar } from 'lucide-react';
+import { Search, Filter, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
@@ -11,8 +11,8 @@ export default function MovementsView() {
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [hasMoreMovements, setHasMoreMovements] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(15);
 
   const getProductName = (id: string) => products.find(p => p.id === id)?.name || 'Producto Eliminado';
 
@@ -64,6 +64,15 @@ export default function MovementsView() {
       })
       .reverse(); // Mostrar los más recientes primero en la tabla
   }, [movements, searchTerm, typeFilter, startDate, endDate, products]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, typeFilter, startDate, endDate]);
+
+  const totalPages = Math.ceil(filteredMovements.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedMovements = filteredMovements.slice(startIndex, endIndex);
 
   return (
     <div className="space-y-6">
@@ -137,14 +146,14 @@ export default function MovementsView() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filteredMovements.length === 0 ? (
+              {paginatedMovements.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-4 py-8 text-center text-text-secondary">
                     No se encontraron movimientos.
                   </td>
                 </tr>
               ) : (
-                filteredMovements.map((movement) => {
+                paginatedMovements.map((movement) => {
                   const isEntrada = movement.type === 'ENTRADA';
                   const isSalida = movement.type === 'SALIDA';
                   
@@ -197,20 +206,32 @@ export default function MovementsView() {
             </tbody>
           </table>
 
-          {hasMoreMovements && (
-            <div className="flex justify-center py-4">
-              <Button
-                variant="outline"
-                onClick={async () => {
-                  setLoadingMore(true);
-                  const result = await fetchMore(50);
-                  setHasMoreMovements(result.hasMore);
-                  setLoadingMore(false);
-                }}
-                disabled={loadingMore}
-              >
-                {loadingMore ? 'Cargando...' : 'Ver más movimientos'}
-              </Button>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between py-4 px-4 border-t border-border">
+              <div className="text-sm text-text-secondary">
+                Mostrando {startIndex + 1}-{Math.min(endIndex, filteredMovements.length)} de {filteredMovements.length} movimientos
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm text-text-secondary px-2">
+                  Página {currentPage} de {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           )}
         </div>

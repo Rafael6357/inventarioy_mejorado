@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
 import { useAuthStore } from '../../store/authStore';
 import { Users, UserPlus, Trash2, Mail, Phone, Briefcase, DollarSign, FileText, Upload, Download, X, FolderOpen, BookOpen, ShieldCheck, Paperclip, Eye, ChevronDown, Building2, Calculator, Settings, RefreshCw, Save, Edit, FileSpreadsheet } from 'lucide-react';
@@ -451,7 +451,7 @@ export default function HRView() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="salary">Salario (Mensual) *</Label>
+                <Label htmlFor="salary">Salario Básico *</Label>
                 <Input
                   id="salary"
                   type="number"
@@ -464,12 +464,17 @@ export default function HRView() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="phone">Teléfono</Label>
+                <Label htmlFor="phone">Teléfono (opcional)</Label>
                 <Input
                   id="phone"
                   type="tel"
+                  maxLength={10}
+                  placeholder="Máximo 10 dígitos"
                   value={newEmployee.phone}
-                  onChange={e => setNewEmployee({ ...newEmployee, phone: e.target.value })}
+                  onChange={e => {
+                    const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    setNewEmployee({ ...newEmployee, phone: val });
+                  }}
                 />
               </div>
 
@@ -484,12 +489,16 @@ export default function HRView() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="nit_id">NIT / Carnet de Identidad</Label>
+                <Label htmlFor="nit_id">NIT / Carnet de Identidad (opcional)</Label>
                 <Input
                   id="nit_id"
-                  placeholder="Ej: 0102030405"
+                  maxLength={11}
+                  placeholder="Máximo 11 dígitos"
                   value={newEmployee.nit_id}
-                  onChange={e => setNewEmployee({ ...newEmployee, nit_id: e.target.value })}
+                  onChange={e => {
+                    const val = e.target.value.replace(/\D/g, '').slice(0, 11);
+                    setNewEmployee({ ...newEmployee, nit_id: val });
+                  }}
                 />
               </div>
 
@@ -1063,7 +1072,16 @@ export default function HRView() {
                       toast.success('Base exenta actualizada', { duration: 1500 });
                     }}
                   />
-                  <p className="text-xs text-text-secondary">Monto que se descuenta antes del 3% de impuesto</p>
+                  <p className="text-xs text-text-secondary">Monto que está libre de impuestos. En Cuba es aproximadamente $4,800 CUP/mes</p>
+                </div>
+                
+                <div className="p-4 rounded-lg bg-blue-50 border border-blue-200">
+                  <p className="text-sm font-medium text-blue-800 mb-2">¿Qué es la Base Imponible?</p>
+                  <p className="text-xs text-blue-700">
+                    Es la porción del salario sobre la cual se calcula el impuesto. Se calcula así:<br/>
+                    <strong>Base Imponible = Salario Bruto - Base Exenta</strong><br/>
+                    Ejemplo: Salario $10,000 - Base Exenta $4,800 = <strong>Base Imponible $5,200</strong>
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label>% Impuesto sobre Renta</Label>

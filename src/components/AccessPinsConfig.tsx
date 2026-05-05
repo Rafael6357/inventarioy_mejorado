@@ -107,58 +107,96 @@ export default function AccessPinsConfig() {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-text mb-4 flex items-center gap-2">
-            <Lock className="h-5 w-5 text-primary" />
-            Control de Acceso
-          </h3>
-          <p className="text-sm text-text-secondary">
-            Configure pines de seguridad para limitar el acceso a módulos
-          </p>
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="border-b border-border pb-6">
+        <h3 className="text-xl font-semibold text-text flex items-center gap-3">
+          <Lock className="h-6 w-6 text-primary" />
+          Control de Acceso por PIN
+        </h3>
+        <p className="text-base text-text-secondary mt-2">
+          Configure pines de seguridad para limitar el acceso a los módulos del sistema
+        </p>
+      </div>
+
+      {/* Resumen de Roles */}
+      <div className="p-4 rounded-xl bg-surface-hover border border-border/30">
+        <h4 className="text-base font-medium text-text mb-3 flex items-center gap-2">
+          Resumen de Roles
+        </h4>
+        <div className="flex flex-wrap gap-2">
+          {(['owner', 'economist', 'admin', 'supervisor', 'clerk'] as const).map(role => (
+            <span 
+              key={role} 
+              className={`px-3 py-1 rounded-full text-xs font-medium ${
+                accessPins.some(p => p.role === role && p.is_active) 
+                  ? 'bg-success/20 text-success' 
+                  : accessPins.some(p => p.role === role && !p.is_active)
+                    ? 'bg-warning/20 text-warning'
+                    : 'bg-border text-text-secondary'
+              }`}
+            >
+              {ROLE_LABELS[role]}
+            </span>
+          ))}
         </div>
+      </div>
+
+      {/* Crear Nuevo PIN */}
+      <div className="p-4 rounded-xl bg-bg/50 border border-border/30">
+        <h4 className="text-base font-medium text-text mb-3 flex items-center gap-2">
+          <span>➕</span> Crear Nuevo PIN
+        </h4>
         <Button
           onClick={() => handleOpenModal()}
-          className="gap-2"
-          size="sm"
+          className="gap-2 w-full sm:w-auto"
         >
           <Plus className="h-4 w-4" />
-          Agregar PIN
+          Agregar Nuevo PIN
         </Button>
       </div>
 
+      {/* Lista de PINs Activos */}
       {accessPins.length === 0 ? (
-        <div className="text-center py-8 text-text-secondary">
-          <Lock className="h-12 w-12 mx-auto mb-3 opacity-50" />
-          <p className="font-medium text-warning">Configure primero el PIN de Dueño/a</p>
-          <p className="text-xs mt-1">Debe configurar el PIN de Dueño/a antes que cualquier otro para poder acceder a todos los módulos del sistema.</p>
+        <div className="text-center py-6 px-4 rounded-xl bg-warning/5 border border-warning/30">
+          <Lock className="h-8 w-8 mx-auto mb-2 text-warning" />
+          <p className="font-medium text-warning text-sm">Configure primero el PIN de Propietario/a</p>
+          <p className="text-xs text-text-secondary mt-2">
+            Debe configurar el PIN de Propietario/a antes que cualquier otro para poder acceder a todos los módulos del sistema.
+          </p>
         </div>
       ) : (
         <div className="space-y-3">
+          <h4 className="text-base font-medium text-text flex items-center gap-2">
+            PINs Configurados
+          </h4>
           {accessPins.map(pin => (
             <div
               key={pin.id}
-              className="flex items-center justify-between p-4 bg-surface-hover rounded-lg border border-border/30"
+              className="flex flex-col p-4 bg-surface rounded-lg border border-border/30 hover:border-primary/30 transition-colors"
             >
-              <div className="flex-1">
+              <div className="flex items-center justify-between w-full mb-2">
                 <div className="flex items-center gap-2">
-                  <span className="font-medium text-text">{ROLE_LABELS[pin.role]}</span>
+                  <span className="font-medium text-text text-base">{ROLE_LABELS[pin.role]}</span>
                   {pin.is_active ? (
-                    <CheckCircle className="h-4 w-4 text-success" />
+                    <span className="flex items-center gap-1 text-sm text-success">
+                      <CheckCircle className="h-4 w-4" /> Activo
+                    </span>
                   ) : (
-                    <XCircle className="h-4 w-4 text-text-secondary" />
+                    <span className="flex items-center gap-1 text-sm text-text-secondary">
+                      <XCircle className="h-4 w-4" /> Inactivo
+                    </span>
                   )}
                 </div>
-                <p className="text-xs text-text-secondary mt-1">
-                  Módulos: {translateModules(ROLE_MODULES[pin.role] || [])}
-                </p>
               </div>
-              <div className="flex gap-2">
+              <p className="text-sm text-text-secondary mb-2">
+                <strong>Módulos:</strong> {translateModules(ROLE_MODULES[pin.role] || [])}
+              </p>
+              <div className="flex gap-2 mt-auto pt-2 border-t border-border/30">
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8"
+                  className="h-8 text-sm px-3"
                   onClick={() => handleToggle(pin.id, pin.is_active)}
                 >
                   {pin.is_active ? 'Desactivar' : 'Activar'}
@@ -166,7 +204,7 @@ export default function AccessPinsConfig() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-8 text-danger hover:text-danger"
+                  className="h-8 text-danger hover:text-danger px-2"
                   onClick={() => handleDelete(pin.id)}
                 >
                   <Trash2 className="h-4 w-4" />

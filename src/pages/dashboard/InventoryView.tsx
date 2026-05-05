@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
 import { useAuthStore } from '../../store/authStore';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
-import { PackagePlus, ArrowRightLeft, Settings2, RefreshCw, Loader2 } from 'lucide-react';
+import { PackagePlus, ArrowRightLeft, Settings2, RefreshCw, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   convertUnit,
@@ -86,8 +86,11 @@ export default function InventoryView() {
     status: 'NORMAL' as 'NORMAL' | 'ANOMALIA' | 'JUSTIFICADO',
   });
   const [isSubmittingMovement, setIsSubmittingMovement] = useState(false);
+  const [isSubmittingProduct, setIsSubmittingProduct] = useState(false);
 
   const handleAddProduct = async (e: React.FormEvent) => {
+    if (isSubmittingProduct) return; // Evitar múltiples clics
+    setIsSubmittingProduct(true);
     e.preventDefault();
     if (!user) return;
     
@@ -123,6 +126,8 @@ export default function InventoryView() {
       } else {
         toast.error(error.message || 'Error al agregar producto');
       }
+    } finally {
+      setIsSubmittingProduct(false);
     }
   };
 
@@ -132,6 +137,7 @@ export default function InventoryView() {
 
   const handleAddMovement = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingMovement) return; // Evitar múltiples clics
     
     if (!user) return;
     if (!movement.product_id) {
@@ -397,8 +403,8 @@ export default function InventoryView() {
               </div>
             )}
 
-            <Button type="submit" className="mt-6 px-8">
-              Agregar Producto
+            <Button type="submit" className="mt-6 px-8" disabled={isSubmittingProduct}>
+              {isSubmittingProduct ? 'Agregando...' : 'Agregar Producto'}
             </Button>
           </form>
         </div>
