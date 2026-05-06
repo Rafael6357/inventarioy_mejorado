@@ -47,7 +47,7 @@ jobs:
           tagName: v${{ github.ref_name }}-${{ github.run_number }}
           releaseName: 'InventarioY v${{ github.ref_name }}-${{ github.run_number }}'
           releaseBody: 'Build generado automáticamente por GitHub Actions.'
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
 
       - name: Upload artifact
