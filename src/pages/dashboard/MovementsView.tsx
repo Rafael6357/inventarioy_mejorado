@@ -46,7 +46,7 @@ export default function MovementsView() {
     // Paso 2: Aplicar filtros
     return movementsWithBal
       .filter(m => {
-        const isNotSale = !m.reason?.startsWith('Venta');
+        const isInventoryMovement = m.type === 'ENTRADA' || m.type === 'SALIDA' || m.type === 'MERMA';
         const matchesSearch = getProductName(m.product_id).toLowerCase().includes(searchTerm.toLowerCase());
         const matchesType = typeFilter === 'ALL' || m.type === typeFilter;
         
@@ -60,7 +60,7 @@ export default function MovementsView() {
           matchesDate = matchesDate && new Date(m.date) <= end;
         }
         
-        return isNotSale && matchesSearch && matchesType && matchesDate;
+        return isInventoryMovement && matchesSearch && matchesType && matchesDate;
       })
       .reverse(); // Mostrar los más recientes primero en la tabla
   }, [movements, searchTerm, typeFilter, startDate, endDate, products]);
