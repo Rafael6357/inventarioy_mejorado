@@ -198,9 +198,20 @@ async function createTables(): Promise<void> {
 
 export async function getDB(): Promise<any> {
   if (!db) {
-    return await initLocalDB();
+    try {
+      const result = await initLocalDB();
+      return result;
+    } catch (error) {
+      console.warn('SQLite no disponible, getDB retorna null');
+      return null;
+    }
   }
   return db;
+}
+
+export async function isDBReady(): Promise<boolean> {
+  const database = await getDB();
+  return database !== null;
 }
 
 export async function isTauri(): Promise<boolean> {
@@ -217,11 +228,13 @@ export async function isTauri(): Promise<boolean> {
 
 export async function queryProducts(): Promise<any[]> {
   const database = await getDB();
+  if (!database) return [];
   return await database.select('SELECT * FROM products WHERE is_active = 1 ORDER BY name');
 }
 
 export async function insertProduct(product: any): Promise<void> {
   const database = await getDB();
+  if (!database) return;
   await database.execute(
     `INSERT INTO products (id, user_id, name, category, quantity, unit, price, cost, rop, eoq, lead_time, order_cost, holding_cost, expiration_date, description, is_individual, is_active, in_transit, created_at, updated_at)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`,
@@ -238,6 +251,7 @@ export async function insertProduct(product: any): Promise<void> {
 
 export async function updateProduct(product: any): Promise<void> {
   const database = await getDB();
+  if (!database) return;
   await database.execute(
     `UPDATE products SET name = $1, category = $2, quantity = $3, unit = $4, price = $5, cost = $6, rop = $7, eoq = $8, lead_time = $9, order_cost = $10, holding_cost = $11, expiration_date = $12, description = $13, is_individual = $14, is_active = $15, in_transit = $16, updated_at = $17 WHERE id = $18`,
     [
@@ -253,6 +267,10 @@ export async function updateProduct(product: any): Promise<void> {
 
 export async function addToSyncQueue(tableName: string, operation: string, data: any): Promise<void> {
   const database = await getDB();
+  if (!database) {
+    console.log('SQLite no disponible, saltando addToSyncQueue');
+    return;
+  }
   await database.execute(
     `INSERT INTO sync_queue (table_name, operation, data, created_at, synced, retry_count) VALUES ($1, $2, $3, $4, 0, 0)`,
     [tableName, operation, JSON.stringify(data), new Date().toISOString()]
@@ -261,20 +279,27 @@ export async function addToSyncQueue(tableName: string, operation: string, data:
 
 export async function getPendingSyncItems(): Promise<any[]> {
   const database = await getDB();
+  if (!database) {
+    console.log('SQLite no disponible, retornando array vacío');
+    return [];
+  }
   return await database.select('SELECT * FROM sync_queue WHERE synced = 0 ORDER BY created_at');
 }
 
 export async function markAsSynced(id: number): Promise<void> {
   const database = await getDB();
+  if (!database) return;
   await database.execute('UPDATE sync_queue SET synced = 1 WHERE id = $1', [id]);
 }
 
 export async function incrementRetryCount(id: number): Promise<void> {
   const database = await getDB();
+  if (!database) return;
   await database.execute('UPDATE sync_queue SET retry_count = retry_count + 1 WHERE id = $1', [id]);
 }
 
 export async function clearSyncedItems(): Promise<void> {
   const database = await getDB();
+  if (!database) return;
   await database.execute('DELETE FROM sync_queue WHERE synced = 1');
 }
