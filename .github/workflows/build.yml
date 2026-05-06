@@ -27,9 +27,7 @@ jobs:
           cache: 'npm'
 
       - name: Install Rust stable
-        uses: dtolnay/rust-toolchain-action@stable
-        with:
-          toolchain: stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
@@ -44,9 +42,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: v__VERSION__
-          releaseName: 'InventarioY v__VERSION__'
-          releaseBody: 'See the assets to download and install this version.'
+          tagName: v${{ github.ref_name }}-${{ github.run_number }}
+          releaseName: 'InventarioY v${{ github.ref_name }}-${{ github.run_number }}'
+          releaseBody: 'Build generado automáticamente por GitHub Actions.'
           releaseDraft: true
           prerelease: false
 
