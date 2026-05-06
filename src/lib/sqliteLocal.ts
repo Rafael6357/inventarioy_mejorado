@@ -1,14 +1,19 @@
-import Database from '@tauri-apps/plugin-sql';
-
-let db: Database | null = null;
+let db: any = null;
 
 const DB_NAME = 'inventarioy.db';
 
-export async function initLocalDB(): Promise<Database> {
+async function getDatabase() {
+  if (db) return db;
+  const Database = (await import('@tauri-apps/plugin-sql')).default;
+  db = await Database.load(`sqlite:${DB_NAME}`);
+  return db;
+}
+
+export async function initLocalDB(): Promise<any> {
   if (db) return db;
 
   try {
-    db = await Database.load(`sqlite:${DB_NAME}`);
+    db = await getDatabase();
     await createTables();
     console.log('Base de datos SQLite local inicializada');
     return db;
@@ -181,7 +186,7 @@ async function createTables(): Promise<void> {
   console.log('Todas las tablas creadas');
 }
 
-export async function getDB(): Promise<Database> {
+export async function getDB(): Promise<any> {
   if (!db) {
     return await initLocalDB();
   }
