@@ -218,9 +218,11 @@ export async function isTauri(): Promise<boolean> {
   if (typeof window !== 'undefined' && (window as any).__TAURI__) {
     return true;
   }
+  
   try {
     await import('@tauri-apps/api/core');
-    return true;
+    const hasTauriGlobal = typeof window !== 'undefined' && (window as any).__TAURI__;
+    return !!hasTauriGlobal;
   } catch {
     return false;
   }

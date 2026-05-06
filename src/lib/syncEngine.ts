@@ -92,13 +92,30 @@ export async function initSyncEngine(): Promise<void> {
 }
 
 export async function loadInitialData(): Promise<void> {
+  const isTauriApp = await sqlite.isTauri();
+  if (!isTauriApp) {
+    state.pendingChanges = 0;
+    return;
+  }
+  
   const pending = await sqlite.getPendingSyncItems();
   state.pendingChanges = pending.length;
 }
 
 export async function syncNow(): Promise<void> {
+  const isTauriApp = await sqlite.isTauri();
+  if (!isTauriApp) {
+    return;
+  }
+
   if (state.status === 'syncing') {
     console.log('Sincronización en progreso, omitiendo...');
+    return;
+  }
+
+  const dbReady = await sqlite.isDBReady();
+  if (!dbReady) {
+    console.log('SQLite no disponible, omitiendo sincronización');
     return;
   }
 
@@ -181,6 +198,17 @@ async function handleDelete(table: string, data: any): Promise<void> {
 
 async function pullRemoteChanges(): Promise<void> {
   if (!state.isOnline) return;
+
+  const isTauriApp = await sqlite.isTauri();
+  if (!isTauriApp) {
+    return;
+  }
+
+  const dbReady = await sqlite.isDBReady();
+  if (!dbReady) {
+    console.log('SQLite no disponible, omitiendo pull de cambios remotos');
+    return;
+  }
 
   const lastSync = state.lastSyncTime?.toISOString() || '1970-01-01T00:00:00Z';
 

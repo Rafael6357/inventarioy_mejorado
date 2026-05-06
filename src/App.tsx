@@ -20,9 +20,16 @@ export default function App() {
 
   useEffect(() => {
     async function checkEnvironment() {
+      const hasTauriGlobal = typeof window !== 'undefined' && (window as any).__TAURI__;
+      if (hasTauriGlobal) {
+        setIsTauri(true);
+        return;
+      }
+      
       try {
         await import('@tauri-apps/api/core');
-        setIsTauri(true);
+        const hasTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+        setIsTauri(!!hasTauri);
       } catch {
         setIsTauri(false);
       }
