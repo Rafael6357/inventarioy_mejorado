@@ -8,3 +8,5 @@ coverage/
 !.env.example
 .vercel
 .env*.local
+src-tauri/target/
+src-tauri/Cargo.lock

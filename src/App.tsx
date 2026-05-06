@@ -10,13 +10,39 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import ConnectionStatus from './components/ConnectionStatus';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { initOfflineDB } from './lib/offlineDB';
+import { initSyncEngine } from './lib/syncEngine';
 
 export default function App() {
+  const [isTauri, setIsTauri] = useState(false);
+  const [syncEngineReady, setSyncEngineReady] = useState(false);
+
   useEffect(() => {
+    async function checkEnvironment() {
+      try {
+        await import('@tauri-apps/api/core');
+        setIsTauri(true);
+      } catch {
+        setIsTauri(false);
+      }
+    }
+
+    checkEnvironment();
+
     initOfflineDB().catch(err => console.error('Failed to initialize offline DB:', err));
   }, []);
+
+  useEffect(() => {
+    if (isTauri && !syncEngineReady) {
+      initSyncEngine()
+        .then(() => {
+          console.log('Sync engine initialized');
+          setSyncEngineReady(true);
+        })
+        .catch(err => console.error('Failed to initialize sync engine:', err));
+    }
+  }, [isTauri, syncEngineReady]);
 
   return (
     <Router>
