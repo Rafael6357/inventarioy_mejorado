@@ -4,6 +4,12 @@ const DB_NAME = 'inventarioy.db';
 
 async function getDatabase() {
   if (db) return db;
+  
+  const isTauriEnv = typeof window !== 'undefined' && (window as any).__TAURI__;
+  if (!isTauriEnv) {
+    throw new Error('SQLite solo disponible en la app de escritorio');
+  }
+  
   const Database = (await import('@tauri-apps/plugin-sql')).default;
   db = await Database.load(`sqlite:${DB_NAME}`);
   return db;
@@ -17,7 +23,11 @@ export async function initLocalDB(): Promise<any> {
     await createTables();
     console.log('Base de datos SQLite local inicializada');
     return db;
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message === 'SQLite solo disponible en la app de escritorio') {
+      console.log('Modo web: SQLite no disponible, usando Supabase directamente');
+      return null;
+    }
     console.error('Error al inicializar SQLite:', error);
     throw error;
   }

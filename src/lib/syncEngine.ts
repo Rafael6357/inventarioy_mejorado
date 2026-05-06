@@ -65,7 +65,12 @@ export async function initSyncEngine(): Promise<void> {
     return;
   }
 
-  await sqlite.initLocalDB();
+  try {
+    await sqlite.initLocalDB();
+  } catch (error: any) {
+    console.log('SQLite no disponible:', error.message);
+    return;
+  }
 
   await checkConnection();
 
