@@ -27,6 +27,7 @@ import { useAuthStore } from '../store/authStore';
 import { useDatabaseStore, MODULE_ROLES } from '../store/dbStore';
 import InventarioYLogo from '../components/InventarioYLogo';
 import SubscriptionBanner from '../components/SubscriptionBanner';
+import SyncStatus from '../components/SyncStatus';
 import PinModal from '../components/PinModal';
 import StockView from './dashboard/StockView';
 import InventoryView from './dashboard/InventoryView';
@@ -317,6 +318,7 @@ export default function Dashboard() {
         <header className="flex h-16 items-center justify-between border-b border-border/50 bg-surface/80 backdrop-blur-xl px-4 lg:hidden">
           <div className="flex items-center gap-2">
             <InventarioYLogo size="lg" />
+            <SyncStatus />
           </div>
           <button
             onClick={() => setIsMobileMenuOpen(true)}
