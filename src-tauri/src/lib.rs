@@ -5,6 +5,15 @@ use log::info;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_sql::Builder::new().build())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::Builder::new().build())
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .target(tauri_plugin_log::Target::new(
+                    tauri_plugin_log::TargetKind::LogDir { file_name: Some("inventarioy".into()) },
+                ))
+                .build(),
+        )
         .setup(|app| {
             info!("Aplicación Tauri iniciada");
 

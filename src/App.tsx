@@ -10,13 +10,31 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import ConnectionStatus from './components/ConnectionStatus';
+import UpdateNotification from './components/UpdateNotification';
 import { useEffect, useState } from 'react';
 import { initOfflineDB } from './lib/offlineDB';
 import { initSyncEngine } from './lib/syncEngine';
+import { useAutoUpdater } from './hooks/useAutoUpdater';
 
 export default function App() {
   const [isTauri, setIsTauri] = useState(false);
   const [syncEngineReady, setSyncEngineReady] = useState(false);
+  const [appVersion] = useState('1.0.0');
+
+  const {
+    updateInfo,
+    progress,
+    isChecking,
+    isDownloading,
+    error,
+    settings,
+    checkForUpdates,
+    downloadAndInstall,
+    downloadAndInstallWithRetry,
+    dismissUpdate,
+    toggleAutoUpdate,
+    toggleEnabled,
+  } = useAutoUpdater();
 
   useEffect(() => {
     async function checkEnvironment() {
@@ -51,6 +69,12 @@ export default function App() {
     }
   }, [isTauri, syncEngineReady]);
 
+  useEffect(() => {
+    if (isTauri && settings.enabled) {
+      checkForUpdates();
+    }
+  }, [isTauri, settings.enabled]);
+
   return (
     <Router>
       <Toaster 
@@ -67,11 +91,26 @@ export default function App() {
         }}
       />
       <ConnectionStatus />
+      {isTauri && settings.enabled && (
+        <UpdateNotification
+          updateInfo={{
+            available: !!updateInfo?.available,
+            version: updateInfo?.version,
+            currentVersion: updateInfo?.currentVersion || appVersion,
+          }}
+          progress={progress}
+          isDownloading={isDownloading}
+          error={error}
+          onDownload={downloadAndInstall}
+          onRetry={downloadAndInstallWithRetry}
+          onDismiss={dismissUpdate}
+        />
+      )}
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/dashboard/*" element={<Dashboard />} />
+        <Route path="/dashboard/*" element={<Dashboard updateSettings={settings} onToggleAutoUpdate={toggleAutoUpdate} onToggleEnabled={toggleEnabled} />} />
       </Routes>
     </Router>
   );
