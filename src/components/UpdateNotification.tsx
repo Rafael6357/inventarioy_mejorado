@@ -121,3 +121,5 @@ export function UpdateNotification({
 
   return null;
 }
+
+export default UpdateNotification;
