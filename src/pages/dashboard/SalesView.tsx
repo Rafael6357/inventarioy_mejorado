@@ -1030,7 +1030,7 @@ setShowTicket(true);
 
             <div className="mb-6 text-sm text-text-secondary bg-surface-hover p-3 rounded-lg">
               <p><span className="font-medium text-text">Vendedor:</span> {sellerName}</p>
-              <p><span className="font-medium text-text">Tipo:</span> {saleType === 'SALON' ? 'En Salón' : 'A Domicilio'}</p>
+              <p><span className="font-medium text-text">Tipo:</span> {saleType === 'SALON' ? 'En Salón' : saleType === 'DOMICILIO' ? 'A Domicilio' : saleType === 'BAR' ? 'Bar' : saleType === 'VENTA_RAPIDA' ? 'Venta Rápida' : 'Venta'}</p>
             </div>
 
             <div className="mb-4 p-3 bg-surface-hover rounded-lg">

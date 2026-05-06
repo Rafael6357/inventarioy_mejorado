@@ -19,7 +19,12 @@ export function useAutoUpdater() {
   const [error, setError] = useState<UpdateError | null>(null);
   const [settings, setSettings] = useState<UpdateSettings>(DEFAULT_UPDATE_SETTINGS);
 
+  const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+
   useEffect(() => {
+    if (!isTauri) {
+      return;
+    }
     const saved = localStorage.getItem(UPDATE_SETTINGS_KEY);
     if (saved) {
       try {
@@ -38,6 +43,9 @@ export function useAutoUpdater() {
   }, [settings]);
 
   const checkForUpdates = useCallback(async () => {
+    if (!isTauri) {
+      return;
+    }
     if (!settings.enabled) {
       return;
     }
@@ -79,6 +87,9 @@ export function useAutoUpdater() {
   }, [settings.enabled, saveSettings]);
 
   const downloadAndInstall = useCallback(async () => {
+    if (!isTauri) {
+      return;
+    }
     if (!updateInfo?.available || !settings.autoUpdate) {
       return;
     }
@@ -146,6 +157,9 @@ export function useAutoUpdater() {
   }, [saveSettings]);
 
   useEffect(() => {
+    if (!isTauri) {
+      return;
+    }
     if (settings.enabled) {
       checkForUpdates();
     }

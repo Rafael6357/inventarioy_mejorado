@@ -1,9 +1,9 @@
-name: Build Tauri App
+name: Build and Release Tauri App
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
+  push:
+    branches: [release]
 
 jobs:
   build:
@@ -43,6 +43,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         with:
           tagName: v${{ github.ref_name }}-${{ github.run_number }}
           releaseName: 'InventarioY v${{ github.ref_name }}-${{ github.run_number }}'

@@ -29,6 +29,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": ["msi", "nsis"],
     "icon": [
       "icons/32x32.png",
@@ -51,6 +52,12 @@
   "plugins": {
     "sql": {
       "preload": ["sqlite:inventarioy.db"]
+    },
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDI5MTI1MzQ5RDk3NUY5MEIKUldRTCtYWFpTVk1TS2NKQlR6M1JPdVhpdVc5aCtEaXZ3QUd6YzZhWFpRc2ZBWDdSclVXVUpKQnQK",
+      "endpoints": [
+        "https://github.com/Rafael6357/inventarioy_mejorado/releases/latest/download/latest.json"
+      ]
     }
   }
 }
