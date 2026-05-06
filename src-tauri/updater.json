@@ -1,7 +1,0 @@
-{
-  "$schema": "https://github.com/tauri-apps/tauri/raw/v2/crates/tauri-plugin-updater/schema.json",
-  "endpoints": [
-    "https://github.com/Rafael6357/inventarioy_mejorado/releases/latest/download/latest.json"
-  ],
-  "pubkey": ""
-}
