@@ -42,6 +42,28 @@ export default function SalesView() {
   });
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [paymentWarning, setPaymentWarning] = useState<string | null>(null);
+  const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
+  const [pendingSectionCollapsed, setPendingSectionCollapsed] = useState(false);
+
+  const toggleAccountExpansion = (accountId: string) => {
+    setExpandedAccounts(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(accountId)) {
+        newSet.delete(accountId);
+      } else {
+        newSet.add(accountId);
+      }
+      return newSet;
+    });
+  };
+
+  const expandAllAccounts = () => {
+    setExpandedAccounts(new Set(pendingAccounts.map(a => a.id)));
+  };
+
+  const collapseAllAccounts = () => {
+    setExpandedAccounts(new Set());
+  };
 
   useEffect(() => {
     getPendingAccounts();
@@ -602,20 +624,61 @@ setShowTicket(true);
         <div className="flex-shrink-0 h-px bg-border/50 mx-4 mt-3" />
         
         {pendingAccounts && pendingAccounts.length > 0 && (
-          <div className="p-4 pb-2">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-warning flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                Clientes Pendientes ({pendingAccounts.length})
-              </h3>
-            </div>
-            <div className="space-y-2 max-h-48 overflow-y-auto">
+          <div className={`p-4 pb-2 ${pendingSectionCollapsed ? 'py-2' : ''}`}>
+            {pendingSectionCollapsed ? (
+              <div 
+                className="flex items-center justify-between cursor-pointer hover:bg-warning/10 rounded p-2 -mx-2"
+                onClick={() => setPendingSectionCollapsed(false)}
+              >
+                <h3 className="text-sm font-semibold text-warning flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Clientes Pendientes ({pendingAccounts.length})
+                </h3>
+                <span className="text-xs text-warning font-medium">▼ Expandir</span>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-warning flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Clientes Pendientes ({pendingAccounts.length})
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={expandAllAccounts}
+                      className="text-xs px-2 py-1 bg-warning/20 text-warning hover:bg-warning/30 rounded font-medium"
+                    >
+                      Expandir Todos
+                    </button>
+                    <button
+                      onClick={collapseAllAccounts}
+                      className="text-xs px-2 py-1 bg-warning/20 text-warning hover:bg-warning/30 rounded font-medium"
+                    >
+                      Contraer Todos
+                    </button>
+                    <button
+                      onClick={() => setPendingSectionCollapsed(true)}
+                      className="text-xs px-2 py-1 bg-warning/20 text-warning hover:bg-warning/30 rounded font-medium"
+                      title="Contraer sección"
+                    >
+                      ▲
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2 max-h-96 overflow-y-auto overflow-hidden">
               {pendingAccounts.map(account => {
                 const accountItems = (account.items as any[]) || [];
+                const isExpanded = expandedAccounts.has(account.id);
                 return (
                   <div key={account.id} className={`p-3 rounded-lg border ${(account as any).is_account_house ? 'bg-danger/10 border-danger/30' : 'bg-warning/5 border-warning/20'}`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
+                    <div 
+                      className="flex items-center justify-between mb-2 cursor-pointer"
+                      onClick={() => toggleAccountExpansion(account.id)}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-text-secondary">
+                          {isExpanded ? '▼' : '▶'}
+                        </span>
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-medium text-text text-sm">{account.client_name}</p>
                           <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${(account as any).sale_type === 'DOMICILIO' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
@@ -670,13 +733,30 @@ setShowTicket(true);
                         </Button>
                         </div>
                     </div>
+                    {isExpanded && accountItems.length > 0 && (
+                      <div className="mt-2 pt-2 border-t border-border/30 max-h-32 overflow-y-auto">
+                        <p className="text-xs font-medium text-text-secondary mb-1">Items:</p>
+                        <div className="space-y-1">
+                          {accountItems.map((item, index) => (
+                            <div key={index} className="flex items-center justify-between text-xs pl-2">
+                              <span className="text-text">{item.name || item.product_name}</span>
+                              <span className="text-text-secondary">
+                                x{item.quantity} ${((item.price || item.unit_price) * item.quantity).toFixed(2)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
+              </>
+            )}
           </div>
         )}
-        
+
         <div className="flex-1 overflow-y-auto p-4">
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
             {filteredProducts.map(product => (

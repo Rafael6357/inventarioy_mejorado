@@ -21,6 +21,9 @@ export interface User {
   eurEnabled: boolean;
   eurRate: number;
   cupTransferEnabled: boolean;
+  phone: string;
+  address: string;
+  businessHours: string;
 }
 
 interface AuthState {
@@ -296,6 +299,9 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         eurEnabled: profile?.eur_enabled ?? false,
         eurRate: profile?.eur_rate ?? 350,
         cupTransferEnabled: profile?.cup_transfer_enabled ?? false,
+        phone: profile?.phone || '',
+        address: profile?.address || '',
+        businessHours: profile?.business_hours || '',
       };
 
       console.log('Usuario cargado:', user.email, 'role:', user.role, 'subscriptionActive:', user.isSubscriptionActive);

@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { useDatabaseStore } from '../../store/dbStore';
-import { Settings, Save, Building2, User, Shield, Printer, MessageSquare, DollarSign } from 'lucide-react';
+import { Settings, Save, Building2, User, Shield, Printer, MessageSquare, DollarSign, QrCode, Copy, ExternalLink, Download } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
@@ -9,6 +9,7 @@ import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
 import { Switch } from '../../components/ui/switch';
 import AccessPinsConfig from '../../components/AccessPinsConfig';
+import QRCode from 'react-qr-code';
 
 export default function SettingsView() {
   const { user, fetchUser } = useAuthStore();
@@ -18,6 +19,9 @@ export default function SettingsView() {
     businessName: user?.businessName || '',
     generateTicket: user?.generateTicket ?? false,
     ticketMessage: user?.ticketMessage || '¡Gracias por su visita!',
+    phone: user?.phone || '',
+    address: user?.address || '',
+    businessHours: user?.businessHours || '',
   });
   const [currencySettings, setCurrencySettings] = useState({
     usdEnabled: user?.usdEnabled ?? false,
@@ -28,6 +32,7 @@ export default function SettingsView() {
     cupTransferEnabled: user?.cupTransferEnabled ?? false,
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -39,11 +44,26 @@ export default function SettingsView() {
         cupEnabled: true,
         cupTransferEnabled: user.cupTransferEnabled ?? false,
       });
+      setFormData({
+        name: user.name || '',
+        businessName: user.businessName || '',
+        generateTicket: user.generateTicket ?? false,
+        ticketMessage: user.ticketMessage || '¡Gracias por su visita!',
+        phone: user.phone || '',
+        address: user.address || '',
+        businessHours: user.businessHours || '',
+      });
     }
   }, [user]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (isSubmitting) {
+      console.log('Guardado ya en proceso, ignorando...');
+      return;
+    }
+    
     if (!user) return;
     if (!formData.name.trim()) {
       toast.error('El nombre no puede estar vacío');
@@ -57,7 +77,10 @@ export default function SettingsView() {
     const hasFormChanges = formData.name !== user.name || 
       formData.businessName !== user.businessName ||
       formData.generateTicket !== user.generateTicket ||
-      formData.ticketMessage !== user.ticketMessage;
+      formData.ticketMessage !== user.ticketMessage ||
+      formData.phone !== (user.phone || '') ||
+      formData.address !== (user.address || '') ||
+      formData.businessHours !== (user.businessHours || '');
 
     const hasCurrencyChanges = 
       currencySettings.usdEnabled !== (user.usdEnabled ?? false) ||
@@ -72,41 +95,74 @@ export default function SettingsView() {
     }
     
     setIsSaving(true);
+    setIsSubmitting(true);
     
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        name: formData.name,
-        business_name: formData.businessName,
-        generate_ticket: formData.generateTicket,
-        ticket_message: formData.ticketMessage,
-        usd_enabled: currencySettings.usdEnabled,
-        usd_rate: currencySettings.usdRate,
-        eur_enabled: currencySettings.eurEnabled,
-        eur_rate: currencySettings.eurRate,
-        cup_transfer_enabled: currencySettings.cupTransferEnabled,
-      })
-      .eq('id', user.id);
+    console.log('Intentando guardar perfil con datos:', {
+      userId: user.id,
+      phone: formData.phone,
+      address: formData.address,
+      businessHours: formData.businessHours
+    });
+    
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          name: formData.name,
+          business_name: formData.businessName,
+          generate_ticket: formData.generateTicket,
+          ticket_message: formData.ticketMessage,
+          usd_enabled: currencySettings.usdEnabled,
+          usd_rate: currencySettings.usdRate,
+          eur_enabled: currencySettings.eurEnabled,
+          eur_rate: currencySettings.eurRate,
+          cup_transfer_enabled: currencySettings.cupTransferEnabled,
+          phone: formData.phone,
+          address: formData.address,
+          business_hours: formData.businessHours,
+        })
+        .eq('id', user.id);
 
-    if (error) {
-      let errorMessage = 'Error al guardar la configuración';
-      if (error.message.includes('row-level security')) {
-        errorMessage = 'No tienes permisos para modificar estos datos';
-      } else if (error.message.includes('duplicate')) {
-        errorMessage = 'Ya existe un registro con estos datos';
-      } else if (error.message.includes('network') || error.message.includes('fetch')) {
-        errorMessage = 'Error de conexión. Verifica tu internet';
+      console.log('Resultado de guardado:', { error });
+
+      if (error) {
+        let errorMessage = 'Error al guardar la configuración';
+        if (error.message.includes('row-level security')) {
+          errorMessage = 'No tienes permisos para modificar estos datos';
+        } else if (error.message.includes('duplicate')) {
+          errorMessage = 'Ya existe un registro con estos datos';
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+          errorMessage = 'Error de conexión. Verifica tu internet';
+        }
+        console.error('Error guardado:', errorMessage, error);
+        toast.error(errorMessage);
+        setIsSaving(false);
+        setIsSubmitting(false);
+      } else {
+        try {
+          await fetchUser();
+        } catch (fetchError) {
+          console.warn('No se pudo recargar el usuario:', fetchError);
+        }
+        
+        try {
+          await useDatabaseStore.getState().logAction('settings', 'CONFIG', {
+            changes: Object.keys(formData).filter(k => formData[k as keyof typeof formData] !== (user as any)?.[k]).join(', ')
+          });
+        } catch (logError) {
+          console.warn('No se pudo registrar la acción:', logError);
+        }
+        
+        toast.success('Configuración guardada exitosamente');
+        setIsSaving(false);
+        setIsSubmitting(false);
       }
-      toast.error(errorMessage);
-    } else {
-      await fetchUser();
-      await useDatabaseStore.getState().logAction('settings', 'CONFIG', {
-        changes: Object.keys(formData).filter(k => formData[k as keyof typeof formData] !== (user as any)?.[k]).join(', ')
-      });
-      toast.success('Configuración guardada exitosamente');
+    } catch (err) {
+      console.error('Excepción en guardado:', err);
+      toast.error('Error inesperado al guardar');
+      setIsSaving(false);
+      setIsSubmitting(false);
     }
-    
-    setIsSaving(false);
   };
 
   return (
@@ -134,7 +190,7 @@ export default function SettingsView() {
             <div>
               <p className="text-text-secondary">Plan Actual</p>
               <div className="mt-1 inline-flex items-center rounded-full border border-primary/50 bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary shadow-[0_0_10px_rgba(205,164,52,0.2)]">
-                {user?.subscription.status === 'trialing' ? 'Prueba Gratuita' : 'Plan Pro'}
+                {user?.subscription.status === 'trialing' ? 'Prueba Gratuita' : 'Plan Profesional'}
               </div>
             </div>
             {user?.subscription.status === 'trialing' && (
@@ -194,6 +250,48 @@ export default function SettingsView() {
                 />
               </div>
 
+              <div className="space-y-2 pt-4">
+                <Label htmlFor="phone" className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4" />
+                  Teléfono del Negocio
+                </Label>
+                <Input 
+                  id="phone" 
+                  value={formData.phone}
+                  onChange={e => setFormData({...formData, phone: e.target.value})}
+                  placeholder="+53 12345678"
+                  maxLength={20}
+                />
+              </div>
+
+              <div className="space-y-2 pt-4">
+                <Label htmlFor="address" className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4" />
+                  Dirección del Negocio
+                </Label>
+                <Input 
+                  id="address" 
+                  value={formData.address}
+                  onChange={e => setFormData({...formData, address: e.target.value})}
+                  placeholder="Calle 123, Ciudad"
+                  maxLength={200}
+                />
+              </div>
+
+              <div className="space-y-2 pt-4">
+                <Label htmlFor="businessHours" className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4" />
+                  Horario de Atención
+                </Label>
+                <Input 
+                  id="businessHours" 
+                  value={formData.businessHours}
+                  onChange={e => setFormData({...formData, businessHours: e.target.value})}
+                  placeholder="Lun-Vie: 9am-6pm"
+                  maxLength={100}
+                />
+              </div>
+
               <div className="pt-6 border-t border-border mt-4">
                 <h3 className="text-lg font-semibold text-text mb-4 flex items-center gap-2">
                   <Printer className="h-5 w-5" />
@@ -228,6 +326,103 @@ export default function SettingsView() {
                     />
                   </div>
                 )}
+
+                <div className="pt-6 border-t border-border mt-4">
+                  <h3 className="text-lg font-semibold text-text mb-4 flex items-center gap-2">
+                    <QrCode className="h-5 w-5" />
+                    Menú Público Digital
+                  </h3>
+                  
+                  <div className="bg-bg/50 rounded-lg p-4 space-y-4">
+                    <p className="text-sm text-text-secondary">
+                      Imprime este código QR y ponlo en tu negocio. Los clientes lo escanean y ven tu menú digital:
+                    </p>
+                    
+                    {user?.id && (
+                      <div className="flex flex-col items-center">
+                        <div id="qr-code" className="bg-white p-4 rounded-lg">
+                          <QRCode
+                            value={`${window.location.origin}/menu?b=${user.id}`}
+                            size={180}
+                            level="H"
+                          />
+                        </div>
+                        <p className="text-xs text-text-secondary mt-2 text-center">
+                          Escanea para ver el menú
+                        </p>
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center gap-2">
+                      <Input
+                        readOnly
+                        value={user?.id ? `${window.location.origin}/menu?b=${user.id}` : ''}
+                        className="font-mono text-sm bg-bg text-text border-border"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (user?.id) {
+                            navigator.clipboard.writeText(`${window.location.origin}/menu?b=${user.id}`);
+                            toast.success('Enlace copiado al portapapeles');
+                          }
+                        }}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => {
+                        const svg = document.querySelector('#qr-code svg') as SVGElement;
+                        if (svg) {
+                          const svgData = new XMLSerializer().serializeToString(svg);
+                          const canvas = document.createElement('canvas');
+                          const ctx = canvas.getContext('2d');
+                          const img = new Image();
+                          const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+                          const url = URL.createObjectURL(svgBlob);
+                          
+                          img.onload = () => {
+                            canvas.width = 300;
+                            canvas.height = 300;
+                            ctx?.drawImage(img, 0, 0, 300, 300);
+                            const pngUrl = canvas.toDataURL('image/png');
+                            const downloadLink = document.createElement('a');
+                            downloadLink.href = pngUrl;
+                            downloadLink.download = `menu-qr-${user?.name || 'negocio'}.png`;
+                            downloadLink.click();
+                            URL.revokeObjectURL(url);
+                            toast.success('Código QR descargado');
+                          };
+                          img.src = url;
+                        }
+                      }}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Descargar QR
+                    </Button>
+                    
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => window.open(`/menu?b=${user?.id}`, '_blank')}
+                      >
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Ver Menú
+                      </Button>
+                    </div>
+                    
+                    <p className="text-xs text-text-secondary">
+                      Los clientes podrán ver tus productos, precios y estado de disponibilidad sin necesidad de iniciar sesión.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div className="pt-6 border-t border-border mt-4">
@@ -305,7 +500,7 @@ export default function SettingsView() {
               </div>
 
               <div className="pt-4 flex justify-end">
-                <Button type="submit" className="gap-2" disabled={isSaving}>
+                <Button type="submit" className="gap-2" disabled={isSaving || isSubmitting}>
                   <Save className="h-4 w-4" />
                   {isSaving ? 'Guardando...' : 'Guardar Cambios'}
                 </Button>

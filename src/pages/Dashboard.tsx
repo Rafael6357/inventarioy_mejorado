@@ -285,7 +285,7 @@ export default function Dashboard({ updateSettings, onToggleAutoUpdate, onToggle
               <p className="text-sm font-medium text-text">{user.name}</p>
               <p className="text-xs text-text-secondary truncate">{user.email}</p>
               <div className="mt-2 inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                {user.subscription.status === 'trialing' ? 'Prueba Gratis' : 'Plan Pro'}
+                {user.subscription.status === 'trialing' ? 'Prueba Gratis' : 'Plan Profesional'}
               </div>
             </div>
             {verifiedRole && (

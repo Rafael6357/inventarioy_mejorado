@@ -4,13 +4,14 @@ import { Button } from '../components/ui/button';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
 import InventarioYLogo from '../components/InventarioYLogo';
-import { Loader2 } from 'lucide-react';
+import { Loader2, MessageCircle } from 'lucide-react';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [subscriptionExpired, setSubscriptionExpired] = useState(false);
   const navigate = useNavigate();
   const { login, user } = useAuthStore();
 
@@ -39,8 +40,7 @@ export default function Login() {
     
     if (currentUser && !currentUser.isSubscriptionActive) {
       setIsLoading(false);
-      setError('Tu suscripción ha vencido. Adquiere el plan profesional para seguir usando la aplicación.');
-      await useAuthStore.getState().logout();
+      setSubscriptionExpired(true);
       return;
     }
 
@@ -66,6 +66,33 @@ export default function Login() {
           {error && (
             <div className="rounded-xl bg-danger/10 p-3 text-sm text-danger">
               {error}
+            </div>
+          )}
+          
+          {subscriptionExpired && (
+            <div className="rounded-xl bg-warning/10 p-4 border border-warning/30">
+              <p className="text-sm text-danger font-medium mb-3">
+                Tu período de prueba ha vencido. 
+                Contacta al +53 54523884 para renovar tu Plan Profesional y seguir usando la app.
+              </p>
+              <div className="flex flex-col gap-2">
+                <a 
+                  href="https://wa.me/5354523884?text=Hola,%20quiero%20renovar%20mi%20Plan%20Profesional" 
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 w-full py-2 bg-primary text-black rounded-lg font-medium hover:bg-primary/90"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  Contactar a +53 54523884
+                </a>
+                <button
+                  type="button"
+                  onClick={() => window.location.href = '/'}
+                  className="text-sm text-text-secondary text-center hover:text-text"
+                >
+                  Página de inicio
+                </button>
+              </div>
             </div>
           )}
           

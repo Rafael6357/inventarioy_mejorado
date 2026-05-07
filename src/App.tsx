@@ -9,6 +9,7 @@ import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
+import MenuView from './pages/MenuView';
 import ConnectionStatus from './components/ConnectionStatus';
 import UpdateNotification from './components/UpdateNotification';
 import { useEffect, useState } from 'react';
@@ -110,6 +111,7 @@ export default function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/menu" element={<MenuView />} />
         <Route path="/dashboard/*" element={<Dashboard updateSettings={settings} onToggleAutoUpdate={toggleAutoUpdate} onToggleEnabled={toggleEnabled} />} />
       </Routes>
     </Router>
