@@ -97,21 +97,34 @@ export default function App() {
         }}
       />
       <ConnectionStatus />
-      {isTauri && updateInfo?.available && (
-        <div className="fixed top-0 left-0 right-0 z-50 bg-warning text-white px-4 py-3 shadow-lg">
-          <div className="flex items-center justify-between max-w-7xl mx-auto">
-            <div className="flex items-center gap-3">
-              <Download className="h-5 w-5" />
-              <span className="text-sm font-medium">
-                Nueva versión disponible: v{updateInfo.version}
-              </span>
+      {isTauri && updateInfo?.available && !isDownloading && (
+        <div className="fixed bottom-6 right-6 z-50 bg-surface border border-border/50 rounded-xl shadow-lg p-4 w-80 animate-fade-in">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+              <Download className="h-5 w-5 text-primary" />
             </div>
+            <div className="flex-1">
+              <h4 className="text-sm font-semibold text-text">Nueva versión disponible</h4>
+              <p className="text-xs text-text-secondary mt-1">
+                Actualiza a la versión {updateInfo.version} para obtener las últimas mejoras y correcciones.
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2 mt-4">
             <Button 
               onClick={downloadAndInstall} 
               size="sm" 
-              className="bg-white text-warning hover:bg-gray-100"
+              className="flex-1 bg-primary text-black hover:bg-primary/90"
             >
-              Actualizar ahora
+              Instalar y reiniciar
+            </Button>
+            <Button 
+              onClick={dismissUpdate} 
+              variant="outline" 
+              size="sm" 
+              className="flex-1"
+            >
+              Todavía no
             </Button>
           </div>
         </div>

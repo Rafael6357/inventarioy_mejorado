@@ -4,6 +4,8 @@ on:
   workflow_dispatch:
   push:
     branches: [release]
+    tags:
+      - 'v*'
 
 jobs:
   build:
@@ -37,6 +39,22 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
+      - name: Set Version from Tag
+        shell: bash
+        run: |
+          if [[ $GITHUB_REF == refs/tags/v* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+            echo "Setting version to $VERSION"
+            # Update tauri.conf.json
+            sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" src-tauri/tauri.conf.json
+            # Update Cargo.toml
+            sed -i "s/^version = \".*\"/version = \"$VERSION\"/" src-tauri/Cargo.toml
+            # Update App.tsx version
+            sed -i "s/const \[appVersion\] = useState('.*');/const [appVersion] = useState('$VERSION');/" src/App.tsx
+            # Update SettingsView.tsx version
+            sed -i "s/>v.*<\/p/>v$VERSION<\/p>/" src/pages/dashboard/SettingsView.tsx
+          fi
+
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -45,9 +63,9 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         with:
-          tagName: v${{ github.ref_name }}-${{ github.run_number }}
-          releaseName: 'InventarioY v${{ github.ref_name }}-${{ github.run_number }}'
-          releaseBody: 'Build generado automáticamente por GitHub Actions.'
+          tagName: ${{ github.ref_name }}
+          releaseName: 'InventarioY ${{ github.ref_name }}'
+          releaseBody: 'Actualización automática generada por GitHub Actions.'
           releaseDraft: false
           prerelease: false
 
