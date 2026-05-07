@@ -16,6 +16,7 @@ import { useEffect, useState } from 'react';
 import { initOfflineDB } from './lib/offlineDB';
 import { initSyncEngine } from './lib/syncEngine';
 import { useAutoUpdater } from './hooks/useAutoUpdater';
+import { useAuthStore } from './store/authStore';
 
 export default function App() {
   const [isTauri, setIsTauri] = useState(false);
@@ -37,6 +38,8 @@ export default function App() {
     toggleEnabled,
   } = useAutoUpdater();
 
+  const { initialize: initializeAuth } = useAuthStore();
+
   useEffect(() => {
     async function checkEnvironment() {
       const hasTauriGlobal = typeof window !== 'undefined' && (window as any).__TAURI__;
@@ -57,6 +60,7 @@ export default function App() {
     checkEnvironment();
 
     initOfflineDB().catch(err => console.error('Failed to initialize offline DB:', err));
+    initializeAuth();
   }, []);
 
   useEffect(() => {
