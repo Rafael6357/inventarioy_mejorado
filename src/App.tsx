@@ -11,8 +11,9 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import MenuView from './pages/MenuView';
 import ConnectionStatus from './components/ConnectionStatus';
-import UpdateNotification from './components/UpdateNotification';
+import { Button } from './components/ui/button';
 import { useEffect, useState } from 'react';
+import { Download } from 'lucide-react';
 import { initOfflineDB } from './lib/offlineDB';
 import { initSyncEngine } from './lib/syncEngine';
 import { useAutoUpdater } from './hooks/useAutoUpdater';
@@ -96,20 +97,24 @@ export default function App() {
         }}
       />
       <ConnectionStatus />
-      {isTauri && settings.enabled && (
-        <UpdateNotification
-          updateInfo={{
-            available: !!updateInfo?.available,
-            version: updateInfo?.version,
-            currentVersion: updateInfo?.currentVersion || appVersion,
-          }}
-          progress={progress}
-          isDownloading={isDownloading}
-          error={error}
-          onDownload={downloadAndInstall}
-          onRetry={downloadAndInstallWithRetry}
-          onDismiss={dismissUpdate}
-        />
+      {isTauri && updateInfo?.available && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-warning text-white px-4 py-3 shadow-lg">
+          <div className="flex items-center justify-between max-w-7xl mx-auto">
+            <div className="flex items-center gap-3">
+              <Download className="h-5 w-5" />
+              <span className="text-sm font-medium">
+                Nueva versión disponible: v{updateInfo.version}
+              </span>
+            </div>
+            <Button 
+              onClick={downloadAndInstall} 
+              size="sm" 
+              className="bg-white text-warning hover:bg-gray-100"
+            >
+              Actualizar ahora
+            </Button>
+          </div>
+        </div>
       )}
       <Routes>
         <Route path="/" element={<Landing />} />
