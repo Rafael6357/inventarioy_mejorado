@@ -3,7 +3,6 @@ name: Build and Release Tauri App
 on:
   workflow_dispatch:
   push:
-    branches: [release]
     tags:
       - 'v*'
 
