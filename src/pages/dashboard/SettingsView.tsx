@@ -559,7 +559,7 @@ function ActualizacionesSection() {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-text-secondary">Versión actual</p>
-          <p className="text-lg font-medium text-text">v1.0.0</p>
+          <p className="text-lg font-medium text-text">v1.0.1</p>
         </div>
         <div className="flex items-center gap-2">
           {hasUpdate ? (
