@@ -681,8 +681,16 @@ setShowTicket(true);
                         </span>
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-medium text-text text-sm">{account.client_name}</p>
-                          <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${(account as any).sale_type === 'DOMICILIO' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
-                            {(account as any).sale_type === 'DOMICILIO' ? 'DOMICILIO' : 'SALÓN'}
+                          <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                            (account as any).sale_type === 'DOMICILIO' ? 'bg-blue-100 text-blue-700' : 
+                            (account as any).sale_type === 'BAR' ? 'bg-purple-100 text-purple-700' :
+                            (account as any).sale_type === 'VENTA_RAPIDA' ? 'bg-green-100 text-green-700' :
+                            'bg-gray-100 text-gray-600'
+                          }`}>
+                            {(account as any).sale_type === 'SALON' ? 'SALÓN' : 
+                             (account as any).sale_type === 'DOMICILIO' ? 'A DOMICILIO' : 
+                             (account as any).sale_type === 'BAR' ? 'BAR' : 
+                             (account as any).sale_type === 'VENTA_RAPIDA' ? 'VENTA RÁPIDA' : 'SALÓN'}
                           </span>
                           {(account as any).is_account_house && (
                             <span className="text-xs px-1.5 py-0.5 bg-danger/20 text-danger rounded font-medium">CUENTA CASA</span>
