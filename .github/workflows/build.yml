@@ -50,8 +50,6 @@ jobs:
             sed -i "s/^version = \".*\"/version = \"$VERSION\"/" src-tauri/Cargo.toml
             # Update App.tsx version
             sed -i "s/const \[appVersion\] = useState('.*');/const [appVersion] = useState('$VERSION');/" src/App.tsx
-            # Update SettingsView.tsx version
-            sed -i "s/>v.*<\/p/>v$VERSION<\/p>/" src/pages/dashboard/SettingsView.tsx
           fi
 
       - name: Build Tauri app
