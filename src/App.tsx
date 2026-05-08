@@ -22,7 +22,7 @@ import { useAuthStore } from './store/authStore';
 export default function App() {
   const [isTauri, setIsTauri] = useState(false);
   const [syncEngineReady, setSyncEngineReady] = useState(false);
-  const [appVersion, setAppVersion] = useState('1.1.0');
+  const [appVersion, setAppVersion] = useState('1.1.2');
   const [isLoadingVersion, setIsLoadingVersion] = useState(true);
 
   const refreshVersion = async () => {
