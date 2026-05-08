@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from './authStore';
 import { toast } from 'sonner';
+import * as sqliteLocal from '../lib/sqliteLocal';
 import {
   initOfflineDB,
   savePendingSale,
@@ -526,27 +527,83 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
 
     set({ isLoading: true });
 
+    const isTauri = await sqliteLocal.isTauri();
+    const dbReady = isTauri ? await sqliteLocal.isDBReady() : false;
+
+    if (isTauri && dbReady) {
+      console.log('📥 Cargando datos desde SQLite local...');
+      try {
+        const [
+          products, movements, sales, recipes, employees, categories,
+          transitItems, dailyClosings, pendingAccounts, accessPins,
+          actionLogs, hrDocs, departments, payrollConfig
+        ] = await Promise.all([
+          sqliteLocal.queryProducts(),
+          sqliteLocal.queryMovements(),
+          sqliteLocal.querySales(),
+          sqliteLocal.queryRecipes(),
+          sqliteLocal.queryEmployees(),
+          sqliteLocal.queryCategories(),
+          sqliteLocal.queryTransitItems(),
+          sqliteLocal.queryDailyClosings(),
+          sqliteLocal.queryPendingAccounts(),
+          sqliteLocal.queryAccessPins(),
+          sqliteLocal.queryActionLogs(limit),
+          sqliteLocal.queryHRDocuments(),
+          sqliteLocal.queryDepartments(),
+          sqliteLocal.queryPayrollConfig(),
+        ]);
+
+        const salesWithItems = await Promise.all(sales.map(async (sale: any) => {
+          const items = await sqliteLocal.querySaleItems(sale.id);
+          return { ...sale, items };
+        }));
+
+        const recipesWithIngredients = await Promise.all(recipes.map(async (recipe: any) => {
+          const ingredients = await sqliteLocal.queryRecipeIngredients(recipe.id);
+          return { ...recipe, ingredients };
+        }));
+
+        set({
+          products: products.filter((p: any) => p.is_active === 1),
+          movements: movements.slice(0, limit),
+          sales: salesWithItems.slice(0, limit),
+          recipes: recipesWithIngredients,
+          employees,
+          categories,
+          transitItems: transitItems.filter((t: any) => t.remaining > 0),
+          dailyClosings: dailyClosings.slice(0, limit),
+          hrDocuments: hrDocs,
+          departments,
+          payrollConfig,
+          pendingAccounts: pendingAccounts.filter((p: any) => p.status === 'pending'),
+          accessPins,
+          actionLogs: actionLogs.slice(0, limit),
+          isLoading: false,
+        });
+        console.log('✅ Datos cargados desde SQLite');
+        return;
+      } catch (err) {
+        console.warn('Error leyendo de SQLite, cayendo a Supabase:', err);
+      }
+    }
+
+    console.log('📥 Cargando datos desde Supabase...');
     const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
     try {
-      // Grupo 1: Datos principales (los más importantes)
-      console.log('📥 Cargando datos principales...');
       const [productsRes, movementsRes] = await Promise.all([
         supabase.from('products').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(limit),
         supabase.from('movements').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(limit),
       ]);
       await delay(300);
 
-      // Grupo 2: Ventas y Recetas
-      console.log('📥 Cargando ventas y recetas...');
       const [salesRes, recipesRes] = await Promise.all([
         supabase.from('sales').select('*, sale_items(*)').eq('user_id', user.id).order('created_at', { ascending: false }).limit(limit),
         supabase.from('recipes').select('*, recipe_ingredients(*)').eq('user_id', user.id).order('created_at', { ascending: false }).limit(limit),
       ]);
       await delay(300);
 
-      // Grupo 3: Empleados y Recursos Humanos
-      console.log('📥 Cargando empleados y RRHH...');
       const [employeesRes, categoriesRes, hrDocsRes, departmentsRes] = await Promise.all([
         supabase.from('employees').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(limit),
         supabase.from('categories').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(limit),
@@ -555,8 +612,6 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       ]);
       await delay(300);
 
-      // Grupo 4: Cierres, Configuración y Otros
-      console.log('📥 Cargando cierres y configuración...');
       const [transitRes, dailyClosingsRes, pendingRes, accessPinsRes, actionLogsRes, payrollConfigRes] = await Promise.all([
         supabase.from('transit_items').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(limit),
         supabase.from('daily_closings').select('*').eq('user_id', user.id).order('closing_date', { ascending: false }).limit(limit),
@@ -578,6 +633,32 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
 
       const transitItems = (transitRes.data || []).filter(t => t.remaining > 0);
 
+      if (isTauri && dbReady) {
+        try {
+          await sqliteLocal.bulkInsert('products', productsRes.data || []);
+          await sqliteLocal.bulkInsert('movements', movementsRes.data || []);
+          await sqliteLocal.bulkInsert('sales', salesRes.data || []);
+          await sqliteLocal.bulkInsert('sale_items', salesRes.data?.flatMap((s: any) => s.sale_items || []) || []);
+          await sqliteLocal.bulkInsert('recipes', recipesRes.data || []);
+          await sqliteLocal.bulkInsert('recipe_ingredients', recipesRes.data?.flatMap((r: any) => r.recipe_ingredients || []) || []);
+          await sqliteLocal.bulkInsert('employees', employeesRes.data || []);
+          await sqliteLocal.bulkInsert('categories', categoriesRes.data || []);
+          await sqliteLocal.bulkInsert('hr_documents', hrDocsRes.data || []);
+          await sqliteLocal.bulkInsert('departments', departmentsRes.data || []);
+          await sqliteLocal.bulkInsert('transit_items', transitRes.data || []);
+          await sqliteLocal.bulkInsert('daily_closings', dailyClosingsRes.data || []);
+          await sqliteLocal.bulkInsert('pending_accounts', pendingRes.data || []);
+          await sqliteLocal.bulkInsert('access_pins', accessPinsRes.data || []);
+          await sqliteLocal.bulkInsert('action_logs', actionLogsRes.data || []);
+          if (payrollConfigRes.data) {
+            await sqliteLocal.insertPayrollConfig(payrollConfigRes.data);
+          }
+          console.log('✅ Datos guardados en SQLite para uso offline');
+        } catch (syncErr) {
+          console.warn('Error guardando en SQLite:', syncErr);
+        }
+      }
+
       set({
         products: productsRes.data || [],
         movements: movementsRes.data || [],
@@ -595,7 +676,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
         actionLogs: actionLogsRes.data || [],
         isLoading: false,
       });
-      console.log('✅ Datos cargados completamente');
+      console.log('✅ Datos cargados desde Supabase');
     } catch (error) {
       console.error('Error en fetchAll:', error);
       set({ isLoading: false });
@@ -675,14 +756,30 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       throw new Error(`¡Ups! El producto "${product.name}" ya existe. Intenta con otro nombre.`);
     }
 
+    const now = new Date().toISOString();
     const productData = {
       ...product,
+      id: product.id || crypto.randomUUID(),
       name: capitalize(product.name),
       category: capitalize(product.category),
       user_id: user.id,
       expiration_date: product.expiration_date || null,
+      created_at: now,
+      updated_at: now,
     };
 
+    // Escribir a SQLite primero (disponible offline)
+    const isTauri = await sqliteLocal.isTauri();
+    if (isTauri) {
+      try {
+        await sqliteLocal.insertProduct(productData);
+        console.log('Producto guardado en SQLite');
+      } catch (sqliteErr) {
+        console.warn('Error guardando en SQLite:', sqliteErr);
+      }
+    }
+
+    // Luego intentar escribir a Supabase (si hay internet)
     const productPromise = supabase
       .from('products')
       .insert(productData)
@@ -693,24 +790,37 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
 
     if (error) {
       console.error('Error adding product:', error);
+      // El producto ya está en SQLite, se sincronizará después
       throw new Error(error.message || 'Este producto ya existe');
     }
 
     // Crear movimiento inicial si hay cantidad > 0
     if (Number(product.quantity) > 0) {
+      const movementData = {
+        id: crypto.randomUUID(),
+        user_id: user.id,
+        product_id: data.id,
+        type: 'ENTRADA',
+        quantity: Number(product.quantity),
+        unit: product.unit,
+        date: now,
+        cost: Number(product.cost),
+        reason: 'Stock inicial (Registro de producto)',
+        status: 'NORMAL',
+        created_at: now,
+      };
+
+      if (isTauri) {
+        try {
+          await sqliteLocal.insertMovement(movementData);
+        } catch (mErr) {
+          console.warn('Error guardando movimiento en SQLite:', mErr);
+        }
+      }
+
       const { error: movementError } = await supabase
         .from('movements')
-        .insert({
-          user_id: user.id,
-          product_id: data.id,
-          type: 'ENTRADA',
-          quantity: Number(product.quantity),
-          unit: product.unit,
-          date: new Date().toISOString(),
-          cost: Number(product.cost),
-          reason: 'Stock inicial (Registro de producto)',
-          status: 'NORMAL',
-        });
+        .insert(movementData);
 
       if (movementError && import.meta.env.DEV) {
         console.error('Error creating initial movement:', movementError);
@@ -718,16 +828,31 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     }
 
     set((state) => ({ products: [data, ...state.products] }));
-    await get().fetchAll(); // Refrescar todo para asegurar consistencia
+    await get().fetchAll();
   },
 
   updateProduct: async (id, updates) => {
+    const now = new Date().toISOString();
     const capitalizedUpdates = {
       ...updates,
       ...(updates.name !== undefined && { name: capitalize(updates.name) }),
       ...(updates.category !== undefined && { category: capitalize(updates.category) }),
-      updated_at: new Date().toISOString(),
+      updated_at: now,
     };
+
+    // Escribir a SQLite primero
+    const isTauri = await sqliteLocal.isTauri();
+    if (isTauri) {
+      try {
+        const existing = get().products.find(p => p.id === id);
+        if (existing) {
+          await sqliteLocal.updateProduct({ ...existing, ...capitalizedUpdates });
+        }
+      } catch (sqliteErr) {
+        console.warn('Error actualizando en SQLite:', sqliteErr);
+      }
+    }
+
     const { error } = await supabase
       .from('products')
       .update(capitalizedUpdates)
@@ -738,14 +863,29 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     }
 
     set((state) => ({
-      products: state.products.map(p => p.id === id ? { ...p, ...updates, updated_at: new Date().toISOString() } : p),
+      products: state.products.map(p => p.id === id ? { ...p, ...updates, updated_at: now } : p),
     }));
   },
 
   deleteProduct: async (id) => {
+    const now = new Date().toISOString();
+
+    // Escribir a SQLite primero
+    const isTauri = await sqliteLocal.isTauri();
+    if (isTauri) {
+      try {
+        const existing = get().products.find(p => p.id === id);
+        if (existing) {
+          await sqliteLocal.updateProduct({ ...existing, is_active: false, updated_at: now });
+        }
+      } catch (sqliteErr) {
+        console.warn('Error eliminando en SQLite:', sqliteErr);
+      }
+    }
+
     const { error } = await supabase
       .from('products')
-      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .update({ is_active: false, updated_at: now })
       .eq('id', id);
 
     if (error) {
@@ -762,24 +902,42 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     if (!user) return;
 
     const isOnline = navigator.onLine;
-    
-    // Usar la fecha tal cual viene del frontend (ya en formato local)
     const movementDate = movement.date || new Date().toISOString();
+    const now = new Date().toISOString();
+    const movementId = movement.id || crypto.randomUUID();
 
-    // Si está offline, guardar en IndexedDB
+    const movementData = {
+      ...movement,
+      id: movementId,
+      user_id: user.id,
+      date: movementDate,
+      created_at: now,
+    };
+
+    // Escribir a SQLite primero (disponible offline)
+    const isTauri = await sqliteLocal.isTauri();
+    if (isTauri) {
+      try {
+        await sqliteLocal.insertMovement(movementData);
+        console.log('Movimiento guardado en SQLite');
+      } catch (sqliteErr) {
+        console.warn('Error guardando movimiento en SQLite:', sqliteErr);
+      }
+    }
+
+    // Si está offline, guardar también en IndexedDB
     if (!isOnline) {
       try {
         await initOfflineDB();
-        await savePendingMovement({ data: { ...movement, user_id: user.id, date: movementDate } });
+        await savePendingMovement({ data: movementData });
         
-        // Actualizar stock localmente para que el usuario vea el cambio inmediatamente
         const product = get().products.find(p => p.id === movement.product_id);
         if (product && movement.type === 'ENTRADA') {
           let newQuantity = Number(product.quantity) + Number(movement.quantity);
           set((state) => ({
             products: state.products.map(p => 
               p.id === movement.product_id 
-                ? { ...p, quantity: newQuantity, updated_at: new Date().toISOString() } 
+                ? { ...p, quantity: newQuantity, updated_at: now } 
                 : p
             ),
           }));
@@ -788,7 +946,6 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
         toast.success('Movimiento guardado. Se sincronizará cuando haya conexión.');
       } catch (err) {
         console.error('Error saving movement offline:', err);
-        throw new Error('No se pudo guardar el movimiento offline');
       }
       return;
     }
@@ -799,7 +956,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
 
     const movementPromise = supabase
       .from('movements')
-      .insert({ ...movement, user_id: user.id, date: movementDate })
+      .insert(movementData)
       .select()
       .single();
 
@@ -938,6 +1095,47 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       }
     }
 
+    // Preparar datos de la venta
+    const now = new Date().toISOString();
+    const saleId = sale.id || crypto.randomUUID();
+    const saleData = {
+      id: saleId,
+      user_id: user.id,
+      employee_id: sale.employee_id,
+      items: JSON.stringify(sale.items),
+      total_amount: sale.total_amount,
+      date: sale.date || now,
+      sale_type: sale.sale_type || 'SALON',
+      is_account_house: sale.is_account_house || false,
+      notes: sale.notes,
+      discount: sale.discount || 0,
+      created_at: now,
+    };
+
+    // Escribir a SQLite primero (disponible offline)
+    const isTauri = await sqliteLocal.isTauri();
+    if (isTauri) {
+      try {
+        await sqliteLocal.insertSale(saleData);
+        for (const item of sale.items) {
+          await sqliteLocal.insertSaleItem({
+            id: crypto.randomUUID(),
+            sale_id: saleId,
+            product_id: item.product_id,
+            product_name: item.product_name,
+            quantity: item.quantity,
+            unit: item.unit || 'unidad',
+            unit_price: item.selling_price || item.unit_price || 0,
+            total_price: item.subtotal,
+            created_at: now,
+          });
+        }
+        console.log('Venta guardada en SQLite');
+      } catch (sqliteErr) {
+        console.warn('Error guardando venta en SQLite:', sqliteErr);
+      }
+    }
+
     // Si está offline, guardar en IndexedDB
     if (!isOnline) {
       try {
@@ -948,7 +1146,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
             items: sale.items,
             total_amount: sale.total_amount,
             date: sale.date,
-sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
+            sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
             is_account_house: sale.is_account_house || false,
             notes: sale.notes,
             discount: sale.discount,
@@ -983,6 +1181,7 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
     const salePromise = supabase
       .from('sales')
       .insert({ 
+        id: saleId,
         user_id: user.id, 
         employee_id: sale.employee_id,
         total_amount: sale.total_amount,
@@ -1000,7 +1199,7 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
       .select()
       .single();
 
-    const { data: newSale, error: saleError } = await withTimeout(salePromise, 15000); // 15 segundos para ventas
+    const { data: newSale, error: saleError } = await withTimeout(salePromise, 15000);
 
     if (saleError) {
       console.error('Error adding sale:', saleError);
@@ -1008,12 +1207,15 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
     }
 
     const saleItems = sale.items.map(item => ({
-      sale_id: newSale.id,
+      id: crypto.randomUUID(),
+      sale_id: saleId,
       product_id: item.product_id,
+      product_name: item.product_name,
       quantity: item.quantity,
-      unit_cost: item.unit_cost,
-      selling_price: item.selling_price,
-      subtotal: item.subtotal,
+      unit: item.unit || 'unidad',
+      unit_price: item.selling_price || item.unit_price || 0,
+      total_price: item.subtotal,
+      created_at: now,
       is_recipe: item.is_recipe || false,
       recipe_snapshot: item.recipe_snapshot,
     }));
@@ -1043,12 +1245,14 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
     const product = get().products.find(p => p.id === productId);
     if (!product) return { success: false, error: 'Producto no encontrado' };
 
+    const now = new Date().toISOString();
     let remaining = qtyNeeded;
     const transitItemsForProduct = get().transitItems
       .filter(t => t.product_id === productId && t.remaining > 0)
       .sort((a, b) => new Date(a.sent_date).getTime() - new Date(b.sent_date).getTime());
 
     const updatedItems: { id: string; newRemaining: number; newConsumed: number }[] = [];
+    const isTauri = await sqliteLocal.isTauri();
 
     for (const item of transitItemsForProduct) {
       if (remaining <= 0) break;
@@ -1058,10 +1262,17 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
       const newConsumed = item.consumed + toConsume;
       remaining -= toConsume;
 
+      // Escribir a SQLite
+      if (isTauri) {
+        try {
+          await sqliteLocal.updateTransitItem({ ...item, remaining: newRemaining, consumed: newConsumed });
+        } catch (sqliteErr) {}
+      }
+
       if (isOnline) {
         const { error } = await supabase
           .from('transit_items')
-          .update({ remaining: newRemaining, consumed: newConsumed, updated_at: new Date().toISOString() })
+          .update({ remaining: newRemaining, consumed: newConsumed, updated_at: now })
           .eq('id', item.id);
 
         if (error) {
@@ -1352,10 +1563,35 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
     const user = useAuthStore.getState().user;
     if (!user) return { success: false, error: 'No hay usuario autenticado' };
 
+    const now = new Date().toISOString();
+    const accountId = crypto.randomUUID();
+    const accountData = {
+      id: accountId,
+      user_id: user.id,
+      client_name: clientName,
+      items: JSON.stringify([]),
+      amount: 0,
+      description: null,
+      status: 'pending',
+      due_date: null,
+      created_at: now,
+      updated_at: now,
+    };
+
+    const isTauri = await sqliteLocal.isTauri();
+    if (isTauri) {
+      try {
+        await sqliteLocal.insertPendingAccount(accountData);
+      } catch (sqliteErr) {
+        console.warn('Error guardando cuenta pendiente en SQLite:', sqliteErr);
+      }
+    }
+
     const operation = async () => {
       const promise = supabase
         .from('pending_accounts')
         .insert({
+          id: accountId,
           user_id: user.id,
           client_name: clientName,
           items: [],
@@ -1456,9 +1692,23 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
   },
 
   updatePendingAccount: async (accountId: string, updates: Partial<PendingAccount>) => {
+    const now = new Date().toISOString();
+
+    const isTauri = await sqliteLocal.isTauri();
+    if (isTauri) {
+      try {
+        const existing = get().pendingAccounts.find(a => a.id === accountId);
+        if (existing) {
+          await sqliteLocal.updatePendingAccount({ ...existing, ...updates, updated_at: now });
+        }
+      } catch (sqliteErr) {
+        console.warn('Error actualizando cuenta pendiente en SQLite:', sqliteErr);
+      }
+    }
+
     const { error } = await supabase
       .from('pending_accounts')
-      .update({ ...updates, updated_at: new Date().toISOString() })
+      .update({ ...updates, updated_at: now })
       .eq('id', accountId);
 
     if (error) {
@@ -1498,40 +1748,62 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
     const account = get().pendingAccounts.find(a => a.id === accountId);
     if (!account) return { success: false, error: 'Cuenta no encontrada' };
 
+    const now = new Date().toISOString();
+
     // Devolver productos al tránsito
     const accountItems = account.items as any[] || [];
+    const isTauri = await sqliteLocal.isTauri();
+
     for (const item of accountItems) {
       const product = get().products.find(p => p.id === item.product_id);
       
       if (product?.is_recipe && product.recipe_ingredients) {
-        // Si es receta, devolver cada ingrediente
         for (const ing of product.recipe_ingredients) {
           const qtyToReturn = ing.quantity * item.quantity;
-          // Buscar transit item existente y sumar
           const transitItem = get().transitItems.find(t => t.product_id === ing.product_id);
           if (transitItem) {
+            const newRemaining = transitItem.remaining + qtyToReturn;
+            if (isTauri) {
+              try {
+                await sqliteLocal.updateTransitItem({ ...transitItem, remaining: newRemaining });
+              } catch (e) {}
+            }
             await supabase
               .from('transit_items')
-              .update({ remaining: transitItem.remaining + qtyToReturn })
+              .update({ remaining: newRemaining })
               .eq('id', transitItem.id);
           }
         }
       } else {
-        // Si no es receta, devolver el producto directo
         const qtyToReturn = item.quantity;
         const transitItem = get().transitItems.find(t => t.product_id === item.product_id);
         if (transitItem) {
+          const newRemaining = transitItem.remaining + qtyToReturn;
+          if (isTauri) {
+            try {
+              await sqliteLocal.updateTransitItem({ ...transitItem, remaining: newRemaining });
+            } catch (e) {}
+          }
           await supabase
             .from('transit_items')
-            .update({ remaining: transitItem.remaining + qtyToReturn })
+            .update({ remaining: newRemaining })
             .eq('id', transitItem.id);
         }
       }
     }
 
+    // Escribir a SQLite
+    if (isTauri) {
+      try {
+        await sqliteLocal.updatePendingAccount({ ...account, status: 'cancelled', updated_at: now });
+      } catch (sqliteErr) {
+        console.warn('Error actualizando cuenta pendiente en SQLite:', sqliteErr);
+      }
+    }
+
     const { error } = await supabase
       .from('pending_accounts')
-      .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+      .update({ status: 'cancelled', updated_at: now })
       .eq('id', accountId);
 
     if (error) {
@@ -1641,18 +1913,44 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
 
     const existingPin = get().accessPins.find(p => p.role === role);
     const pinHash = await get().hashPin(pin);
+    const now = new Date().toISOString();
+    const isTauri = await sqliteLocal.isTauri();
 
     if (existingPin) {
+      const updatedData = { pin_hash: pinHash, is_active: true, failed_attempts: 0, blocked_until: null };
+      
+      if (isTauri) {
+        try {
+          await sqliteLocal.updateAccessPin({ ...existingPin, ...updatedData });
+        } catch (sqliteErr) {}
+      }
+
       const { error } = await supabase
         .from('access_pins')
-        .update({ pin_hash: pinHash, is_active: true, failed_attempts: 0, blocked_until: null })
+        .update(updatedData)
         .eq('id', existingPin.id);
 
       if (error) return { success: false, error: error.message };
     } else {
+      const pinData = {
+        id: crypto.randomUUID(),
+        user_id: user.id,
+        pin: pinHash,
+        role,
+        blocked_until: null,
+        failed_attempts: 0,
+        created_at: now,
+      };
+
+      if (isTauri) {
+        try {
+          await sqliteLocal.insertAccessPin(pinData);
+        } catch (sqliteErr) {}
+      }
+
       const { error } = await supabase
         .from('access_pins')
-        .insert({ user_id: user.id, role, pin_hash: pinHash });
+        .insert(pinData);
 
       if (error) return { success: false, error: error.message };
     }
@@ -1663,6 +1961,16 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
   },
 
   toggleAccessPin: async (pinId: string, isActive: boolean) => {
+    const isTauri = await sqliteLocal.isTauri();
+    if (isTauri) {
+      try {
+        const existing = get().accessPins.find(p => p.id === pinId);
+        if (existing) {
+          await sqliteLocal.updateAccessPin({ ...existing, is_active: isActive });
+        }
+      } catch (sqliteErr) {}
+    }
+
     const { error } = await supabase
       .from('access_pins')
       .update({ is_active: isActive })
@@ -1679,6 +1987,13 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
   },
 
   deleteAccessPin: async (pinId: string) => {
+    const isTauri = await sqliteLocal.isTauri();
+    if (isTauri) {
+      try {
+        await sqliteLocal.deleteAccessPin(pinId);
+      } catch (sqliteErr) {}
+    }
+
     const { error } = await supabase
       .from('access_pins')
       .delete()
@@ -1788,6 +2103,23 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
     const role = verifiedRole || activePin?.role || user.role || 'owner';
     const roleLabel = verifiedRole ? ROLE_LABELS[verifiedRole] : (activePin ? ROLE_LABELS[activePin.role] : (user.name || 'Dueño/a'));
     
+    const now = new Date().toISOString();
+    const logData = {
+      id: crypto.randomUUID(),
+      user_id: user.id,
+      action: `${module}:${action}`,
+      entity_type: module,
+      details: JSON.stringify(details),
+      created_at: now,
+    };
+
+    const isTauri = await sqliteLocal.isTauri();
+    if (isTauri) {
+      try {
+        await sqliteLocal.insertActionLog(logData);
+      } catch (sqliteErr) {}
+    }
+
     await supabase.from('action_logs').insert({
       user_id: user.id,
       role: role,
@@ -1795,7 +2127,7 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
       module,
       action,
       details,
-      created_at: new Date().toISOString(),
+      created_at: now,
     });
   },
 
@@ -1818,9 +2150,41 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
     const user = useAuthStore.getState().user;
     if (!user) return;
 
+    const now = new Date().toISOString();
+    const recipeId = crypto.randomUUID();
+    const recipeData = {
+      id: recipeId,
+      user_id: user.id,
+      name: capitalize(recipe.name),
+      selling_price: recipe.selling_price,
+      ingredients: JSON.stringify(recipe.ingredients),
+      created_at: now,
+    };
+
+    const isTauri = await sqliteLocal.isTauri();
+    if (isTauri) {
+      try {
+        await sqliteLocal.insertRecipe(recipeData);
+        for (const ing of recipe.ingredients) {
+          await sqliteLocal.insertRecipeIngredient({
+            id: crypto.randomUUID(),
+            recipe_id: recipeId,
+            product_id: ing.product_id,
+            product_name: ing.product_name,
+            quantity: ing.quantity,
+            unit: ing.unit,
+            created_at: now,
+          });
+        }
+      } catch (sqliteErr) {
+        console.warn('Error guardando receta en SQLite:', sqliteErr);
+      }
+    }
+
     const { data: newRecipe, error } = await supabase
       .from('recipes')
       .insert({ 
+        id: recipeId,
         user_id: user.id, 
         name: capitalize(recipe.name), 
         selling_price: recipe.selling_price 
@@ -1834,10 +2198,13 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
 
     if (recipe.ingredients.length > 0) {
       const ingredients = recipe.ingredients.map(ing => ({
-        recipe_id: newRecipe.id,
+        id: crypto.randomUUID(),
+        recipe_id: recipeId,
         product_id: ing.product_id,
+        product_name: ing.product_name,
         quantity: ing.quantity,
         unit: ing.unit,
+        created_at: now,
       }));
 
       await supabase.from('recipe_ingredients').insert(ingredients);
@@ -1895,10 +2262,28 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
     const user = useAuthStore.getState().user;
     if (!user) throw new Error('No hay usuario autenticado');
 
+    const now = new Date().toISOString();
+    const employeeData = {
+      ...employee,
+      id: employee.id || crypto.randomUUID(),
+      name: capitalize(employee.name),
+      user_id: user.id,
+      created_at: now,
+    };
+
+    const isTauri = await sqliteLocal.isTauri();
+    if (isTauri) {
+      try {
+        await sqliteLocal.insertEmployee(employeeData);
+      } catch (sqliteErr) {
+        console.warn('Error guardando empleado en SQLite:', sqliteErr);
+      }
+    }
+
     const operation = async () => {
       const promise = supabase
         .from('employees')
-        .insert({ ...employee, name: capitalize(employee.name), user_id: user.id })
+        .insert(employeeData)
         .select()
         .single();
 
@@ -1922,6 +2307,19 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
       ...updates,
       ...(updates.name !== undefined && { name: capitalize(updates.name) }),
     };
+
+    const isTauri = await sqliteLocal.isTauri();
+    if (isTauri) {
+      try {
+        const existing = get().employees.find(e => e.id === id);
+        if (existing) {
+          await sqliteLocal.updateEmployee({ ...existing, ...capitalizedUpdates });
+        }
+      } catch (sqliteErr) {
+        console.warn('Error actualizando empleado en SQLite:', sqliteErr);
+      }
+    }
+
     const { error } = await supabase.from('employees').update(capitalizedUpdates).eq('id', id);
 
     if (error) {
@@ -1934,6 +2332,15 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
   },
 
   deleteEmployee: async (id) => {
+    const isTauri = await sqliteLocal.isTauri();
+    if (isTauri) {
+      try {
+        await sqliteLocal.deleteEmployee(id);
+      } catch (sqliteErr) {
+        console.warn('Error eliminando empleado en SQLite:', sqliteErr);
+      }
+    }
+
     const { error } = await supabase.from('employees').delete().eq('id', id);
 
     if (error) {
@@ -1947,10 +2354,27 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
     const user = useAuthStore.getState().user;
     if (!user) throw new Error('No hay usuario autenticado');
 
+    const now = new Date().toISOString();
+    const deptData = {
+      id: crypto.randomUUID(),
+      user_id: user.id,
+      name: capitalize(name),
+      created_at: now,
+    };
+
+    const isTauri = await sqliteLocal.isTauri();
+    if (isTauri) {
+      try {
+        await sqliteLocal.insertDepartment(deptData);
+      } catch (sqliteErr) {
+        console.warn('Error guardando departamento en SQLite:', sqliteErr);
+      }
+    }
+
     const operation = async () => {
       const promise = supabase
         .from('departments')
-        .insert({ name: capitalize(name), user_id: user.id })
+        .insert(deptData)
         .select()
         .single();
 
@@ -1970,6 +2394,18 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
   },
 
   updateDepartment: async (id, name) => {
+    const isTauri = await sqliteLocal.isTauri();
+    if (isTauri) {
+      try {
+        const existing = get().departments.find(d => d.id === id);
+        if (existing) {
+          await sqliteLocal.updateDepartment({ ...existing, name: capitalize(name) });
+        }
+      } catch (sqliteErr) {
+        console.warn('Error actualizando departamento en SQLite:', sqliteErr);
+      }
+    }
+
     const { error } = await supabase.from('departments').update({ name: capitalize(name) }).eq('id', id);
 
     if (error) {
@@ -1982,6 +2418,15 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
   },
 
   deleteDepartment: async (id) => {
+    const isTauri = await sqliteLocal.isTauri();
+    if (isTauri) {
+      try {
+        await sqliteLocal.deleteDepartment(id);
+      } catch (sqliteErr) {
+        console.warn('Error eliminando departamento en SQLite:', sqliteErr);
+      }
+    }
+
     const { error } = await supabase.from('departments').delete().eq('id', id);
 
     if (error) {
@@ -2099,6 +2544,37 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
     });
 
     if (entriesToInsert.length > 0) {
+      const now = new Date().toISOString();
+      const isTauri = await sqliteLocal.isTauri();
+
+      // Escribir a SQLite
+      if (isTauri) {
+        try {
+          for (const entry of entriesToInsert) {
+            const entryData = {
+              id: crypto.randomUUID(),
+              user_id: user.id,
+              employee_id: entry.employee_id,
+              month,
+              year,
+              regular_hours: 0,
+              overtime_hours: 0,
+              night_hours: 0,
+              holiday_hours: 0,
+              base_salary: entry.base_salary,
+              bonuses: 0,
+              deductions: 0,
+              total_salary: entry.net_salary,
+              status: 'completed',
+              created_at: now,
+            };
+            await sqliteLocal.insertPayrollEntry(entryData);
+          }
+        } catch (sqliteErr) {
+          console.warn('Error guardando nómina en SQLite:', sqliteErr);
+        }
+      }
+
       const { data, error } = await supabase.from('payroll_entries').insert(entriesToInsert).select();
       if (error) {
         throw new Error('No se pudo generar la nómina');
@@ -2108,6 +2584,12 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
         payrollEntries: data || [],
         payrollConfig: state.payrollConfig ? { ...state.payrollConfig, last_calculated_month: monthStr } : null,
       }));
+
+      if (isTauri && get().payrollConfig) {
+        try {
+          await sqliteLocal.updatePayrollConfig({ ...get().payrollConfig!, last_calculated_month: monthStr, updated_at: now });
+        } catch (e) {}
+      }
 
       await supabase.from('payroll_config').update({ last_calculated_month: monthStr }).eq('user_id', user.id);
     }
@@ -2397,9 +2879,26 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
     const user = useAuthStore.getState().user;
     if (!user) return;
 
+    const now = new Date().toISOString();
+    const categoryData = {
+      id: crypto.randomUUID(),
+      user_id: user.id,
+      name: capitalize(name),
+      created_at: now,
+    };
+
+    const isTauri = await sqliteLocal.isTauri();
+    if (isTauri) {
+      try {
+        await sqliteLocal.insertCategory(categoryData);
+      } catch (sqliteErr) {
+        console.warn('Error guardando categoría en SQLite:', sqliteErr);
+      }
+    }
+
     const { data, error } = await supabase
       .from('categories')
-      .insert({ user_id: user.id, name: capitalize(name) })
+      .insert(categoryData)
       .select()
       .single();
 
@@ -2411,6 +2910,15 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
   },
 
   deleteCategory: async (id) => {
+    const isTauri = await sqliteLocal.isTauri();
+    if (isTauri) {
+      try {
+        await sqliteLocal.deleteCategory(id);
+      } catch (sqliteErr) {
+        console.warn('Error eliminando categoría en SQLite:', sqliteErr);
+      }
+    }
+
     const { error } = await supabase.from('categories').delete().eq('id', id);
 
     if (error) {
@@ -2442,30 +2950,49 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
     if (!user) return { success: false, error: 'No autenticado' };
 
     const isOnline = navigator.onLine;
+    const now = new Date().toISOString();
+    const closingId = closing.id || crypto.randomUUID();
+
+    const closingData = {
+      id: closingId,
+      user_id: user.id,
+      closing_date: closing.closing_date,
+      total_sales: closing.total_sales,
+      total_discounts: closing.total_discounts,
+      total_refunds: closing.total_refunds,
+      closing_amount: closing.closing_amount,
+      notes: closing.notes,
+      created_by: closing.created_by,
+      created_by_name: closing.created_by_name,
+      cup_efectivo: closing.cup_efectivo || 0,
+      cup_transfer: closing.cup_transfer || 0,
+      usd: closing.usd || 0,
+      eur: closing.eur || 0,
+      created_at: now,
+    };
+
+    // Escribir a SQLite primero
+    const isTauri = await sqliteLocal.isTauri();
+    if (isTauri) {
+      try {
+        await sqliteLocal.insertDailyClosing(closingData);
+        console.log('Cierre de caja guardado en SQLite');
+      } catch (sqliteErr) {
+        console.warn('Error guardando cierre en SQLite:', sqliteErr);
+      }
+    }
 
     // Si está offline, guardar en IndexedDB
     if (!isOnline) {
       try {
         await initOfflineDB();
-        await savePendingClosing({
-          data: {
-            closing_date: closing.closing_date,
-            total_sales: closing.total_sales,
-            total_discounts: closing.total_discounts,
-            total_refunds: closing.total_refunds,
-            closing_amount: closing.closing_amount,
-            notes: closing.notes,
-            created_by: closing.created_by,
-            created_by_name: closing.created_by_name,
-          },
-        });
+        await savePendingClosing({ data: closingData });
 
-        // Actualizar el estado local para que el usuario vea el cierre
         const tempClosing = {
-          id: `offline-${Date.now()}`,
+          id: closingId,
           user_id: user.id,
           ...closing,
-          created_at: new Date().toISOString(),
+          created_at: now,
         };
         
         set((state) => ({ dailyClosings: [tempClosing, ...state.dailyClosings] }));
@@ -2480,7 +3007,7 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
     // Si está online, proceder normalmente
     const closingPromise = supabase
       .from('daily_closings')
-      .insert({ ...closing, user_id: user.id })
+      .insert(closingData)
       .select()
       .single();
 
@@ -2554,10 +3081,29 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
     const { data: urlData } = supabase.storage.from('hr-documents').getPublicUrl(filePath);
 
     const docName = file.name.replace(`.${fileExt}`, '').replace(/_/g, ' ').replace(/[.-]/g, ' ');
+    const now = new Date().toISOString();
+    const docId = crypto.randomUUID();
+
+    const docData = {
+      id: docId,
+      user_id: user.id,
+      type: docType,
+      title: docName,
+      file_url: urlData.publicUrl,
+      created_at: now,
+    };
+
+    const isTauri = await sqliteLocal.isTauri();
+    if (isTauri) {
+      try {
+        await sqliteLocal.insertHRDocument(docData);
+      } catch (sqliteErr) {}
+    }
 
     const { error: dbError } = await supabase
       .from('hr_documents')
       .insert({
+        id: docId,
         user_id: user.id,
         name: docName,
         doc_type: docType,
@@ -2593,6 +3139,13 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
   },
 
   deleteHRDocument: async (id: string, fileUrl: string) => {
+    const isTauri = await sqliteLocal.isTauri();
+    if (isTauri) {
+      try {
+        await sqliteLocal.deleteHRDocument(id);
+      } catch (sqliteErr) {}
+    }
+
     const { error: dbError } = await supabase
       .from('hr_documents')
       .delete()
@@ -2631,10 +3184,30 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
     const { data: urlData } = supabase.storage.from('hr-documents').getPublicUrl(filePath);
 
     const docName = name || file.name.replace(`.${fileExt}`, '').replace(/_/g, ' ').replace(/[.-]/g, ' ');
+    const now = new Date().toISOString();
+    const docId = crypto.randomUUID();
+
+    const docData = {
+      id: docId,
+      user_id: user.id,
+      employee_id: employeeId,
+      type: docType,
+      title: docName,
+      file_url: urlData.publicUrl,
+      created_at: now,
+    };
+
+    const isTauri = await sqliteLocal.isTauri();
+    if (isTauri) {
+      try {
+        await sqliteLocal.insertEmployeeDocument(docData);
+      } catch (sqliteErr) {}
+    }
 
     const { error: dbError } = await supabase
       .from('employee_documents')
       .insert({
+        id: docId,
         user_id: user.id,
         employee_id: employeeId,
         name: docName,
@@ -2671,6 +3244,13 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
   },
 
   deleteEmployeeDocument: async (id: string, fileUrl: string) => {
+    const isTauri = await sqliteLocal.isTauri();
+    if (isTauri) {
+      try {
+        await sqliteLocal.deleteEmployeeDocument(id);
+      } catch (sqliteErr) {}
+    }
+
     const { error: dbError } = await supabase
       .from('employee_documents')
       .delete()

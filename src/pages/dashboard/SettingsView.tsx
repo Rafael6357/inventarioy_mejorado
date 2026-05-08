@@ -11,8 +11,15 @@ import { toast } from 'sonner';
 import { Switch } from '../../components/ui/switch';
 import AccessPinsConfig from '../../components/AccessPinsConfig';
 import QRCode from 'react-qr-code';
+import { RefreshCw } from 'lucide-react';
 
-export default function SettingsView() {
+interface SettingsViewProps {
+  appVersion?: string;
+  isLoadingVersion?: boolean;
+  onRefreshVersion?: () => void;
+}
+
+export default function SettingsView({ appVersion = '1.0.0', isLoadingVersion = false, onRefreshVersion }: SettingsViewProps) {
   const { user, fetchUser } = useAuthStore();
   
   const [formData, setFormData] = useState({
@@ -506,7 +513,11 @@ export default function SettingsView() {
                   Actualizaciones
                 </h3>
                 
-                <ActualizacionesSection />
+                <ActualizacionesSection 
+                  appVersion={appVersion} 
+                  isLoadingVersion={isLoadingVersion} 
+                  onRefreshVersion={onRefreshVersion} 
+                />
               </div>
 
               <div className="pt-4 flex justify-end">
@@ -528,7 +539,15 @@ export default function SettingsView() {
   );
 }
 
-function ActualizacionesSection() {
+function ActualizacionesSection({ 
+  appVersion, 
+  isLoadingVersion, 
+  onRefreshVersion 
+}: { 
+  appVersion: string, 
+  isLoadingVersion: boolean, 
+  onRefreshVersion?: () => void 
+}) {
   const { 
     updateInfo, 
     isChecking, 
@@ -559,9 +578,28 @@ function ActualizacionesSection() {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-text-secondary">Versión actual</p>
-          <p className="text-lg font-medium text-text">v1.0.1</p>
+          {isLoadingVersion ? (
+            <p className="text-lg font-medium text-text flex items-center gap-2">
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              Cargando...
+            </p>
+          ) : (
+            <p className="text-lg font-medium text-text">v{appVersion}</p>
+          )}
         </div>
         <div className="flex items-center gap-2">
+          {onRefreshVersion && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onRefreshVersion}
+              disabled={isLoadingVersion}
+              className="flex items-center gap-1"
+            >
+              <RefreshCw className={`h-3 w-3 ${isLoadingVersion ? 'animate-spin' : ''}`} />
+              Actualizar
+            </Button>
+          )}
           {hasUpdate ? (
             <span className="flex items-center gap-1 text-sm text-warning font-medium">
               <AlertCircle className="h-4 w-4" />

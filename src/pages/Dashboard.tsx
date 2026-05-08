@@ -51,9 +51,12 @@ interface DashboardProps {
   updateSettings?: UpdateSettings;
   onToggleAutoUpdate?: (enabled: boolean) => void;
   onToggleEnabled?: (enabled: boolean) => void;
+  appVersion?: string;
+  isLoadingVersion?: boolean;
+  onRefreshVersion?: () => void;
 }
 
-export default function Dashboard({ updateSettings, onToggleAutoUpdate, onToggleEnabled }: DashboardProps) {
+export default function Dashboard({ updateSettings, onToggleAutoUpdate, onToggleEnabled, appVersion = '1.0.0', isLoadingVersion = false, onRefreshVersion }: DashboardProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const sidebarTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -350,7 +353,7 @@ export default function Dashboard({ updateSettings, onToggleAutoUpdate, onToggle
             <Route path="/charts" element={<ChartsView />} />
             <Route path="/filtered" element={<FilteredCenterView />} />
             <Route path="/ai" element={<AIView />} />
-            <Route path="/settings" element={<SettingsView />} />
+            <Route path="/settings" element={<SettingsView appVersion={appVersion} isLoadingVersion={isLoadingVersion} onRefreshVersion={onRefreshVersion} />} />
             <Route path="/action-logs" element={<ActionLogsView />} />
             {user.role === 'admin' && (
               <Route path="/payments" element={<PaymentsView />} />

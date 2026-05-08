@@ -1,5 +1,16 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
+import { Store } from '@tauri-apps/plugin-store';
+import { initialDataLoad } from '../lib/syncEngine';
+
+let _authStore: Store | null = null;
+
+async function getAuthStore(): Promise<Store> {
+  if (!_authStore) {
+    _authStore = await Store.load('auth_store.json');
+  }
+  return _authStore;
+}
 
 export interface User {
   id: string;
@@ -139,93 +150,189 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   initialize: async () => {
     if (_isInitializing) {
-      console.log('initialize ya está en progreso, ignorando...');
+      console.log('🔐 initialize ya está en progreso, ignorando...');
       return;
     }
     _isInitializing = true;
-    console.log('Inicializando autenticación...');
+    console.log('🔐 ========== INICIALIZANDO AUTH ==========');
 
+    // Buscar tokens de sesión guardados (funciona offline)
+    let savedSession: string | null = null;
+    let savedCredentials: string | null = null;
+    let savedEmail: string | null = null;
+    
+    console.log('🔐 Paso 1: Buscando tokens de sesión...');
+    
+    // Primero buscar tokens de sesión (permite restore sin red)
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
-
+      const store = await getAuthStore();
+      savedSession = await store.get<string>('saved_session');
+      savedCredentials = await store.get<string>('saved_credentials');
+      savedEmail = await store.get<string>('saved_email');
+      console.log('🔐 - Tokens de sesión encontrados:', savedSession ? 'SÍ' : 'NO');
+      console.log('🔐 - Credenciales encontradas:', savedCredentials ? 'SÍ' : 'NO');
+    } catch (storeErr) {
+      console.warn('🔐 Error leyendo Tauri Store, intentando localStorage:', storeErr);
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        clearTimeout(timeoutId);
+        savedSession = localStorage.getItem('saved_session');
+        savedCredentials = localStorage.getItem('saved_credentials');
+        savedEmail = localStorage.getItem('saved_email');
+      } catch (lsErr) {
+        console.warn('🔐 Error leyendo localStorage:', lsErr);
+      }
+    }
+
+    // INTENTO 1: Restaurar sesión con tokens guardados (funciona SIN internet si el token es válido)
+    if (savedSession) {
+      console.log('🔐 ========== INTENTO 1: Restaurar con tokens ==========');
+      try {
+        const sessionData = JSON.parse(atob(savedSession));
+        console.log('🔐 - Token encontrado, intentando restaurar sesión...');
         
-        if (session?.user) {
+        // Intentar establecer la sesión con el token guardado (sin llamada a Supabase)
+        // Esto funciona offline si el token no ha expirado
+        const { data: sessionDataResult, error: sessionError } = await supabase.auth.setSession({
+          access_token: sessionData.access_token,
+          refresh_token: sessionData.refresh_token,
+        });
+        
+        if (!sessionError && sessionDataResult?.user) {
+          console.log('🔐 ========== SESIÓN RESTAURADA CON TOKEN (OFFLINE) ==========');
+          console.log('🔐 Usuario:', sessionDataResult.user.email);
           await get().fetchUser();
-        } else {
-          // Intentar login automático con credenciales guardadas
-          const savedCredentials = localStorage.getItem('saved_credentials');
-          if (savedCredentials) {
-            try {
-              const creds = JSON.parse(atob(savedCredentials));
-              const { error: signInError } = await supabase.auth.signInWithPassword({
-                email: creds.email,
-                password: creds.password,
-              });
-              if (!signInError) {
+          
+          if (!_authListenerSubscription) {
+            console.log('🔐 Creando listener de autenticación...');
+            _authListenerSubscription = supabase.auth.onAuthStateChange(async (event, session) => {
+              console.log('🔐 Auth state change:', event);
+              if (event === 'SIGNED_IN' && session?.user) {
                 await get().fetchUser();
-              } else {
-                // Credenciales inválidas, limpiar
-                localStorage.removeItem('saved_credentials');
-                localStorage.removeItem('saved_email');
-                set({ isLoading: false });
+              } else if (event === 'SIGNED_OUT') {
+                console.log('🔐 Sesión cerrada por Supabase (token expiró?)');
+                set({ user: null, isAuthenticated: false, isLoading: false });
               }
-            } catch (autoLoginErr) {
-              console.warn('Login automático falló:', autoLoginErr);
-              set({ isLoading: false });
-            }
-          } else {
-            set({ isLoading: false });
+            });
           }
+          _isInitializing = false;
+          return;
+        } else {
+          console.warn('🔐 Token inválido o expirado:', sessionError?.message);
+          // El token expiró, continue al intento 2
         }
-      } catch (abortErr: any) {
-        clearTimeout(timeoutId);
-        if (abortErr.name === 'AbortError') {
-          console.warn('Timeout en getSession');
+      } catch (tokenErr) {
+        console.warn('🔐 Error restaurando con token:', tokenErr);
+      }
+    }
+
+    // INTENTO 2: Login con credenciales (requiere internet)
+    if (savedCredentials) {
+      console.log('🔐 ========== INTENTO 2: Login con credenciales ==========');
+      console.log('🔐 - Intentando login con credenciales guardadas...');
+      try {
+        const creds = JSON.parse(atob(savedCredentials));
+        const { data, error: signInError } = await supabase.auth.signInWithPassword({
+          email: creds.email,
+          password: creds.password,
+        });
+        
+        if (!signInError && data?.user) {
+          console.log('🔐 ========== LOGIN CON CREDENCIALES EXITOSO ==========');
+          console.log('🔐 Usuario:', data.user.email);
+          
+          // Guardar los nuevos tokens para futuras veces
+          if (data.session) {
+            const newSessionData = btoa(JSON.stringify({
+              access_token: data.session.access_token,
+              refresh_token: data.session.refresh_token,
+              expires_at: data.session.expires_at,
+              expires_in: data.session.expires_in,
+            }));
+            try {
+              const store = await getAuthStore();
+              await store.set('saved_session', newSessionData);
+              await store.save();
+              console.log('🔐 Nuevos tokens guardados');
+            } catch (e) {
+              localStorage.setItem('saved_session', newSessionData);
+            }
+          }
+          
+          await get().fetchUser();
+          
+          if (!_authListenerSubscription) {
+            console.log('🔐 Creando listener de autenticación...');
+            _authListenerSubscription = supabase.auth.onAuthStateChange(async (event, session) => {
+              console.log('🔐 Auth state change:', event);
+              if (event === 'SIGNED_IN' && session?.user) {
+                await get().fetchUser();
+              } else if (event === 'SIGNED_OUT') {
+                set({ user: null, isAuthenticated: false, isLoading: false });
+              }
+            });
+          }
+          _isInitializing = false;
+          return;
+        } else {
+          console.warn('🔐 Credenciales inválidas:', signInError?.message);
+          // Credenciales inválidas, limpiar
+          try {
+            const store = await getAuthStore();
+            await store.delete('saved_credentials');
+            await store.delete('saved_email');
+            await store.delete('saved_session');
+            await store.save();
+          } catch (cleanErr) {
+            localStorage.removeItem('saved_credentials');
+            localStorage.removeItem('saved_email');
+            localStorage.removeItem('saved_session');
+          }
           set({ isLoading: false });
           _isInitializing = false;
           return;
         }
-        throw abortErr;
+      } catch (autoLoginErr) {
+        console.warn('🔐 Login automático falló:', autoLoginErr);
       }
-
-      if (!_authListenerSubscription) {
-        console.log('Creando listener de autenticación...');
-        _authListenerSubscription = supabase.auth.onAuthStateChange(async (event, session) => {
-          console.log('Auth state change:', event);
-          if (event === 'SIGNED_IN' && session?.user) {
-            await get().fetchUser();
-          } else if (event === 'SIGNED_OUT') {
-            set({ user: null, isAuthenticated: false, isLoading: false });
-          }
-        });
-      }
-    } catch (err: any) {
-      if (err?.message?.includes('429') || err?.status === 429) {
-        console.warn('Rate limit alcanzado en autenticación, reintentando en 5 segundos...');
-        await new Promise(r => setTimeout(r, 5000));
-        try {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session?.user) {
-            await get().fetchUser();
-          } else {
-            set({ isLoading: false });
-          }
-        } catch {
-          set({ isLoading: false });
-        }
-      } else if (import.meta.env.DEV) {
-        console.error('Error en initialize:', err);
-        set({ isLoading: false });
-      } else {
-        set({ isLoading: false });
-      }
-    } finally {
-      _isInitializing = false;
     }
+
+    // INTENTO 3: getSession de Supabase (último recurso, timeout más largo para conexiones lentas)
+    console.log('🔐 ========== INTENTO 3: getSession de Supabase ==========');
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 segundos timeout
+
+      const { data: { session } } = await supabase.auth.getSession();
+      clearTimeout(timeoutId);
+      
+      if (session?.user) {
+        console.log('🔐 Sesión activa encontrada en Supabase');
+        await get().fetchUser();
+        
+        if (!_authListenerSubscription) {
+          console.log('🔐 Creando listener de autenticación...');
+          _authListenerSubscription = supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log('🔐 Auth state change:', event);
+            if (event === 'SIGNED_IN' && session?.user) {
+              await get().fetchUser();
+            } else if (event === 'SIGNED_OUT') {
+              set({ user: null, isAuthenticated: false, isLoading: false });
+            }
+          });
+        }
+        return;
+      }
+    } catch (abortErr: any) {
+      if (abortErr.name === 'AbortError') {
+        console.warn('🔐 Timeout en getSession (3s),sin sesión activa');
+      } else {
+        console.warn('🔐 Error en getSession:', abortErr.message);
+      }
+    }
+
+    // No hay sesión ni credenciales válidas
+    console.log('🔐 No hay sesión disponible, usuario debe hacer login');
+    set({ isLoading: false });
+    _isInitializing = false;
   },
 
   fetchUser: async () => {
@@ -323,12 +430,51 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     }
 
     if (data.user) {
-      // Guardar credenciales para sesión persistente
+      // Guardar credenciales para sesión persistente usando Tauri Store
       const credentials = btoa(JSON.stringify({ email, password }));
-      localStorage.setItem('saved_credentials', credentials);
-      localStorage.setItem('saved_email', email);
+      
+      // Guardar también los tokens de sesión para restauración offline
+      let sessionData = null;
+      if (data.session) {
+        sessionData = btoa(JSON.stringify({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+          expires_at: data.session.expires_at,
+          expires_in: data.session.expires_in,
+        }));
+      }
+      
+      try {
+        const store = await getAuthStore();
+        await store.set('saved_credentials', credentials);
+        await store.set('saved_email', email);
+        if (sessionData) {
+          await store.set('saved_session', sessionData);
+        }
+        await store.save();
+        console.log('🔐 Tokens guardados en Tauri Store');
+      } catch (storeErr) {
+        console.warn('🔐 Error guardando en store, usando localStorage como fallback:', storeErr);
+        localStorage.setItem('saved_credentials', credentials);
+        localStorage.setItem('saved_email', email);
+        if (sessionData) {
+          localStorage.setItem('saved_session', sessionData);
+        }
+      }
       
       await get().fetchUser();
+      
+      const user = get().user;
+      if (user) {
+        setTimeout(() => {
+          initialDataLoad(user.id).then(result => {
+            if (result.success) {
+              console.log('Datos iniciales cargados a SQLite');
+            }
+          });
+        }, 1000);
+      }
+      
       return { success: true };
     }
 
@@ -373,11 +519,22 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 
   logout: async () => {
-    console.log('Logout llamado...');
+    console.log('🔐 Logout llamado, limpiando sesión...');
     try {
-      // 1. Limpiar credenciales guardadas
-      localStorage.removeItem('saved_credentials');
-      localStorage.removeItem('saved_email');
+      // 1. Limpiar credenciales Y tokens guardados (Tauri Store + localStorage fallback)
+      try {
+        const store = await getAuthStore();
+        await store.delete('saved_credentials');
+        await store.delete('saved_email');
+        await store.delete('saved_session');
+        await store.save();
+        console.log('🔐 Credenciales y tokens limpiados de Tauri Store');
+      } catch (storeErr) {
+        localStorage.removeItem('saved_credentials');
+        localStorage.removeItem('saved_email');
+        localStorage.removeItem('saved_session');
+        console.log('🔐 Credenciales y tokens limpiados de localStorage');
+      }
       
       // 2. Limpiar estado primero
       _isInitializing = false;

@@ -19,6 +19,7 @@
     "@tauri-apps/api": "^2.1.1",
     "@tauri-apps/plugin-process": "^2.2.0",
     "@tauri-apps/plugin-sql": "^2.2.0",
+    "@tauri-apps/plugin-store": "^2.4.3",
     "@tauri-apps/plugin-updater": "^2.2.0",
     "@vitejs/plugin-react": "^5.0.4",
     "class-variance-authority": "^0.7.1",
