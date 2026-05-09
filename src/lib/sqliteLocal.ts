@@ -174,6 +174,20 @@ async function createTables(): Promise<void> {
   `);
 
   await db.execute(`
+    CREATE TABLE IF NOT EXISTS pending_accounts (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      client_name TEXT NOT NULL,
+      items TEXT DEFAULT '[]',
+      total_amount REAL DEFAULT 0,
+      status TEXT DEFAULT 'pending',
+      is_account_house INTEGER DEFAULT 0,
+      sale_type TEXT DEFAULT 'SALON',
+      created_at TEXT NOT NULL
+    )
+  `);
+
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL,
@@ -450,6 +464,139 @@ export async function getTransitItemsLocally(userId: string): Promise<any[]> {
   
   return await database.select(
     'SELECT * FROM transit_items WHERE user_id = $1 ORDER BY created_at DESC',
+    [userId]
+  );
+}
+
+export async function savePendingAccountLocally(account: any): Promise<void> {
+  const database = await getDB();
+  if (!database) return;
+  
+  await database.execute(
+    `INSERT OR REPLACE INTO pending_accounts (id, user_id, client_name, items, total_amount, status, is_account_house, sale_type, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [
+      account.id,
+      account.user_id,
+      account.client_name,
+      typeof account.items === 'string' ? account.items : JSON.stringify(account.items || []),
+      account.total_amount || 0,
+      account.status || 'pending',
+      account.is_account_house ? 1 : 0,
+      account.sale_type || 'SALON',
+      account.created_at || new Date().toISOString(),
+    ]
+  );
+}
+
+export async function getPendingAccountsLocally(userId: string): Promise<any[]> {
+  const database = await getDB();
+  if (!database) return [];
+  
+  return await database.select(
+    'SELECT * FROM pending_accounts WHERE user_id = $1 AND status = $2 ORDER BY created_at DESC',
+    [userId, 'pending']
+  );
+}
+
+export async function updatePendingAccountLocally(accountId: string, updates: any): Promise<void> {
+  const database = await getDB();
+  if (!database) return;
+  
+  await database.execute(
+    `UPDATE pending_accounts SET items = $1, total_amount = $2, is_account_house = $3, sale_type = $4 WHERE id = $5`,
+    [
+      typeof updates.items === 'string' ? updates.items : JSON.stringify(updates.items || []),
+      updates.total_amount || 0,
+      updates.is_account_house ? 1 : 0,
+      updates.sale_type || 'SALON',
+      accountId
+    ]
+  );
+}
+
+export async function saveEmployeeLocally(employee: any): Promise<void> {
+  const database = await getDB();
+  if (!database) return;
+  
+  await database.execute(
+    `INSERT OR REPLACE INTO employees (id, user_id, name, role, salary, phone, email, nit_id, category, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    [
+      employee.id,
+      employee.user_id,
+      employee.name,
+      employee.role,
+      employee.salary || 0,
+      employee.phone || null,
+      employee.email || null,
+      employee.nit_id || null,
+      employee.category || null,
+      employee.created_at || new Date().toISOString(),
+    ]
+  );
+}
+
+export async function getEmployeesLocally(userId: string): Promise<any[]> {
+  const database = await getDB();
+  if (!database) return [];
+  
+  return await database.select(
+    'SELECT * FROM employees WHERE user_id = $1 ORDER BY created_at DESC',
+    [userId]
+  );
+}
+
+export async function saveCategoryLocally(category: any): Promise<void> {
+  const database = await getDB();
+  if (!database) return;
+  
+  await database.execute(
+    `INSERT OR REPLACE INTO categories (id, user_id, name, created_at)
+     VALUES ($1, $2, $3, $4)`,
+    [
+      category.id,
+      category.user_id,
+      category.name,
+      category.created_at || new Date().toISOString(),
+    ]
+  );
+}
+
+export async function getCategoriesLocally(userId: string): Promise<any[]> {
+  const database = await getDB();
+  if (!database) return [];
+  
+  return await database.select(
+    'SELECT * FROM categories WHERE user_id = $1 ORDER BY name',
+    [userId]
+  );
+}
+
+export async function saveRecipeLocally(recipe: any): Promise<void> {
+  const database = await getDB();
+  if (!database) return;
+  
+  await database.execute(
+    `INSERT OR REPLACE INTO recipes (id, user_id, name, selling_price, ingredients, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [
+      recipe.id,
+      recipe.user_id,
+      recipe.name,
+      recipe.selling_price || 0,
+      typeof recipe.ingredients === 'string' ? recipe.ingredients : JSON.stringify(recipe.ingredients || []),
+      recipe.created_at || new Date().toISOString(),
+    ]
+  );
+}
+
+export async function getRecipesLocally(userId: string): Promise<any[]> {
+  const database = await getDB();
+  if (!database) return [];
+  
+  return await database.select(
+    'SELECT * FROM recipes WHERE user_id = $1 ORDER BY name',
     [userId]
   );
 }

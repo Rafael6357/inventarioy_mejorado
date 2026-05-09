@@ -736,13 +736,38 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       throw new Error(`¡Ups! El producto "${product.name}" ya existe. Intenta con otro nombre.`);
     }
 
+    const isOnline = navigator.onLine;
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+    const productId = `offline-${Date.now()}`;
+
     const productData = {
       ...product,
+      id: productId,
       name: capitalize(product.name),
       category: capitalize(product.category),
       user_id: user.id,
       expiration_date: product.expiration_date || null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
+
+    if (!isOnline) {
+      if (isTauri) {
+        try {
+          const dbReady = await sqliteLocal.isDBReady();
+          if (dbReady) {
+            await sqliteLocal.saveProductLocally(productData);
+            console.log('[addProduct] Producto guardado en SQLite');
+          }
+        } catch (sqliteErr) {
+          console.warn('[addProduct] Error guardando en SQLite:', sqliteErr);
+        }
+      }
+
+      set((state) => ({ products: [productData, ...state.products] }));
+      toast.success('Producto guardado offline. Se sincronizará cuando haya conexión.');
+      return;
+    }
 
     const productPromise = supabase
       .from('products')
@@ -783,12 +808,39 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
   },
 
   updateProduct: async (id, updates) => {
+    const isOnline = navigator.onLine;
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+
     const capitalizedUpdates = {
       ...updates,
       ...(updates.name !== undefined && { name: capitalize(updates.name) }),
       ...(updates.category !== undefined && { category: capitalize(updates.category) }),
       updated_at: new Date().toISOString(),
     };
+
+    if (!isOnline) {
+      if (isTauri) {
+        try {
+          const dbReady = await sqliteLocal.isDBReady();
+          if (dbReady) {
+            const database = await sqliteLocal.getDB();
+            const fields = Object.keys(capitalizedUpdates).map((k, i) => `${k} = $${i + 2}`).join(', ');
+            const values = [id, ...Object.values(capitalizedUpdates)];
+            await database.execute(`UPDATE products SET ${fields} WHERE id = $1`, values);
+            console.log('[updateProduct] Producto actualizado en SQLite');
+          }
+        } catch (sqliteErr) {
+          console.warn('[updateProduct] Error guardando en SQLite:', sqliteErr);
+        }
+      }
+
+      set((state) => ({
+        products: state.products.map(p => p.id === id ? { ...p, ...updates, updated_at: new Date().toISOString() } : p),
+      }));
+      toast.success('Producto actualizado offline. Se sincronizará cuando haya conexión.');
+      return;
+    }
+
     const { error } = await supabase
       .from('products')
       .update(capitalizedUpdates)
@@ -1567,6 +1619,40 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const user = useAuthStore.getState().user;
     if (!user) return { success: false, error: 'No hay usuario autenticado' };
 
+    const isOnline = navigator.onLine;
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+
+    if (!isOnline) {
+      const tempId = `offline-${Date.now()}`;
+      const account = {
+        id: tempId,
+        user_id: user.id,
+        client_name: clientName,
+        items: [],
+        total_amount: 0,
+        status: 'pending',
+        is_account_house: false,
+        sale_type: 'SALON',
+        created_at: new Date().toISOString(),
+      };
+
+      if (isTauri) {
+        try {
+          const dbReady = await sqliteLocal.isDBReady();
+          if (dbReady) {
+            await sqliteLocal.savePendingAccountLocally(account);
+            console.log('[createPendingAccount] Cuenta guardada en SQLite');
+          }
+        } catch (sqliteErr) {
+          console.warn('[createPendingAccount] Error guardando en SQLite:', sqliteErr);
+        }
+      }
+
+      set((state) => ({ pendingAccounts: [account, ...state.pendingAccounts] }));
+      toast.success('Cuenta guardada offline. Se sincronizará cuando haya conexión.');
+      return { success: true, accountId: tempId };
+    }
+
     const operation = async () => {
       const promise = supabase
         .from('pending_accounts')
@@ -2033,6 +2119,37 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const user = useAuthStore.getState().user;
     if (!user) return;
 
+    const isOnline = navigator.onLine;
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+
+    const recipeId = `offline-${Date.now()}`;
+    const recipeData = {
+      id: recipeId,
+      user_id: user.id,
+      name: capitalize(recipe.name),
+      selling_price: recipe.selling_price,
+      ingredients: JSON.stringify(recipe.ingredients || []),
+      created_at: new Date().toISOString(),
+    };
+
+    if (!isOnline) {
+      if (isTauri) {
+        try {
+          const dbReady = await sqliteLocal.isDBReady();
+          if (dbReady) {
+            await sqliteLocal.saveRecipeLocally(recipeData);
+            console.log('[addRecipe] Receta guardada en SQLite');
+          }
+        } catch (sqliteErr) {
+          console.warn('[addRecipe] Error guardando en SQLite:', sqliteErr);
+        }
+      }
+
+      set((state) => ({ recipes: [{ ...recipeData, ingredients: recipe.ingredients }, ...state.recipes] }));
+      toast.success('Receta guardada offline. Se sincronizará cuando haya conexión.');
+      return;
+    }
+
     const { data: newRecipe, error } = await supabase
       .from('recipes')
       .insert({ 
@@ -2109,6 +2226,35 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
   addEmployee: async (employee) => {
     const user = useAuthStore.getState().user;
     if (!user) throw new Error('No hay usuario autenticado');
+
+    const isOnline = navigator.onLine;
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+
+    const employeeData = {
+      ...employee,
+      name: capitalize(employee.name),
+      user_id: user.id,
+      id: `offline-${Date.now()}`,
+      created_at: new Date().toISOString(),
+    };
+
+    if (!isOnline) {
+      if (isTauri) {
+        try {
+          const dbReady = await sqliteLocal.isDBReady();
+          if (dbReady) {
+            await sqliteLocal.saveEmployeeLocally(employeeData);
+            console.log('[addEmployee] Empleado guardado en SQLite');
+          }
+        } catch (sqliteErr) {
+          console.warn('[addEmployee] Error guardando en SQLite:', sqliteErr);
+        }
+      }
+
+      set((state) => ({ employees: [employeeData, ...state.employees] }));
+      toast.success('Empleado guardado offline. Se sincronizará cuando haya conexión.');
+      return;
+    }
 
     const operation = async () => {
       const promise = supabase
@@ -2611,6 +2757,34 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
   addCategory: async (name) => {
     const user = useAuthStore.getState().user;
     if (!user) return;
+
+    const isOnline = navigator.onLine;
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+
+    const categoryData = {
+      id: `offline-${Date.now()}`,
+      user_id: user.id,
+      name: capitalize(name),
+      created_at: new Date().toISOString(),
+    };
+
+    if (!isOnline) {
+      if (isTauri) {
+        try {
+          const dbReady = await sqliteLocal.isDBReady();
+          if (dbReady) {
+            await sqliteLocal.saveCategoryLocally(categoryData);
+            console.log('[addCategory] Categoría guardada en SQLite');
+          }
+        } catch (sqliteErr) {
+          console.warn('[addCategory] Error guardando en SQLite:', sqliteErr);
+        }
+      }
+
+      set((state) => ({ categories: [categoryData, ...state.categories] }));
+      toast.success('Categoría guardada offline. Se sincronizará cuando haya conexión.');
+      return;
+    }
 
     const { data, error } = await supabase
       .from('categories')
