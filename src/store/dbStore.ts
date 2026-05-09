@@ -1969,6 +1969,31 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       return { success: false, error: result.error };
     }
 
+    // Si está offline, actualizar la cuenta en SQLite
+    const isOnline = navigator.onLine;
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+
+    if (!isOnline && isTauri) {
+      try {
+        const dbReady = await sqliteLocal.isDBReady();
+        if (dbReady) {
+          // Marcar cuenta como pagada en SQLite
+          await sqliteLocal.updatePendingAccountLocally(accountId, {
+            status: 'paid',
+            updated_at: new Date().toISOString(),
+          });
+          // Actualizar estado local
+          set((state) => ({
+            pendingAccounts: state.pendingAccounts.filter(a => a.id !== accountId)
+          }));
+          await get().fetchAll();
+          return { success: true };
+        }
+      } catch (sqliteErr) {
+        console.warn('[chargePendingAccount] Error guardando en SQLite:', sqliteErr);
+      }
+    }
+
     const { error } = await supabase
       .from('pending_accounts')
       .update({ status: 'paid', updated_at: new Date().toISOString() })

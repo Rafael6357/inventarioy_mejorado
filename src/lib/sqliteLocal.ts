@@ -513,15 +513,43 @@ export async function updatePendingAccountLocally(accountId: string, updates: an
   const database = await getDB();
   if (!database) return;
   
+  // Construir la query dinámicamente según los campos presentes
+  const fields: string[] = [];
+  const values: any[] = [];
+  let paramIndex = 1;
+
+  if (updates.items !== undefined) {
+    fields.push(`items = $${paramIndex++}`);
+    values.push(typeof updates.items === 'string' ? updates.items : JSON.stringify(updates.items || []));
+  }
+  if (updates.total_amount !== undefined) {
+    fields.push(`total_amount = $${paramIndex++}`);
+    values.push(updates.total_amount);
+  }
+  if (updates.is_account_house !== undefined) {
+    fields.push(`is_account_house = $${paramIndex++}`);
+    values.push(updates.is_account_house ? 1 : 0);
+  }
+  if (updates.sale_type !== undefined) {
+    fields.push(`sale_type = $${paramIndex++}`);
+    values.push(updates.sale_type);
+  }
+  if (updates.status !== undefined) {
+    fields.push(`status = $${paramIndex++}`);
+    values.push(updates.status);
+  }
+  if (updates.updated_at !== undefined) {
+    fields.push(`updated_at = $${paramIndex++}`);
+    values.push(updates.updated_at);
+  }
+
+  if (fields.length === 0) return;
+
+  values.push(accountId);
+  
   await database.execute(
-    `UPDATE pending_accounts SET items = $1, total_amount = $2, is_account_house = $3, sale_type = $4 WHERE id = $5`,
-    [
-      typeof updates.items === 'string' ? updates.items : JSON.stringify(updates.items || []),
-      updates.total_amount || 0,
-      updates.is_account_house ? 1 : 0,
-      updates.sale_type || 'SALON',
-      accountId
-    ]
+    `UPDATE pending_accounts SET ${fields.join(', ')} WHERE id = $${paramIndex}`,
+    values
   );
 }
 
