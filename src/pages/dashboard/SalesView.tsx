@@ -1641,40 +1641,48 @@ setShowTicket(true);
                       chargeBreakdown.usd || 0,
                       chargeBreakdown.eur || 0
                     );
+                    console.log('[SalesView] chargePendingAccount result:', result);
                     if (result.success) {
-                      toast.success('Cuenta cobrada');
-                      const isAccHouse = selectedAccountForCharge.is_account_house;
-                      // No bloquear el flujo si logAction falla (ej. offline)
-                      if (navigator.onLine) {
-                        try {
-                          await useDatabaseStore.getState().logAction('sales', 'COBRO', {
-                            client_name: selectedAccountForCharge.client_name,
-                            total: accountTotal,
-                            payment_method: paymentMethodStr,
-                            is_account_house: isAccHouse
-                          });
-                        } catch (logErr) {
-                          console.warn('[logAction] Error (offline?):', logErr);
+                      try {
+                        toast.success('Cuenta cobrada');
+                        const isAccHouse = selectedAccountForCharge.is_account_house;
+                        // No bloquear el flujo si logAction falla (ej. offline)
+                        if (navigator.onLine) {
+                          try {
+                            await useDatabaseStore.getState().logAction('sales', 'COBRO', {
+                              client_name: selectedAccountForCharge.client_name,
+                              total: accountTotal,
+                              payment_method: paymentMethodStr,
+                              is_account_house: isAccHouse
+                            });
+                          } catch (logErr) {
+                            console.warn('[logAction] Error (offline?):', logErr);
+                          }
                         }
+                        setTicketData({
+                          items: ((selectedAccountForCharge.items as any[]) || []).map((item: any) => ({
+                            name: item.product_name,
+                            quantity: item.quantity,
+                            unitPrice: item.unit_price,
+                            subtotal: item.subtotal
+                          })),
+                          total: isAccHouse ? 0 : accountTotal,
+                          employeeName: selectedEmp ? selectedEmp.name : (user?.name || 'Vendedor'),
+                          businessName: user?.businessName || 'Mi Negocio',
+                          ticketMessage: user?.ticketMessage || '¡Gracias por su visita!',
+                          saleType: selectedAccountForCharge.sale_type || 'SALON',
+                          isAccountHouse: isAccHouse,
+                          paymentBreakdown: chargeBreakdown,
+                          date: new Date(closingDate + 'T' + new Date().toTimeString().slice(0,8))
+                        });
+                        setShowTicket(true);
+                        console.log('[SalesView] Cerrando modal de cobro...');
+                      } catch (successErr) {
+                        console.error('[SalesView] Error en flujo success:', successErr);
+                      } finally {
+                        setShowChargeMixModal(false);
+                        console.log('[SalesView] Modal de cobro cerrado');
                       }
-                      setTicketData({
-                        items: ((selectedAccountForCharge.items as any[]) || []).map((item: any) => ({
-                          name: item.product_name,
-                          quantity: item.quantity,
-                          unitPrice: item.unit_price,
-                          subtotal: item.subtotal
-                        })),
-                        total: isAccHouse ? 0 : accountTotal,
-                        employeeName: selectedEmp ? selectedEmp.name : (user?.name || 'Vendedor'),
-                        businessName: user?.businessName || 'Mi Negocio',
-                        ticketMessage: user?.ticketMessage || '¡Gracias por su visita!',
-                        saleType: selectedAccountForCharge.sale_type || 'SALON',
-                        isAccountHouse: isAccHouse,
-                        paymentBreakdown: chargeBreakdown,
-                        date: new Date(closingDate + 'T' + new Date().toTimeString().slice(0,8))
-                      });
-                      setShowTicket(true);
-                      setShowChargeMixModal(false);
                     } else {
                       toast.error(result.error || 'Error al cobrar');
                     }

@@ -300,6 +300,21 @@ const isRateLimitError = (err: any): boolean => {
          err?.message?.includes('too many requests');
 };
 
+const checkRealInternetConnection = async (): Promise<boolean> => {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    await fetch('https://www.google.com/generate_204', { 
+      method: 'HEAD',
+      signal: controller.signal 
+    });
+    clearTimeout(timeoutId);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 const withTimeout = <T>(
   promise: Promise<T>, 
   timeoutMs: number = DEFAULT_TIMEOUT,
@@ -2034,12 +2049,17 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       return { success: false, error: result.error };
     }
 
-    // Si está offline, actualizar la cuenta en SQLite
-    const isOnline = navigator.onLine;
+    // Verificación robusta de conexión - navigator.onLine puede ser engañoso en Tauri
+    const isNavigatorOnline = navigator.onLine;
+    const isRealOnline = await checkRealInternetConnection();
+    const isOnline = isNavigatorOnline && isRealOnline;
     const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+
+    console.log('[chargePendingAccount] Estado de conexión:', { isNavigatorOnline, isRealOnline, isOnline, isTauri });
 
     if (!isOnline && isTauri) {
       try {
+        console.log('[chargePendingAccount] Modo offline detectado, guardando en SQLite...');
         const dbReady = await sqliteLocal.isDBReady();
         if (dbReady) {
           // Marcar cuenta como pagada en SQLite
@@ -2051,6 +2071,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
           set((state) => ({
             pendingAccounts: state.pendingAccounts.filter(a => a.id !== accountId)
           }));
+          console.log('[chargePendingAccount] Cobro offline completado exitosamente');
           return { success: true };
         }
       } catch (sqliteErr) {
@@ -2058,29 +2079,47 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       }
     }
 
-    const { error } = await supabase
+    // Agregar timeout para evitar que se cuelgue si Supabase no responde
+    const updatePromise = supabase
       .from('pending_accounts')
       .update({ status: 'paid', updated_at: new Date().toISOString() })
       .eq('id', accountId);
+
+    const { error } = await withTimeout(updatePromise, 8000); // 8 segundos timeout
 
     if (error) {
       return { success: false, error: error.message };
     }
 
-    await get().getPendingAccounts();
+    // Intentar recargar datos pero no fallar si no se puede
+    try {
+      await get().getPendingAccounts();
+    } catch (err) {
+      console.warn('[chargePendingAccount] Error recargando cuentas pendientes:', err);
+    }
+
     // Recargar ventas para reflejar el nuevo cobro
-    if (!navigator.onLine) {
-      // Si está offline, recargar desde SQLite para obtener la venta con campos de pago
-      await get().fetchAll();
+    const isStillOnline = await checkRealInternetConnection();
+    if (!isStillOnline) {
+      // Si está offline, recargar desde SQLite
+      try {
+        await get().fetchAll();
+      } catch (err) {
+        console.warn('[chargePendingAccount] Error recargando datos offline:', err);
+      }
     } else {
       // Si está online, recargar desde Supabase
-      const { data: salesData } = await supabase.from('sales').select('*, sale_items(*)').eq('user_id', user.id).order('created_at', { ascending: false });
-      if (salesData) {
-        const sales = salesData.map(s => ({
-          ...s,
-          items: s.sale_items || [],
-        }));
-        set((state) => ({ sales }));
+      try {
+        const { data: salesData } = await supabase.from('sales').select('*, sale_items(*)').eq('user_id', user.id).order('created_at', { ascending: false });
+        if (salesData) {
+          const sales = salesData.map(s => ({
+            ...s,
+            items: s.sale_items || [],
+          }));
+          set((state) => ({ sales }));
+        }
+      } catch (err) {
+        console.warn('[chargePendingAccount] Error recargando ventas:', err);
       }
     }
     return { success: true };
