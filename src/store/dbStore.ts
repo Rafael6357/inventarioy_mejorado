@@ -918,6 +918,9 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
           if (dbReady) {
             await sqliteLocal.saveMovementLocally(movementToSave);
             console.log('[addMovement] Movimiento guardado en SQLite');
+            // AGREGAR A LA COLA DE SINCRONIZACIÓN
+            await sqliteLocal.addToSyncQueue('movements', 'INSERT', movementToSave);
+            console.log('[addMovement] Movimiento agregado a cola de sync');
           }
         } catch (sqliteErr) {
           console.warn('[addMovement] Error guardando en SQLite:', sqliteErr);
@@ -1124,6 +1127,12 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
           if (dbReady) {
             await sqliteLocal.saveSaleLocally(saleToSave);
             console.log('[addSale] Venta guardada en SQLite');
+            // AGREGAR A LA COLA DE SINCRONIZACIÓN
+            await sqliteLocal.addToSyncQueue('sales', 'INSERT', {
+              ...saleToSave,
+              created_at: new Date().toISOString()
+            });
+            console.log('[addSale] Venta agregada a cola de sync');
           }
         } catch (sqliteErr) {
           console.warn('[addSale] Error guardando en SQLite:', sqliteErr);
@@ -2453,6 +2462,9 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
           if (dbReady) {
             await sqliteLocal.saveEmployeeLocally(employeeData);
             console.log('[addEmployee] Empleado guardado en SQLite');
+            // AGREGAR A LA COLA DE SINCRONIZACIÓN
+            await sqliteLocal.addToSyncQueue('employees', 'INSERT', employeeData);
+            console.log('[addEmployee] Empleado agregado a cola de sync');
           }
         } catch (sqliteErr) {
           console.warn('[addEmployee] Error guardando en SQLite:', sqliteErr);
@@ -3116,6 +3128,9 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
             if (dbReady) {
               await sqliteLocal.saveDailyClosingLocally(closingWithId);
               console.log('[createDailyClosing] Cierre guardado en SQLite');
+              // AGREGAR A LA COLA DE SINCRONIZACIÓN
+              await sqliteLocal.addToSyncQueue('daily_closings', 'INSERT', closingWithId);
+              console.log('[createDailyClosing] Cierre agregado a cola de sync');
             }
           } catch (sqliteErr) {
             console.warn('[createDailyClosing] Error guardando en SQLite:', sqliteErr);
