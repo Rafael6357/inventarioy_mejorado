@@ -3171,6 +3171,12 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
               sale_type: sale.data.sale_type,
               notes: sale.data.notes,
               discount: sale.data.discount,
+              efectivo: sale.data.efectivo || 0,
+              transferencia: sale.data.transferencia || 0,
+              usd: sale.data.usd || 0,
+              eur: sale.data.eur || 0,
+              payment_method: sale.data.payment_method || null,
+              is_account_house: sale.data.is_account_house || false,
             })
             .select()
             .single();
