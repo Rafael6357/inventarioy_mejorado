@@ -251,10 +251,6 @@ export default function Landing() {
                   a: "Al registrarte, obtienes automáticamente 30 días de acceso completo a todas las funciones del Plan Profesional."
                 },
                 {
-                  q: "¿Mis datos están seguros?",
-                  a: "Absolutamente. Utilizamos encriptación de grado bancario y realizamos copias de seguridad diarias para garantizar la seguridad de tu información."
-                },
-                {
                   q: "¿Necesito instalar algún software?",
                   a: "No, InventarioY es 100% basado en la nube. Puedes acceder desde cualquier dispositivo con conexión a internet."
                 },
