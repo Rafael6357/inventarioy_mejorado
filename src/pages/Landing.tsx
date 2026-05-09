@@ -223,7 +223,7 @@ export default function Landing() {
 
             <div className="text-center">
               <a 
-                href="https://github.com/Rafael6357/inventarioy_mejorado/releases" 
+                href="https://github.com/Rafael6357/inventarioy_mejorado/releases/latest" 
                 target="_blank" 
                 rel="noopener noreferrer"
               >
