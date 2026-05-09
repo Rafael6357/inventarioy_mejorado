@@ -2785,10 +2785,6 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     }
   },
 
-    set({ employeesTotal: count || 0 });
-    return count || 0;
-  },
-
   getDepartmentsPaginated: async (page, search) => {
     const user = useAuthStore.getState().user;
     if (!user) return;

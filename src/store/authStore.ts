@@ -145,6 +145,22 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     _isInitializing = true;
     console.log('Inicializando autenticación...');
 
+    // 1. Primero verificar si hay sesión offline guardada
+    const savedUserData = localStorage.getItem('inventarioy_user_offline');
+    const isOffline = !navigator.onLine;
+    
+    if (isOffline && savedUserData) {
+      try {
+        const userData = JSON.parse(savedUserData);
+        console.log('[initialize] Recuperando sesión offline desde localStorage');
+        set({ user: userData, isAuthenticated: true, isLoading: false });
+        _isInitializing = false;
+        return;
+      } catch (err) {
+        console.warn('[initialize] Error recuperando sesión offline:', err);
+      }
+    }
+
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
@@ -156,28 +172,32 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         if (session?.user) {
           await get().fetchUser();
         } else {
-          // Intentar login automático con credenciales guardadas
-          const savedCredentials = localStorage.getItem('saved_credentials');
-          if (savedCredentials) {
-            try {
-              const creds = JSON.parse(atob(savedCredentials));
-              const { error: signInError } = await supabase.auth.signInWithPassword({
-                email: creds.email,
-                password: creds.password,
-              });
-              if (!signInError) {
-                await get().fetchUser();
-              } else {
-                // Credenciales inválidas, limpiar
-                localStorage.removeItem('saved_credentials');
-                localStorage.removeItem('saved_email');
+          // Intentar login automático con credenciales guardadas solo si hay internet
+          if (navigator.onLine) {
+            const savedCredentials = localStorage.getItem('saved_credentials');
+            if (savedCredentials) {
+              try {
+                const creds = JSON.parse(atob(savedCredentials));
+                const { error: signInError } = await supabase.auth.signInWithPassword({
+                  email: creds.email,
+                  password: creds.password,
+                });
+                if (!signInError) {
+                  await get().fetchUser();
+                } else {
+                  localStorage.removeItem('saved_credentials');
+                  localStorage.removeItem('saved_email');
+                  set({ isLoading: false });
+                }
+              } catch (autoLoginErr) {
+                console.warn('Login automático falló:', autoLoginErr);
                 set({ isLoading: false });
               }
-            } catch (autoLoginErr) {
-              console.warn('Login automático falló:', autoLoginErr);
+            } else {
               set({ isLoading: false });
             }
           } else {
+            // Offline y no hay sesión guardada
             set({ isLoading: false });
           }
         }
@@ -185,7 +205,17 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         clearTimeout(timeoutId);
         if (abortErr.name === 'AbortError') {
           console.warn('Timeout en getSession');
-          set({ isLoading: false });
+          // Si hay sesión offline guardada, usarla
+          if (savedUserData) {
+            try {
+              const userData = JSON.parse(savedUserData);
+              set({ user: userData, isAuthenticated: true, isLoading: false });
+            } catch {
+              set({ isLoading: false });
+            }
+          } else {
+            set({ isLoading: false });
+          }
           _isInitializing = false;
           return;
         }
@@ -306,6 +336,14 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
       console.log('Usuario cargado:', user.email, 'role:', user.role, 'subscriptionActive:', user.isSubscriptionActive);
       set({ user, isAuthenticated: true, isLoading: false });
+      
+      // Guardar sesión en localStorage para modo offline
+      try {
+        localStorage.setItem('inventarioy_user_offline', JSON.stringify(user));
+        console.log('[fetchUser] Sesión guardada en localStorage para offline');
+      } catch (saveErr) {
+        console.warn('[fetchUser] Error guardando sesión offline:', saveErr);
+      }
     } catch (err) {
       console.error('Error en fetchUser:', err);
       set({ isLoading: false });

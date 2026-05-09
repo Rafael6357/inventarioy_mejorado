@@ -37,8 +37,23 @@ export function onSyncStateChange(callback: (state: SyncState) => void): () => v
 }
 
 async function checkConnection(): Promise<boolean> {
+  // Si navigator dice que está offline, no intentar verificar
+  if (!navigator.onLine) {
+    if (state.isOnline !== false) {
+      state.isOnline = false;
+      state.status = 'offline';
+      console.log('[checkConnection] navigator.onLine = false, modo offline');
+    }
+    return false;
+  }
+  
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    
     const { error } = await supabase.from('products').select('id').limit(1).maybeSingle();
+    clearTimeout(timeoutId);
+    
     const online = !error;
     if (state.isOnline !== online) {
       state.isOnline = online;
