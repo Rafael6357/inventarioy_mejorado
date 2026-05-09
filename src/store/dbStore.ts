@@ -1186,6 +1186,24 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
           throw new Error('No se pudo actualizar el item en tránsito');
         }
       } else {
+        const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+        
+        if (isTauri) {
+          try {
+            const dbReady = await sqliteLocal.isDBReady();
+            if (dbReady) {
+              const database = await sqliteLocal.getDB();
+              await database.execute(
+                'UPDATE transit_items SET remaining = $1, consumed = $2 WHERE id = $3',
+                [newRemaining, newConsumed, item.id]
+              );
+              console.log('[consumeFromTransit] Transit item actualizado en SQLite');
+            }
+          } catch (sqliteErr) {
+            console.warn('[consumeFromTransit] Error guardando en SQLite:', sqliteErr);
+          }
+        }
+
         await initOfflineDB();
         await savePendingTransitConsumption({
           data: {
@@ -1329,6 +1347,44 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       if (movementError) {
         if (import.meta.env.DEV) console.error('Error registering return movement:', movementError);
       }
+    } else {
+      const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+      
+      if (isTauri) {
+        try {
+          const dbReady = await sqliteLocal.isDBReady();
+          if (dbReady) {
+            const database = await sqliteLocal.getDB();
+            await database.execute(
+              'UPDATE transit_items SET remaining = $1 WHERE id = $2',
+              [newRemaining, transitItemId]
+            );
+            await database.execute(
+              'UPDATE products SET in_transit = $1 WHERE id = $2',
+              [newInTransit, product.id]
+            );
+            console.log('[cancelTransit] Transit item y producto actualizados en SQLite');
+          }
+        } catch (sqliteErr) {
+          console.warn('[cancelTransit] Error guardando en SQLite:', sqliteErr);
+        }
+      }
+
+      await initOfflineDB();
+      await savePendingMovement({
+        data: {
+          user_id: user.id,
+          product_id: product.id,
+          type: 'ENTRADA',
+          quantity,
+          unit: product.unit,
+          date: new Date().toISOString(),
+          cost: Number(product.cost),
+          reason: `Devolución de tránsito offline: ${reason}`,
+          status: 'NORMAL',
+        },
+      });
+      toast.success('Devolución guardada offline. Se sincronizará cuando haya conexión.');
     }
 
     set((state) => {
@@ -1422,6 +1478,47 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       } else if (movementData) {
         set((state) => ({ movements: [movementData, ...state.movements] }));
       }
+    } else {
+      const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+      
+      const newInTransit = Math.max(0, Number(product.in_transit || 0) - quantity);
+      const newQuantity = Math.max(0, Number(product.quantity || 0) - quantity);
+
+      if (isTauri) {
+        try {
+          const dbReady = await sqliteLocal.isDBReady();
+          if (dbReady) {
+            const database = await sqliteLocal.getDB();
+            await database.execute(
+              'UPDATE transit_items SET remaining = $1 WHERE id = $2',
+              [newRemaining, transitItemId]
+            );
+            await database.execute(
+              'UPDATE products SET in_transit = $1, quantity = $2 WHERE id = $3',
+              [newInTransit, newQuantity, product.id]
+            );
+            console.log('[registerWasteFromTransit] Transit item y producto actualizados en SQLite');
+          }
+        } catch (sqliteErr) {
+          console.warn('[registerWasteFromTransit] Error guardando en SQLite:', sqliteErr);
+        }
+      }
+
+      await initOfflineDB();
+      await savePendingMovement({
+        data: {
+          user_id: user.id,
+          product_id: product.id,
+          type: 'MERMA',
+          quantity,
+          unit: product.unit,
+          date: new Date().toISOString(),
+          cost: Number(product.cost),
+          reason: `Merma en tránsito offline: ${reason}`,
+          status: 'NORMAL',
+        },
+      });
+      toast.success('Merma guardada offline. Se sincronizará cuando haya conexión.');
     }
 
     set((state) => {
