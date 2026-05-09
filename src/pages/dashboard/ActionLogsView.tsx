@@ -92,7 +92,11 @@ export default function ActionLogsView() {
   const [itemsPerPage] = useState(15);
 
   useEffect(() => {
-    getActionLogs();
+    try {
+      getActionLogs();
+    } catch (err) {
+      console.error('[ActionLogsView] Error loading logs:', err);
+    }
   }, []);
   const [roleFilter, setRoleFilter] = useState('');
   const [startDate, setStartDate] = useState('');

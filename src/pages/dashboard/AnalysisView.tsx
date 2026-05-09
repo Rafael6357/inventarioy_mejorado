@@ -6,9 +6,16 @@ import { Button } from '../../components/ui/button';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 export default function AnalysisView() {
-  const { products, sales, movements } = useDatabaseStore();
+  const { products, sales, movements, isLoading } = useDatabaseStore();
   
-  const activeProducts = products.filter(p => p.is_active !== false);
+  // Verificar si los datos aún están cargando para evitar errores
+  const isDataLoaded = !isLoading && Array.isArray(products);
+  
+  const activeProducts = isDataLoaded ? products.filter(p => p.is_active !== false) : [];
+  
+  // Variables seguras para evitar errores cuando los datos no están cargados
+  const safeSales = Array.isArray(sales) ? sales : [];
+  const safeMovements = Array.isArray(movements) ? movements : [];
 
   const [auditProduct, setAuditProduct] = useState<string>('');
   const [auditDateFrom, setAuditDateFrom] = useState<string>('');
@@ -107,14 +114,14 @@ export default function AnalysisView() {
   }, [activeProducts]);
 
   const totalSalesRevenue = useMemo(() => {
-    return sales.reduce((sum, s) => sum + s.total_amount, 0);
-  }, [sales]);
+    return safeSales.reduce((sum, s) => sum + (s?.total_amount || 0), 0);
+  }, [safeSales]);
 
   const totalCostOfGoodsSold = useMemo(() => {
-    return sales.reduce((sum, s) => {
-      return sum + (s.items || []).reduce((itemSum, item) => itemSum + (item.quantity * item.unit_cost), 0);
+    return safeSales.reduce((sum, s) => {
+      return sum + ((s?.items || []).reduce((itemSum, item) => itemSum + ((item?.quantity || 0) * (item?.unit_cost || 0)), 0));
     }, 0);
-  }, [sales]);
+  }, [safeSales]);
 
   const grossProfit = totalSalesRevenue - totalCostOfGoodsSold;
   const grossMargin = totalSalesRevenue > 0 ? (grossProfit / totalSalesRevenue) * 100 : 0;

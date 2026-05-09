@@ -2301,14 +2301,25 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const user = useAuthStore.getState().user;
     if (!user) return;
 
-    const { data, error } = await supabase
-      .from('action_logs')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
+    // Si está offline, no intentar cargar desde Supabase para evitar crash
+    // Mantener los datos existentes en memoria
+    if (!navigator.onLine) {
+      console.log('[getActionLogs] Offline: manteniendo datos existentes');
+      return;
+    }
 
-    if (!error && data) {
-      set({ actionLogs: data as any[] });
+    try {
+      const { data, error } = await supabase
+        .from('action_logs')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        set({ actionLogs: data as any[] });
+      }
+    } catch (err) {
+      console.warn('[getActionLogs] Error cargando logs:', err);
     }
   },
 
@@ -2740,25 +2751,39 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const user = useAuthStore.getState().user;
     if (!user) return 0;
 
-    let query = supabase
-      .from('employees')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id);
-
-    if (search) {
-      query = query.ilike('name', `%${search}%`);
-    }
-
-    if (departmentId) {
-      query = query.eq('category', departmentId);
-    }
-
-    const { count, error } = await query;
-
-    if (error) {
-      console.error('Error counting employees:', error);
+    // Si está offline, retornar 0 para evitar crash
+    if (!navigator.onLine) {
+      console.log('[getEmployeesCount] Offline: returning 0');
       return 0;
     }
+
+    try {
+      let query = supabase
+        .from('employees')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+
+      if (search) {
+        query = query.ilike('name', `%${search}%`);
+      }
+
+      if (departmentId) {
+        query = query.eq('category', departmentId);
+      }
+
+      const { count, error } = await query;
+
+      if (error) {
+        console.error('Error counting employees:', error);
+        return 0;
+      }
+
+      return count || 0;
+    } catch (err) {
+      console.warn('[getEmployeesCount] Error:', err);
+      return 0;
+    }
+  },
 
     set({ employeesTotal: count || 0 });
     return count || 0;
@@ -2800,21 +2825,35 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const user = useAuthStore.getState().user;
     if (!user) return 0;
 
-    let query = supabase
-      .from('departments')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id);
-
-    if (search) {
-      query = query.ilike('name', `%${search}%`);
-    }
-
-    const { count, error } = await query;
-
-    if (error) {
-      console.error('Error counting departments:', error);
+    // Si está offline, retornar 0 para evitar crash
+    if (!navigator.onLine) {
+      console.log('[getDepartmentsCount] Offline: returning 0');
       return 0;
     }
+
+    try {
+      let query = supabase
+        .from('departments')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+
+      if (search) {
+        query = query.ilike('name', `%${search}%`);
+      }
+
+      const { count, error } = await query;
+
+      if (error) {
+        console.error('Error counting departments:', error);
+        return 0;
+      }
+
+      return count || 0;
+    } catch (err) {
+      console.warn('[getDepartmentsCount] Error:', err);
+      return 0;
+    }
+  },
 
     set({ departmentsTotal: count || 0 });
     return count || 0;
@@ -2855,15 +2894,31 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const user = useAuthStore.getState().user;
     if (!user) return 0;
 
-    const { count, error } = await supabase
-      .from('payroll_entries')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .eq('month', month)
-      .eq('year', year);
+    // Si está offline, retornar 0 para evitar crash
+    if (!navigator.onLine) {
+      console.log('[getPayrollEntriesCount] Offline: returning 0');
+      return 0;
+    }
 
-    if (error) {
-      console.error('Error counting payroll entries:', error);
+    try {
+      const { count, error } = await supabase
+        .from('payroll_entries')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('month', month)
+        .eq('year', year);
+
+      if (error) {
+        console.error('Error counting payroll entries:', error);
+        return 0;
+      }
+
+      return count || 0;
+    } catch (err) {
+      console.warn('[getPayrollEntriesCount] Error:', err);
+      return 0;
+    }
+  },
       return 0;
     }
 

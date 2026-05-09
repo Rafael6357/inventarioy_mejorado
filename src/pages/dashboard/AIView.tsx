@@ -304,32 +304,44 @@ export default function AIView() {
   const loadConversation = async () => {
     if (!user) return;
 
-    const { data: persistedMessages } = await supabase
-      .from('ai_conversations')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: true });
+    // Verificar conexión antes de llamar a Supabase
+    if (!navigator.onLine) {
+      console.log('[AIView] Offline detected, initializing without loaded conversation');
+      initializeNewConversation();
+      return;
+    }
 
-    if (persistedMessages && persistedMessages.length > 0) {
-      const loadedMessages = persistedMessages.map((m: PersistedMessage) => ({
-        id: m.id,
-        role: m.role as 'user' | 'assistant',
-        text: m.content,
-        created_at: m.created_at,
-      }));
+    try {
+      const { data: persistedMessages } = await supabase
+        .from('ai_conversations')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true });
 
-      setMessages(loadedMessages);
-      setIsInitialized(true);
-      setConversationStartDate(new Date(persistedMessages[0].created_at));
+      if (persistedMessages && persistedMessages.length > 0) {
+        const loadedMessages = persistedMessages.map((m: PersistedMessage) => ({
+          id: m.id,
+          role: m.role as 'user' | 'assistant',
+          text: m.content,
+          created_at: m.created_at,
+        }));
 
-      const oldestDate = new Date(persistedMessages[0].created_at);
-      const daysSinceCreation = Math.floor((Date.now() - oldestDate.getTime()) / (1000 * 60 * 60 * 24));
-      
-      if (daysSinceCreation >= 90 && !warningShownRef.current) {
-        setShowDeleteWarning(true);
-        warningShownRef.current = true;
+        setMessages(loadedMessages);
+        setIsInitialized(true);
+        setConversationStartDate(new Date(persistedMessages[0].created_at));
+
+        const oldestDate = new Date(persistedMessages[0].created_at);
+        const daysSinceCreation = Math.floor((Date.now() - oldestDate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        if (daysSinceCreation >= 90 && !warningShownRef.current) {
+          setShowDeleteWarning(true);
+          warningShownRef.current = true;
+        }
+      } else {
+        initializeNewConversation();
       }
-    } else {
+    } catch (err) {
+      console.warn('[AIView] Error loading conversation (offline?):', err);
       initializeNewConversation();
     }
   };
@@ -337,31 +349,48 @@ export default function AIView() {
   const saveMessage = async (role: 'user' | 'assistant', content: string) => {
     if (!user) return;
 
-    const newMessage = {
-      user_id: user.id,
-      role,
-      content,
-      created_at: new Date().toISOString(),
-    };
+    // No intentar guardar si está offline
+    if (!navigator.onLine) {
+      console.log('[AIView] Offline: skipping saveMessage');
+      return;
+    }
 
-    const { data, error } = await supabase
-      .from('ai_conversations')
-      .insert(newMessage)
-      .select()
-      .single();
+    try {
+      const newMessage = {
+        user_id: user.id,
+        role,
+        content,
+        created_at: new Date().toISOString(),
+      };
 
-    if (!error && data) {
-      setConversationStartDate(new Date(data.created_at));
+      const { data, error } = await supabase
+        .from('ai_conversations')
+        .insert(newMessage)
+        .select()
+        .single();
+
+      if (!error && data) {
+        setConversationStartDate(new Date(data.created_at));
+      }
+    } catch (err) {
+      console.warn('[AIView] Error saving message (offline?):', err);
     }
   };
 
   const clearConversation = async () => {
     if (!user) return;
 
-    await supabase
-      .from('ai_conversations')
-      .delete()
-      .eq('user_id', user.id);
+    // Intentar borrar en Supabase si está online
+    if (navigator.onLine) {
+      try {
+        await supabase
+          .from('ai_conversations')
+          .delete()
+          .eq('user_id', user.id);
+      } catch (err) {
+        console.warn('[AIView] Error clearing conversation:', err);
+      }
+    }
 
     setMessages([]);
     setIsInitialized(false);
@@ -374,26 +403,40 @@ export default function AIView() {
   };
 
   const initializeNewConversation = async () => {
-    const keysCount = getAvailableKeysCount();
-    setAvailableKeys(keysCount);
-    
-    if (keysCount === 0) {
+    try {
+      const keysCount = getAvailableKeysCount();
+      setAvailableKeys(keysCount);
+      
+      if (keysCount === 0) {
+        setMessages([{
+          role: 'assistant',
+          text: 'No hay claves de API de Groq configuradas en el entorno.'
+        }]);
+        return;
+      }
+
+      const greeting = buildGreeting();
+      setMessages([greeting]);
+      // saveMessage ya tiene protección offline
+      await saveMessage('assistant', greeting.text);
+      setIsInitialized(true);
+    } catch (err) {
+      console.error('[AIView] Error initializing conversation:', err);
       setMessages([{
         role: 'assistant',
-        text: 'No hay claves de API de Groq configuradas en el entorno.'
+        text: 'Error al inicializar. Por favor, recarga la página.'
       }]);
-      return;
     }
-
-    const greeting = buildGreeting();
-    setMessages([greeting]);
-    await saveMessage('assistant', greeting.text);
-    setIsInitialized(true);
   };
 
   useEffect(() => {
     if (user) {
-      loadConversation();
+      try {
+        loadConversation();
+      } catch (err) {
+        console.error('[AIView] Error in useEffect loadConversation:', err);
+        initializeNewConversation();
+      }
     }
   }, [user?.id]);
 
