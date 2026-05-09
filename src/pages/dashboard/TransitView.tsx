@@ -60,11 +60,17 @@ export default function TransitView() {
     setIsCancelling(false);
     if (result.success) {
       toast.success('Producto devuelto al stock exitosamente');
-      await useDatabaseStore.getState().logAction('transit', 'DEVOLUCION', {
-        product_name: cancelModal.item.product_name,
-        quantity: quantityInBase,
-        reason: cancelModal.reason
-      });
+      if (navigator.onLine) {
+        try {
+          await useDatabaseStore.getState().logAction('transit', 'DEVOLUCION', {
+            product_name: cancelModal.item.product_name,
+            quantity: quantityInBase,
+            reason: cancelModal.reason
+          });
+        } catch (logErr) {
+          console.warn('[logAction] Error (offline?):', logErr);
+        }
+      }
       setCancelModal(null);
     } else {
       toast.error(result.error || 'Error al devolver el producto');
@@ -96,11 +102,17 @@ export default function TransitView() {
     setIsWasting(false);
     if (result.success) {
       toast.success('Merma registrada exitosamente');
-      await useDatabaseStore.getState().logAction('transit', 'WASTE', {
-        product_name: wasteModal.item.product_name,
-        quantity: quantityInBase,
-        reason: wasteModal.reason
-      });
+      if (navigator.onLine) {
+        try {
+          await useDatabaseStore.getState().logAction('transit', 'WASTE', {
+            product_name: wasteModal.item.product_name,
+            quantity: quantityInBase,
+            reason: wasteModal.reason
+          });
+        } catch (logErr) {
+          console.warn('[logAction] Error (offline?):', logErr);
+        }
+      }
       setWasteModal(null);
     } else {
       toast.error(result.error || 'Error al registrar la merma');

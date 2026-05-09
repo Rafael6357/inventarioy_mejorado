@@ -1739,11 +1739,17 @@ setShowTicket(true);
                 onClick={async () => {
                   const result = await useDatabaseStore.getState().deletePendingAccount(selectedAccountForCancel.id);
                   if (result.success) {
-                    await useDatabaseStore.getState().logAction('sales', 'CANCELAR_CUENTA', {
-                      client_name: selectedAccountForCancel.client_name,
-                      total: selectedAccountForCancel.total_amount || 0,
-                      justification: cancelJustification
-                    });
+                    if (navigator.onLine) {
+                      try {
+                        await useDatabaseStore.getState().logAction('sales', 'CANCELAR_CUENTA', {
+                          client_name: selectedAccountForCancel.client_name,
+                          total: selectedAccountForCancel.total_amount || 0,
+                          justification: cancelJustification
+                        });
+                      } catch (logErr) {
+                        console.warn('[logAction] Error (offline?):', logErr);
+                      }
+                    }
                     toast.success('Cuenta cancelada');
                     setShowCancelJustModal(false);
                   } else {

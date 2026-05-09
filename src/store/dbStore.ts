@@ -1789,6 +1789,31 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
   },
 
   updatePendingAccount: async (accountId: string, updates: Partial<PendingAccount>) => {
+    const isOnline = navigator.onLine;
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+
+    // Si está offline, guardar en SQLite
+    if (!isOnline && isTauri) {
+      try {
+        const dbReady = await sqliteLocal.isDBReady();
+        if (dbReady) {
+          await sqliteLocal.updatePendingAccountLocally(accountId, {
+            ...updates,
+            updated_at: new Date().toISOString(),
+          });
+          // Actualizar estado local
+          set((state) => ({
+            pendingAccounts: state.pendingAccounts.map(a =>
+              a.id === accountId ? { ...a, ...updates, updated_at: new Date().toISOString() } : a
+            )
+          }));
+          return { success: true };
+        }
+      } catch (sqliteErr) {
+        console.warn('[updatePendingAccount] Error guardando en SQLite:', sqliteErr);
+      }
+    }
+
     const { error } = await supabase
       .from('pending_accounts')
       .update({ ...updates, updated_at: new Date().toISOString() })
@@ -1858,16 +1883,58 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const account = get().pendingAccounts.find(a => a.id === accountId);
     if (!account) return { success: false, error: 'Cuenta no encontrada' };
 
-    // Devolver productos al tránsito
+    const isOnline = navigator.onLine;
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+
+    // Devolver productos al tránsito (actualizar estado local)
     const accountItems = account.items as any[] || [];
+    const updatedTransitItems = get().transitItems.map(t => {
+      let additionalQty = 0;
+      for (const item of accountItems) {
+        const product = get().products.find(p => p.id === item.product_id);
+        if (product?.is_recipe && product.recipe_ingredients) {
+          for (const ing of product.recipe_ingredients) {
+            if (t.product_id === ing.product_id) {
+              additionalQty += ing.quantity * item.quantity;
+            }
+          }
+        } else if (t.product_id === item.product_id) {
+          additionalQty += item.quantity;
+        }
+      }
+      return additionalQty > 0 ? { ...t, remaining: t.remaining + additionalQty } : t;
+    });
+
+    // Si está offline, guardar en SQLite
+    if (!isOnline && isTauri) {
+      try {
+        const dbReady = await sqliteLocal.isDBReady();
+        if (dbReady) {
+          // Marcar cuenta como cancelada en SQLite
+          await sqliteLocal.updatePendingAccountLocally(accountId, {
+            status: 'cancelled',
+            updated_at: new Date().toISOString(),
+          });
+          // Actualizar transit items localmente
+          set({ transitItems: updatedTransitItems.filter(t => t.remaining > 0) });
+          // Actualizar estado local - eliminar cuenta de la lista
+          set((state) => ({
+            pendingAccounts: state.pendingAccounts.filter(a => a.id !== accountId)
+          }));
+          return { success: true };
+        }
+      } catch (sqliteErr) {
+        console.warn('[deletePendingAccount] Error guardando en SQLite:', sqliteErr);
+      }
+    }
+
+    // Online: devolver productos al tránsito
     for (const item of accountItems) {
       const product = get().products.find(p => p.id === item.product_id);
       
       if (product?.is_recipe && product.recipe_ingredients) {
-        // Si es receta, devolver cada ingrediente
         for (const ing of product.recipe_ingredients) {
           const qtyToReturn = ing.quantity * item.quantity;
-          // Buscar transit item existente y sumar
           const transitItem = get().transitItems.find(t => t.product_id === ing.product_id);
           if (transitItem) {
             await supabase
@@ -1877,7 +1944,6 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
           }
         }
       } else {
-        // Si no es receta, devolver el producto directo
         const qtyToReturn = item.quantity;
         const transitItem = get().transitItems.find(t => t.product_id === item.product_id);
         if (transitItem) {
@@ -1899,7 +1965,6 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     }
 
     await get().getPendingAccounts();
-    // Recargar transit items para reflejar cambios
     const { data: transitData } = await supabase.from('transit_items').select('*').eq('user_id', useAuthStore.getState().user?.id);
     if (transitData) {
       set({ transitItems: transitData.filter(t => t.remaining > 0) });
