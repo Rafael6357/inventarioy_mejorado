@@ -1811,6 +1811,33 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     
     const accountItems = (account.items as any[]) || [];
     const newTotal = newIsAccountHouse ? 0 : accountItems.reduce((sum, item) => sum + item.subtotal, 0);
+
+    const isOnline = navigator.onLine;
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+
+    if (!isOnline && isTauri) {
+      try {
+        const dbReady = await sqliteLocal.isDBReady();
+        if (dbReady) {
+          await sqliteLocal.updatePendingAccountLocally(accountId, {
+            items: accountItems,
+            total_amount: newTotal,
+            is_account_house: newIsAccountHouse,
+            sale_type: (account as any).sale_type || 'SALON',
+          });
+          set((state) => ({
+            pendingAccounts: state.pendingAccounts.map(a => 
+              a.id === accountId 
+                ? { ...a, is_account_house: newIsAccountHouse, total_amount: newTotal }
+                : a
+            )
+          }));
+          return { success: true };
+        }
+      } catch (sqliteErr) {
+        console.warn('[togglePendingAccountType] Error guardando en SQLite:', sqliteErr);
+      }
+    }
     
     const { error } = await supabase
       .from('pending_accounts')
