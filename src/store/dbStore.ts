@@ -525,6 +525,34 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       return;
     }
 
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+    
+    let localClosings: any[] = [];
+    let localSales: any[] = [];
+    let localMovements: any[] = [];
+    let localTransitItems: any[] = [];
+    
+    if (isTauri) {
+      try {
+        const dbReady = await sqliteLocal.isDBReady();
+        if (dbReady) {
+          console.log('[fetchAll] Cargando datos locales desde SQLite...');
+          localClosings = await sqliteLocal.getDailyClosingsLocally(user.id);
+          localSales = await sqliteLocal.getSalesLocally(user.id);
+          localMovements = await sqliteLocal.getMovementsLocally(user.id);
+          localTransitItems = await sqliteLocal.getTransitItemsLocally(user.id);
+          console.log('[fetchAll] Datos locales cargados:', {
+            closings: localClosings.length,
+            sales: localSales.length,
+            movements: localMovements.length,
+            transit: localTransitItems.length
+          });
+        }
+      } catch (err) {
+        console.warn('[fetchAll] Error cargando datos locales:', err);
+      }
+    }
+
     set({ isLoading: true });
 
     const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -579,15 +607,47 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
 
       const transitItems = (transitRes.data || []).filter(t => t.remaining > 0);
 
+      const allDailyClosings = [...(dailyClosingsRes.data || [])];
+      for (const closing of localClosings) {
+        if (!allDailyClosings.find(c => c.id === closing.id)) {
+          allDailyClosings.push(closing);
+        }
+      }
+      allDailyClosings.sort((a, b) => new Date(b.closing_date).getTime() - new Date(a.closing_date).getTime());
+
+      const allSales = [...sales];
+      for (const sale of localSales) {
+        if (!allSales.find(s => s.id === sale.id)) {
+          allSales.push(sale);
+        }
+      }
+      allSales.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      const allMovements = [...(movementsRes.data || [])];
+      for (const movement of localMovements) {
+        if (!allMovements.find(m => m.id === movement.id)) {
+          allMovements.push(movement);
+        }
+      }
+      allMovements.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      const allTransitItems = [...transitItems];
+      for (const item of localTransitItems) {
+        if (!allTransitItems.find(t => t.id === item.id)) {
+          allTransitItems.push(item);
+        }
+      }
+      const filteredTransit = allTransitItems.filter(t => t.remaining > 0);
+
       set({
         products: productsRes.data || [],
-        movements: movementsRes.data || [],
-        sales,
+        movements: allMovements,
+        sales: allSales,
         recipes,
         employees: employeesRes.data || [],
         categories: categoriesRes.data || [],
-        transitItems,
-        dailyClosings: dailyClosingsRes.data || [],
+        transitItems: filteredTransit,
+        dailyClosings: allDailyClosings,
         hrDocuments: hrDocsRes.data || [],
         departments: departmentsRes.data || [],
         payrollConfig: payrollConfigRes.data || null,
@@ -767,8 +827,36 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     // Usar la fecha tal cual viene del frontend (ya en formato local)
     const movementDate = movement.date || new Date().toISOString();
 
-    // Si está offline, guardar en IndexedDB
+    // Si está offline, guardar en IndexedDB y/o SQLite
     if (!isOnline) {
+      const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+      
+      const movementToSave = {
+        id: `offline-${Date.now()}`,
+        user_id: user.id,
+        product_id: movement.product_id,
+        type: movement.type,
+        quantity: movement.quantity,
+        unit: movement.unit,
+        date: movementDate,
+        cost: movement.cost || 0,
+        reason: movement.reason || null,
+        status: 'COMPLETED',
+        created_at: new Date().toISOString(),
+      };
+
+      if (isTauri) {
+        try {
+          const dbReady = await sqliteLocal.isDBReady();
+          if (dbReady) {
+            await sqliteLocal.saveMovementLocally(movementToSave);
+            console.log('[addMovement] Movimiento guardado en SQLite');
+          }
+        } catch (sqliteErr) {
+          console.warn('[addMovement] Error guardando en SQLite:', sqliteErr);
+        }
+      }
+
       try {
         await initOfflineDB();
         await savePendingMovement({ data: { ...movement, user_id: user.id, date: movementDate } });
@@ -939,8 +1027,37 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       }
     }
 
-    // Si está offline, guardar en IndexedDB
+    // Si está offline, guardar en IndexedDB y/o SQLite
     if (!isOnline) {
+      const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+      const saleId = `offline-${Date.now()}`;
+      
+      const saleToSave = {
+        id: saleId,
+        user_id: user.id,
+        employee_id: sale.employee_id,
+        items: JSON.stringify(sale.items),
+        total_amount: sale.total_amount,
+        date: sale.date,
+        sale_type: sale.sale_type || 'SALON',
+        is_account_house: sale.is_account_house || false,
+        notes: sale.notes,
+        discount: sale.discount || 0,
+        created_at: new Date().toISOString(),
+      };
+
+      if (isTauri) {
+        try {
+          const dbReady = await sqliteLocal.isDBReady();
+          if (dbReady) {
+            await sqliteLocal.saveSaleLocally(saleToSave);
+            console.log('[addSale] Venta guardada en SQLite');
+          }
+        } catch (sqliteErr) {
+          console.warn('[addSale] Error guardando en SQLite:', sqliteErr);
+        }
+      }
+
       try {
         await initOfflineDB();
         await savePendingSale({
@@ -949,7 +1066,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
             items: sale.items,
             total_amount: sale.total_amount,
             date: sale.date,
-sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
+            sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
             is_account_house: sale.is_account_house || false,
             notes: sale.notes,
             discount: sale.discount,

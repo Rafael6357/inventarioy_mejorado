@@ -345,3 +345,111 @@ export async function getDailyClosingsLocally(userId: string): Promise<any[]> {
     [userId]
   );
 }
+
+export async function saveSaleLocally(sale: any): Promise<void> {
+  const database = await getDB();
+  if (!database) {
+    console.log('[SQLite] Database not available for saving sale');
+    return;
+  }
+  
+  await database.execute(
+    `INSERT OR REPLACE INTO sales (id, user_id, employee_id, items, total_amount, date, sale_type, is_account_house, notes, discount, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    [
+      sale.id,
+      sale.user_id,
+      sale.employee_id || null,
+      sale.items,
+      sale.total_amount,
+      sale.date,
+      sale.sale_type || 'SALON',
+      sale.is_account_house ? 1 : 0,
+      sale.notes || null,
+      sale.discount || 0,
+      sale.created_at || new Date().toISOString(),
+    ]
+  );
+}
+
+export async function getSalesLocally(userId: string): Promise<any[]> {
+  const database = await getDB();
+  if (!database) return [];
+  
+  return await database.select(
+    'SELECT * FROM sales WHERE user_id = $1 ORDER BY created_at DESC',
+    [userId]
+  );
+}
+
+export async function saveMovementLocally(movement: any): Promise<void> {
+  const database = await getDB();
+  if (!database) {
+    console.log('[SQLite] Database not available for saving movement');
+    return;
+  }
+  
+  await database.execute(
+    `INSERT OR REPLACE INTO movements (id, user_id, product_id, type, quantity, unit, date, cost, reason, status, justification, justification_date, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+    [
+      movement.id,
+      movement.user_id,
+      movement.product_id,
+      movement.type,
+      movement.quantity,
+      movement.unit,
+      movement.date,
+      movement.cost || 0,
+      movement.reason || null,
+      movement.status || 'COMPLETED',
+      movement.justification || null,
+      movement.justification_date || null,
+      movement.created_at || new Date().toISOString(),
+    ]
+  );
+}
+
+export async function getMovementsLocally(userId: string): Promise<any[]> {
+  const database = await getDB();
+  if (!database) return [];
+  
+  return await database.select(
+    'SELECT * FROM movements WHERE user_id = $1 ORDER BY created_at DESC',
+    [userId]
+  );
+}
+
+export async function saveTransitItemLocally(item: any): Promise<void> {
+  const database = await getDB();
+  if (!database) {
+    console.log('[SQLite] Database not available for saving transit item');
+    return;
+  }
+  
+  await database.execute(
+    `INSERT OR REPLACE INTO transit_items (id, user_id, product_id, quantity, consumed, remaining, reason, sent_date, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [
+      item.id,
+      item.user_id,
+      item.product_id,
+      item.quantity,
+      item.consumed || 0,
+      item.remaining || item.quantity,
+      item.reason || null,
+      item.sent_date,
+      item.created_at || new Date().toISOString(),
+    ]
+  );
+}
+
+export async function getTransitItemsLocally(userId: string): Promise<any[]> {
+  const database = await getDB();
+  if (!database) return [];
+  
+  return await database.select(
+    'SELECT * FROM transit_items WHERE user_id = $1 ORDER BY created_at DESC',
+    [userId]
+  );
+}
