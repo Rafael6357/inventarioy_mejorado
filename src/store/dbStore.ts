@@ -2851,10 +2851,6 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     }
   },
 
-    set({ departmentsTotal: count || 0 });
-    return count || 0;
-  },
-
   getPayrollEntriesPaginated: async (page, month, year) => {
     const user = useAuthStore.getState().user;
     if (!user) return;
@@ -2914,12 +2910,6 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       console.warn('[getPayrollEntriesCount] Error:', err);
       return 0;
     }
-  },
-      return 0;
-    }
-
-    set({ payrollTotal: count || 0 });
-    return count || 0;
   },
 
   updatePayrollEntry: async (id, updates) => {
