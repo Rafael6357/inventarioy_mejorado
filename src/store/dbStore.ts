@@ -1926,13 +1926,19 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
 
     await get().getPendingAccounts();
     // Recargar ventas para reflejar el nuevo cobro
-    const { data: salesData } = await supabase.from('sales').select('*, sale_items(*)').eq('user_id', user.id).order('created_at', { ascending: false });
-    if (salesData) {
-      const sales = salesData.map(s => ({
-        ...s,
-        items: s.sale_items || [],
-      }));
-      set((state) => ({ sales }));
+    if (!navigator.onLine) {
+      // Si está offline, recargar desde SQLite para obtener la venta con campos de pago
+      await get().fetchAll();
+    } else {
+      // Si está online, recargar desde Supabase
+      const { data: salesData } = await supabase.from('sales').select('*, sale_items(*)').eq('user_id', user.id).order('created_at', { ascending: false });
+      if (salesData) {
+        const sales = salesData.map(s => ({
+          ...s,
+          items: s.sale_items || [],
+        }));
+        set((state) => ({ sales }));
+      }
     }
     return { success: true };
   },
