@@ -81,6 +81,7 @@ export default function SalesView() {
   const [closingSales, setClosingSales] = useState<any[]>([]);
   const [closingLoading, setClosingLoading] = useState(false);
   const [isProcessingSale, setIsProcessingSale] = useState(false);
+  const [isProcessingCharge, setIsProcessingCharge] = useState(false);
   const [isCreatingPending, setIsCreatingPending] = useState(false);
   const [showPreticket, setShowPreticket] = useState(false);
   const [preticketData, setPreticketData] = useState<any>(null);
@@ -1612,63 +1613,70 @@ setShowTicket(true);
               <Button
                 className="flex-1 gap-2"
                 onClick={async () => {
-                  const totalPaid = chargeBreakdown.efectivo + 
-                    (user?.cupTransferEnabled ? chargeBreakdown.transferencia : 0) + 
-                    (user?.usdEnabled ? chargeBreakdown.usd * (user?.usdRate || 0) : 0) +
-                    (user?.eurEnabled ? chargeBreakdown.eur * (user?.eurRate || 0) : 0);
-                  const accountTotal = selectedAccountForCharge.total_amount || 0;
-                  if (totalPaid < accountTotal) {
-                    toast.error('El total pagado es menor al total de la cuenta');
-                    return;
-                  }
-                  const selectedEmp = employees.find(e => e.id === employeeId);
-                  const usdConverted = user?.usdEnabled ? chargeBreakdown.usd * (user?.usdRate || 0) : 0;
-                  const eurConverted = user?.eurEnabled ? chargeBreakdown.eur * (user?.eurRate || 0) : 0;
-                  const paymentMethodStr = `Efectivo: ${chargeBreakdown.efectivo}${user?.cupTransferEnabled ? `, Transfer: ${chargeBreakdown.transferencia}` : ''}${user?.usdEnabled ? `, USD: ${usdConverted}` : ''}${user?.eurEnabled ? `, EUR: ${eurConverted}` : ''}`;
-                  const result = await chargePendingAccount(
-                    selectedAccountForCharge.id,
-                    employeeId || user?.id || '',
-                    selectedEmp ? selectedEmp.name : (user?.name || 'Vendedor'),
-                    closingDate,
-                    paymentMethodStr,
-                    chargeBreakdown.efectivo || 0,
-                    chargeBreakdown.transferencia || 0,
-                    chargeBreakdown.usd || 0,
-                    chargeBreakdown.eur || 0
-                  );
-                  if (result.success) {
-                    toast.success('Cuenta cobrada');
-                    const isAccHouse = selectedAccountForCharge.is_account_house;
-                    await useDatabaseStore.getState().logAction('sales', 'COBRO', {
-                      client_name: selectedAccountForCharge.client_name,
-                      total: accountTotal,
-                      payment_method: paymentMethodStr,
-                      is_account_house: isAccHouse
-                    });
-                    setTicketData({
-                      items: ((selectedAccountForCharge.items as any[]) || []).map((item: any) => ({
-                        name: item.product_name,
-                        quantity: item.quantity,
-                        unitPrice: item.unit_price,
-                        subtotal: item.subtotal
-                      })),
-                      total: isAccHouse ? 0 : accountTotal,
-                      employeeName: selectedEmp ? selectedEmp.name : (user?.name || 'Vendedor'),
-                      businessName: user?.businessName || 'Mi Negocio',
-                      ticketMessage: user?.ticketMessage || '¡Gracias por su visita!',
-                      saleType: selectedAccountForCharge.sale_type || 'SALON',
-                      isAccountHouse: isAccHouse,
-                      paymentBreakdown: chargeBreakdown,
-                      date: new Date(closingDate + 'T' + new Date().toTimeString().slice(0,8))
-                    });
-                    setShowTicket(true);
-                    setShowChargeMixModal(false);
-                  } else {
-                    toast.error(result.error || 'Error al cobrar');
+                  if (isProcessingCharge) return;
+                  setIsProcessingCharge(true);
+                  
+                  try {
+                    const totalPaid = chargeBreakdown.efectivo + 
+                      (user?.cupTransferEnabled ? chargeBreakdown.transferencia : 0) + 
+                      (user?.usdEnabled ? chargeBreakdown.usd * (user?.usdRate || 0) : 0) +
+                      (user?.eurEnabled ? chargeBreakdown.eur * (user?.eurRate || 0) : 0);
+                    const accountTotal = selectedAccountForCharge.total_amount || 0;
+                    if (totalPaid < accountTotal) {
+                      toast.error('El total pagado es menor al total de la cuenta');
+                      return;
+                    }
+                    const selectedEmp = employees.find(e => e.id === employeeId);
+                    const usdConverted = user?.usdEnabled ? chargeBreakdown.usd * (user?.usdRate || 0) : 0;
+                    const eurConverted = user?.eurEnabled ? chargeBreakdown.eur * (user?.eurRate || 0) : 0;
+                    const paymentMethodStr = `Efectivo: ${chargeBreakdown.efectivo}${user?.cupTransferEnabled ? `, Transfer: ${chargeBreakdown.transferencia}` : ''}${user?.usdEnabled ? `, USD: ${usdConverted}` : ''}${user?.eurEnabled ? `, EUR: ${eurConverted}` : ''}`;
+                    const result = await chargePendingAccount(
+                      selectedAccountForCharge.id,
+                      employeeId || user?.id || '',
+                      selectedEmp ? selectedEmp.name : (user?.name || 'Vendedor'),
+                      closingDate,
+                      paymentMethodStr,
+                      chargeBreakdown.efectivo || 0,
+                      chargeBreakdown.transferencia || 0,
+                      chargeBreakdown.usd || 0,
+                      chargeBreakdown.eur || 0
+                    );
+                    if (result.success) {
+                      toast.success('Cuenta cobrada');
+                      const isAccHouse = selectedAccountForCharge.is_account_house;
+                      await useDatabaseStore.getState().logAction('sales', 'COBRO', {
+                        client_name: selectedAccountForCharge.client_name,
+                        total: accountTotal,
+                        payment_method: paymentMethodStr,
+                        is_account_house: isAccHouse
+                      });
+                      setTicketData({
+                        items: ((selectedAccountForCharge.items as any[]) || []).map((item: any) => ({
+                          name: item.product_name,
+                          quantity: item.quantity,
+                          unitPrice: item.unit_price,
+                          subtotal: item.subtotal
+                        })),
+                        total: isAccHouse ? 0 : accountTotal,
+                        employeeName: selectedEmp ? selectedEmp.name : (user?.name || 'Vendedor'),
+                        businessName: user?.businessName || 'Mi Negocio',
+                        ticketMessage: user?.ticketMessage || '¡Gracias por su visita!',
+                        saleType: selectedAccountForCharge.sale_type || 'SALON',
+                        isAccountHouse: isAccHouse,
+                        paymentBreakdown: chargeBreakdown,
+                        date: new Date(closingDate + 'T' + new Date().toTimeString().slice(0,8))
+                      });
+                      setShowTicket(true);
+                      setShowChargeMixModal(false);
+                    } else {
+                      toast.error(result.error || 'Error al cobrar');
+                    }
+                  } finally {
+                    setIsProcessingCharge(false);
                   }
                 }}
               >
-                Confirmar Cobro
+                {isProcessingCharge ? 'Cobrando...' : 'Confirmar Cobro'}
               </Button>
             </div>
           </div>
