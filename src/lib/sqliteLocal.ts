@@ -305,3 +305,43 @@ export async function clearSyncedItems(): Promise<void> {
   if (!database) return;
   await database.execute('DELETE FROM sync_queue WHERE synced = 1');
 }
+
+export async function saveDailyClosingLocally(closing: any): Promise<void> {
+  const database = await getDB();
+  if (!database) {
+    console.log('SQLite no disponible para guardar cierre');
+    return;
+  }
+  
+  await database.execute(
+    `INSERT OR REPLACE INTO daily_closings (id, user_id, closing_date, total_sales, total_discounts, total_refunds, closing_amount, notes, created_by, created_by_name, cup_efectivo, cup_transfer, usd, eur, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+    [
+      closing.id,
+      closing.user_id,
+      closing.closing_date,
+      closing.total_sales || 0,
+      closing.total_discounts || 0,
+      closing.total_refunds || 0,
+      closing.closing_amount || 0,
+      closing.notes || null,
+      closing.created_by || null,
+      closing.created_by_name || null,
+      closing.cup_efectivo || null,
+      closing.cup_transfer || null,
+      closing.usd || null,
+      closing.eur || null,
+      closing.created_at || new Date().toISOString(),
+    ]
+  );
+}
+
+export async function getDailyClosingsLocally(userId: string): Promise<any[]> {
+  const database = await getDB();
+  if (!database) return [];
+  
+  return await database.select(
+    'SELECT * FROM daily_closings WHERE user_id = $1 ORDER BY closing_date DESC',
+    [userId]
+  );
+}

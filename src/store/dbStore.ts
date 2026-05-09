@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from './authStore';
 import { toast } from 'sonner';
+import * as sqliteLocal from '../lib/sqliteLocal';
 import {
   initOfflineDB,
   savePendingSale,
@@ -2424,6 +2425,21 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
     const user = useAuthStore.getState().user;
     if (!user) return;
 
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+    let localClosings: any[] = [];
+
+    if (isTauri) {
+      try {
+        const dbReady = await sqliteLocal.isDBReady();
+        if (dbReady) {
+          localClosings = await sqliteLocal.getDailyClosingsLocally(user.id);
+          console.log('[getDailyClosings] Cierres desde SQLite:', localClosings.length);
+        }
+      } catch (err) {
+        console.warn('[getDailyClosings] Error leyendo cierres de SQLite:', err);
+      }
+    }
+
     const { data, error } = await supabase
       .from('daily_closings')
       .select('*')
@@ -2431,10 +2447,24 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
       .order('closing_date', { ascending: false });
 
     if (error) {
+      if (localClosings.length > 0) {
+        set({ dailyClosings: localClosings });
+        console.log('[getDailyClosings] Error de Supabase, usando cierres locales:', localClosings.length);
+        return;
+      }
       throw new Error('No se pudieron cargar los cierres de caja');
     }
 
-    set({ dailyClosings: data || [] });
+    const allClosings = [...localClosings];
+    for (const closing of (data || [])) {
+      if (!allClosings.find(c => c.id === closing.id)) {
+        allClosings.push(closing);
+      }
+    }
+
+    allClosings.sort((a, b) => new Date(b.closing_date).getTime() - new Date(a.closing_date).getTime());
+
+    set({ dailyClosings: allClosings });
   },
 
   createDailyClosing: async (closing) => {
@@ -2442,10 +2472,30 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
     if (!user) return { success: false, error: 'No autenticado' };
 
     const isOnline = navigator.onLine;
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
 
-    // Si está offline, guardar en IndexedDB
+    // Si está offline, guardar en IndexedDB y/o SQLite
     if (!isOnline) {
       try {
+        const closingWithId = {
+          id: `offline-${Date.now()}`,
+          user_id: user.id,
+          ...closing,
+          created_at: new Date().toISOString(),
+        };
+
+        if (isTauri) {
+          try {
+            const dbReady = await sqliteLocal.isDBReady();
+            if (dbReady) {
+              await sqliteLocal.saveDailyClosingLocally(closingWithId);
+              console.log('[createDailyClosing] Cierre guardado en SQLite');
+            }
+          } catch (sqliteErr) {
+            console.warn('[createDailyClosing] Error guardando en SQLite:', sqliteErr);
+          }
+        }
+
         await initOfflineDB();
         await savePendingClosing({
           data: {
@@ -2460,15 +2510,7 @@ sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
           },
         });
 
-        // Actualizar el estado local para que el usuario vea el cierre
-        const tempClosing = {
-          id: `offline-${Date.now()}`,
-          user_id: user.id,
-          ...closing,
-          created_at: new Date().toISOString(),
-        };
-        
-        set((state) => ({ dailyClosings: [tempClosing, ...state.dailyClosings] }));
+        set((state) => ({ dailyClosings: [closingWithId, ...state.dailyClosings] }));
         toast.success('Cierre de caja guardado offline. Se sincronizará cuando haya conexión.');
         return { success: true };
       } catch (err) {
