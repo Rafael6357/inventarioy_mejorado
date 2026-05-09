@@ -100,6 +100,11 @@ async function createTables(): Promise<void> {
       is_account_house INTEGER DEFAULT 0,
       notes TEXT,
       discount REAL DEFAULT 0,
+      efectivo REAL DEFAULT 0,
+      transferencia REAL DEFAULT 0,
+      usd REAL DEFAULT 0,
+      eur REAL DEFAULT 0,
+      payment_method TEXT,
       created_at TEXT NOT NULL
     )
   `);
@@ -368,8 +373,8 @@ export async function saveSaleLocally(sale: any): Promise<void> {
   }
   
   await database.execute(
-    `INSERT OR REPLACE INTO sales (id, user_id, employee_id, items, total_amount, date, sale_type, is_account_house, notes, discount, created_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    `INSERT OR REPLACE INTO sales (id, user_id, employee_id, items, total_amount, date, sale_type, is_account_house, notes, discount, efectivo, transferencia, usd, eur, payment_method, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
     [
       sale.id,
       sale.user_id,
@@ -381,6 +386,11 @@ export async function saveSaleLocally(sale: any): Promise<void> {
       sale.is_account_house ? 1 : 0,
       sale.notes || null,
       sale.discount || 0,
+      sale.efectivo || 0,
+      sale.transferencia || 0,
+      sale.usd || 0,
+      sale.eur || 0,
+      sale.payment_method || null,
       sale.created_at || new Date().toISOString(),
     ]
   );

@@ -1190,43 +1190,15 @@ setShowTicket(true);
                           <Button
                             size="sm"
                             className="h-6 text-xs bg-success hover:bg-success/80"
-                            onClick={async () => {
+                            onClick={() => {
                               const selectedEmp = employees.find(e => e.id === employeeId);
-                              const result = await chargePendingAccount(
-                                account.id,
-                                employeeId || user?.id || '',
-                                selectedEmp ? selectedEmp.name : (user?.name || 'Vendedor'),
-                                closingDate
-                              );
-                              if (result.success) {
-                                setSelectedPendingAccount('');
-                                toast.success('Cuenta cobrada exitosamente');
-                                const isAccHouse = (account as any).is_account_house;
-                                await useDatabaseStore.getState().logAction('sales', 'COBRO', {
-                                  client_name: account.client_name,
-                                  total: account.total_amount || 0,
-                                  is_account_house: isAccHouse
-                                });
-                                const accItems = (account as any).items || [];
-                                setTicketData({
-                                  items: accItems.map((item: any) => ({
-                                    name: item.product_name,
-                                    quantity: item.quantity,
-                                    unitPrice: item.unit_price,
-                                    subtotal: item.subtotal
-                                  })),
-                                  total: isAccHouse ? 0 : account.total_amount || 0,
-                                  employeeName: selectedEmp ? selectedEmp.name : (user?.name || 'Vendedor'),
-                                  businessName: user?.businessName || 'Mi Negocio',
-                                  ticketMessage: user?.ticketMessage || '¡Gracias por su visita!',
-                                  saleType: (account as any).sale_type || 'SALON',
-                                  isAccountHouse: isAccHouse,
-                                  date: new Date(closingDate + 'T' + new Date().toTimeString().slice(0,8))
-                                });
-                                setShowTicket(true);
-                              } else {
-                                toast.error(result.error || 'Error al cobrar');
-                              }
+                              setSelectedAccountForCharge({
+                                ...account,
+                                employeeId: employeeId || user?.id || '',
+                                employeeName: selectedEmp ? selectedEmp.name : (user?.name || 'Vendedor')
+                              });
+                              setChargeBreakdown({ efectivo: 0, transferencia: 0, usd: 0, eur: 0 });
+                              setShowChargeMixModal(true);
                             }}
                           >
                             Cobrar
@@ -1658,7 +1630,11 @@ setShowTicket(true);
                     employeeId || user?.id || '',
                     selectedEmp ? selectedEmp.name : (user?.name || 'Vendedor'),
                     closingDate,
-                    paymentMethodStr
+                    paymentMethodStr,
+                    chargeBreakdown.efectivo || 0,
+                    chargeBreakdown.transferencia || 0,
+                    chargeBreakdown.usd || 0,
+                    chargeBreakdown.eur || 0
                   );
                   if (result.success) {
                     toast.success('Cuenta cobrada');

@@ -438,7 +438,7 @@ addItemsToPendingAccount: (accountId: string, items: { product_id: string; produ
   togglePendingAccountType: (accountId: string) => Promise<{ success: boolean; error?: string }>;
   deletePendingAccount: (accountId: string) => Promise<{ success: boolean; error?: string }>;
   getPendingAccounts: () => Promise<void>;
-  chargePendingAccount: (accountId: string, employeeId: string, employeeName: string, saleDate?: string, paymentMethod?: string) => Promise<{ success: boolean; error?: string }>;
+  chargePendingAccount: (accountId: string, employeeId: string, employeeName: string, saleDate?: string, paymentMethod?: string, efectivo?: number, transferencia?: number, usd?: number, eur?: number) => Promise<{ success: boolean; error?: string }>;
 
   saveAccessPin: (role: string, pin: string) => Promise<{ success: boolean; error?: string }>;
   toggleAccessPin: (pinId: string, isActive: boolean) => Promise<{ success: boolean; error?: string }>;
@@ -1095,6 +1095,11 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
         is_account_house: sale.is_account_house || false,
         notes: sale.notes,
         discount: sale.discount || 0,
+        efectivo: sale.efectivo || 0,
+        transferencia: sale.transferencia || 0,
+        usd: sale.usd || 0,
+        eur: sale.eur || 0,
+        payment_method: sale.payment_method || null,
         created_at: new Date().toISOString(),
       };
 
@@ -1848,7 +1853,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     return { success: true };
   },
 
-  chargePendingAccount: async (accountId: string, employeeId: string, employeeName: string, saleDate?: string, paymentMethod?: string) => {
+  chargePendingAccount: async (accountId: string, employeeId: string, employeeName: string, saleDate?: string, paymentMethod?: string, efectivo?: number, transferencia?: number, usd?: number, eur?: number) => {
     const user = useAuthStore.getState().user;
     if (!user) return { success: false, error: 'No hay usuario autenticado' };
 
@@ -1900,6 +1905,10 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       notes: `Cobro de cuenta pendiente: ${account.client_name}`,
       discount: 0,
       payment_method: paymentMethod || 'Cobro de cuenta pendiente',
+      efectivo: efectivo || 0,
+      transferencia: transferencia || 0,
+      usd: usd || 0,
+      eur: eur || 0,
     });
 
     if (!result.success) {
