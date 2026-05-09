@@ -1982,11 +1982,10 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
             status: 'paid',
             updated_at: new Date().toISOString(),
           });
-          // Actualizar estado local
+          // Actualizar estado local - NO llamar fetchAll que intenta conectar a Supabase
           set((state) => ({
             pendingAccounts: state.pendingAccounts.filter(a => a.id !== accountId)
           }));
-          await get().fetchAll();
           return { success: true };
         }
       } catch (sqliteErr) {

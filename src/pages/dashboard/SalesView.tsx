@@ -1644,12 +1644,19 @@ setShowTicket(true);
                     if (result.success) {
                       toast.success('Cuenta cobrada');
                       const isAccHouse = selectedAccountForCharge.is_account_house;
-                      await useDatabaseStore.getState().logAction('sales', 'COBRO', {
-                        client_name: selectedAccountForCharge.client_name,
-                        total: accountTotal,
-                        payment_method: paymentMethodStr,
-                        is_account_house: isAccHouse
-                      });
+                      // No bloquear el flujo si logAction falla (ej. offline)
+                      if (navigator.onLine) {
+                        try {
+                          await useDatabaseStore.getState().logAction('sales', 'COBRO', {
+                            client_name: selectedAccountForCharge.client_name,
+                            total: accountTotal,
+                            payment_method: paymentMethodStr,
+                            is_account_house: isAccHouse
+                          });
+                        } catch (logErr) {
+                          console.warn('[logAction] Error (offline?):', logErr);
+                        }
+                      }
                       setTicketData({
                         items: ((selectedAccountForCharge.items as any[]) || []).map((item: any) => ({
                           name: item.product_name,
