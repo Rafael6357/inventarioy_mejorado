@@ -1,6 +1,6 @@
 [package]
 name = "inventarioy"
-version = "1.1.5"
+version = "1.1.6"
 description = "InventarioY - Sistema de gestión de inventario"
 authors = ["InventarioY"]
 edition = "2021"
