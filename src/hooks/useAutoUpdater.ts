@@ -19,7 +19,7 @@ export function useAutoUpdater() {
   const [error, setError] = useState<UpdateError | null>(null);
   const [settings, setSettings] = useState<UpdateSettings>(DEFAULT_UPDATE_SETTINGS);
 
-  const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI__;
+  const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
   useEffect(() => {
     if (!isTauri) {

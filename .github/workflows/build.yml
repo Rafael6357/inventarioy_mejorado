@@ -44,30 +44,12 @@ jobs:
           if [[ $GITHUB_REF == refs/tags/v* ]]; then
             VERSION=${GITHUB_REF#refs/tags/v}
             echo "Setting version to $VERSION"
-            # Update tauri.conf.json version only
-            sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" src-tauri/tauri.conf.json
-            # Update Cargo.toml version only
-            sed -i "s/^version = \"[^\"]*\"/version = \"$VERSION\"/" src-tauri/Cargo.toml
-            # Update App.tsx version only
-            sed -i "s/const \[appVersion, setAppVersion\] = useState('[^']*')/const [appVersion, setAppVersion] = useState('$VERSION')/" src/App.tsx
-          fi
-
-      - name: Ensure WebView2 embedBootstrapper
-        shell: bash
-        run: |
-          # Verify embedBootstrapper is set in tauri.conf.json
-          if grep -q '"type": "embedBootstrapper"' src-tauri/tauri.conf.json; then
-            echo "✓ WebView2 embedBootstrapper already configured"
-          else
-            echo "Adding WebView2 embedBootstrapper to tauri.conf.json"
-            # Use node to safely update the JSON
-            node -e "
-              const fs = require('fs');
-              const config = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
-              if (!config.bundle.windows) config.bundle.windows = {};
-              config.bundle.windows.webviewInstallMode = { type: 'embedBootstrapper' };
-              fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(config, null, 2) + '\n');
-            "
+            # Update tauri.conf.json
+            sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" src-tauri/tauri.conf.json
+            # Update Cargo.toml
+            sed -i "s/^version = \".*\"/version = \"$VERSION\"/" src-tauri/Cargo.toml
+            # Update App.tsx version
+            sed -i "s/const \[appVersion\] = useState('.*');/const [appVersion] = useState('$VERSION');/" src/App.tsx
           fi
 
       - name: Build Tauri app

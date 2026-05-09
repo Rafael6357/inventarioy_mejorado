@@ -22,41 +22,7 @@ import { useAuthStore } from './store/authStore';
 export default function App() {
   const [isTauri, setIsTauri] = useState(false);
   const [syncEngineReady, setSyncEngineReady] = useState(false);
-  const [appVersion, setAppVersion] = useState('1.1.2');
-  const [isLoadingVersion, setIsLoadingVersion] = useState(true);
-
-  const refreshVersion = async () => {
-    setIsLoadingVersion(true);
-    if (typeof window !== 'undefined' && (window as any).__TAURI__) {
-      try {
-        const { getVersion } = await import('@tauri-apps/api/app');
-        const version = await getVersion();
-        console.log('📱 Versión actualizada:', version);
-        setAppVersion(version);
-      } catch (e) {
-        console.warn('Could not get app version:', e);
-      }
-    }
-    setIsLoadingVersion(false);
-  };
-
-  useEffect(() => {
-    async function getVersion() {
-      setIsLoadingVersion(true);
-      if (typeof window !== 'undefined' && (window as any).__TAURI__) {
-        try {
-          const { getVersion } = await import('@tauri-apps/api/app');
-          const version = await getVersion();
-          console.log('📱 Versión obtenida:', version);
-          setAppVersion(version);
-        } catch (e) {
-          console.warn('Could not get app version:', e);
-        }
-      }
-      setIsLoadingVersion(false);
-    }
-    getVersion();
-  }, []);
+  const [appVersion] = useState('1.0.1');
 
   const {
     updateInfo,
@@ -168,7 +134,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/menu" element={<MenuView />} />
-        <Route path="/dashboard/*" element={<Dashboard updateSettings={settings} onToggleAutoUpdate={toggleAutoUpdate} onToggleEnabled={toggleEnabled} appVersion={appVersion} isLoadingVersion={isLoadingVersion} onRefreshVersion={refreshVersion} />} />
+        <Route path="/dashboard/*" element={<Dashboard updateSettings={settings} onToggleAutoUpdate={toggleAutoUpdate} onToggleEnabled={toggleEnabled} />} />
       </Routes>
     </Router>
   );
