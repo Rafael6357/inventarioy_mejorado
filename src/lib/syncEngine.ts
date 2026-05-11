@@ -212,7 +212,10 @@ async function handleDelete(table: string, data: any): Promise<void> {
 }
 
 async function pullRemoteChanges(): Promise<void> {
-  if (!state.isOnline) return;
+  if (!state.isOnline || !navigator.onLine) {
+    console.log('[pullRemoteChanges] Offline, omitiendo sincronización entrante');
+    return;
+  }
 
   const isTauriApp = await sqlite.isTauri();
   if (!isTauriApp) {
@@ -243,7 +246,7 @@ async function pullRemoteChanges(): Promise<void> {
         await mergeRemoteChanges(table, data);
       }
     } catch (error) {
-      console.error(`Error al obtener cambios de ${table}:`, error);
+      console.warn(`Error al obtener cambios de ${table}:`, error);
     }
   }
 }

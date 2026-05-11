@@ -145,24 +145,25 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     _isInitializing = true;
     console.log('Inicializando autenticación...');
 
-    const isOffline = !navigator.onLine;
     const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
 
-    // 1. Primero verificar si hay sesión offline guardada en SQLite (solo en desktop)
-    if (isOffline && isTauri) {
+    // 1. En desktop, primero buscar sesión guardada en SQLite
+    if (isTauri) {
       try {
         const { getUserSession } = await import('../lib/sqliteLocal');
         const savedUserData = await getUserSession();
         if (savedUserData) {
-          console.log('[initialize] Recuperando sesión offline desde SQLite');
+          console.log('[initialize] Sesión encontrada en SQLite, restaurando...');
           set({ user: savedUserData, isAuthenticated: true, isLoading: false });
           _isInitializing = false;
           return;
         }
       } catch (err) {
-        console.warn('[initialize] Error recuperando sesión offline:', err);
+        console.warn('[initialize] Error buscando sesión en SQLite:', err);
       }
     }
+
+    const isOffline = !navigator.onLine;
 
     try {
       const controller = new AbortController();
