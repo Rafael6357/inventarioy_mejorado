@@ -1529,7 +1529,12 @@ setShowTicket(true);
                 <p className="text-sm text-text-secondary">{selectedAccountForCharge.client_name}</p>
               </div>
               <button
-                onClick={() => setShowChargeMixModal(false)}
+                onClick={() => {
+                  setShowChargeMixModal(false);
+                  setSelectedAccountForCharge(null);
+                  setChargeBreakdown({ efectivo: 0, transferencia: 0, usd: 0, eur: 0 });
+                  setIsProcessingCharge(false);
+                }}
                 className="rounded-full p-2 text-text-secondary hover:bg-surface-hover hover:text-text transition-colors"
               >
                 <X className="h-5 w-5" />
@@ -1606,7 +1611,12 @@ setShowTicket(true);
               <Button
                 variant="outline"
                 className="flex-1"
-                onClick={() => setShowChargeMixModal(false)}
+                onClick={() => {
+                  setShowChargeMixModal(false);
+                  setSelectedAccountForCharge(null);
+                  setChargeBreakdown({ efectivo: 0, transferencia: 0, usd: 0, eur: 0 });
+                  setIsProcessingCharge(false);
+                }}
               >
                 Cancelar
               </Button>
@@ -1624,6 +1634,7 @@ setShowTicket(true);
                     const accountTotal = selectedAccountForCharge.total_amount || 0;
                     if (totalPaid < accountTotal) {
                       toast.error('El total pagado es menor al total de la cuenta');
+                      setIsProcessingCharge(false);
                       return;
                     }
                     const selectedEmp = employees.find(e => e.id === employeeId);
@@ -1646,7 +1657,6 @@ setShowTicket(true);
                       try {
                         toast.success('Cuenta cobrada');
                         const isAccHouse = selectedAccountForCharge.is_account_house;
-                        // No bloquear el flujo si logAction falla (ej. offline)
                         if (navigator.onLine) {
                           try {
                             await useDatabaseStore.getState().logAction('sales', 'COBRO', {
@@ -1676,17 +1686,24 @@ setShowTicket(true);
                           date: new Date(closingDate + 'T' + new Date().toTimeString().slice(0,8))
                         });
                         setShowTicket(true);
+                        setSelectedAccountForCharge(null);
+                        setChargeBreakdown({ efectivo: 0, transferencia: 0, usd: 0, eur: 0 });
                         console.log('[SalesView] Cerrando modal de cobro...');
                       } catch (successErr) {
                         console.error('[SalesView] Error en flujo success:', successErr);
+                        setSelectedAccountForCharge(null);
+                        setChargeBreakdown({ efectivo: 0, transferencia: 0, usd: 0, eur: 0 });
                       } finally {
                         setShowChargeMixModal(false);
                         console.log('[SalesView] Modal de cobro cerrado');
                       }
                     } else {
                       toast.error(result.error || 'Error al cobrar');
+                      setIsProcessingCharge(false);
                     }
-                  } finally {
+                  } catch (err) {
+                    console.error('[SalesView] Error en cobro:', err);
+                    toast.error('Error al procesar el cobro');
                     setIsProcessingCharge(false);
                   }
                 }}

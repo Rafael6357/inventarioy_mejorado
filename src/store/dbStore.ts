@@ -1670,6 +1670,24 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const user = useAuthStore.getState().user;
     if (!user) return;
 
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+    const isOnline = navigator.onLine;
+
+    if (!isOnline && isTauri) {
+      try {
+        const dbReady = await sqliteLocal.isDBReady();
+        if (dbReady) {
+          const localAccounts = await sqliteLocal.getPendingAccountsLocally(user.id);
+          const pendingOnly = (localAccounts || []).filter((a: any) => a.status === 'pending');
+          set({ pendingAccounts: pendingOnly });
+          console.log('[getPendingAccounts] Cargadas cuentas pendientes desde SQLite:', pendingOnly.length);
+          return;
+        }
+      } catch (sqliteErr) {
+        console.warn('[getPendingAccounts] Error cargando desde SQLite:', sqliteErr);
+      }
+    }
+
     const { data, error } = await supabase
       .from('pending_accounts')
       .select('*')
