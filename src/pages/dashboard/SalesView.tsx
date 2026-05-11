@@ -698,7 +698,7 @@ setShowTicket(true);
                           )}
                         </div>
                         <p className="text-xs text-text-secondary">
-                          {accountItems.length} items - ${(account.total_amount || 0).toFixed(2)}
+                          {accountItems.length} productos - ${(account.total_amount || 0).toFixed(2)}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -744,7 +744,7 @@ setShowTicket(true);
                     </div>
                     {isExpanded && accountItems.length > 0 && (
                       <div className="mt-2 pt-2 border-t border-border/30 max-h-32 overflow-y-auto">
-                        <p className="text-xs font-medium text-text-secondary mb-1">Items:</p>
+                        <p className="text-xs font-medium text-text-secondary mb-1">Productos:</p>
                         <div className="space-y-1">
                           {accountItems.map((item, index) => (
                             <div key={index} className="flex items-center justify-between text-xs pl-2">
@@ -1184,7 +1184,7 @@ setShowTicket(true);
                         <div className="flex-1">
                           <p className="font-medium text-text">{account.client_name}</p>
                           <p className="text-text-secondary">
-                            {accountItems.length} items - ${(account.total_amount || 0).toFixed(2)}
+{accountItems.length} productos - ${(account.total_amount || 0).toFixed(2)}
                           </p>
                         </div>
                         <div className="flex gap-1">

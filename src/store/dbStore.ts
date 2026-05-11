@@ -2179,35 +2179,12 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       return { success: false, error: error.message };
     }
 
-    // Intentar recargar datos pero no fallar si no se puede
-    try {
-      await get().getPendingAccounts();
-    } catch (err) {
-      console.warn('[chargePendingAccount] Error recargando cuentas pendientes:', err);
-    }
-
-    // Recargar ventas para reflejar el nuevo cobro
-    const isStillOnline = await checkRealInternetConnection();
-    if (!isStillOnline) {
-      // Si está offline, recargar desde SQLite
+    // Solo recargar si hay conexión real (usar la variable ya calculada)
+    if (isOnline) {
       try {
-        await get().fetchAll();
+        await get().getPendingAccounts();
       } catch (err) {
-        console.warn('[chargePendingAccount] Error recargando datos offline:', err);
-      }
-    } else {
-      // Si está online, recargar desde Supabase
-      try {
-        const { data: salesData } = await supabase.from('sales').select('*, sale_items(*)').eq('user_id', user.id).order('created_at', { ascending: false });
-        if (salesData) {
-          const sales = salesData.map(s => ({
-            ...s,
-            items: s.sale_items || [],
-          }));
-          set((state) => ({ sales }));
-        }
-      } catch (err) {
-        console.warn('[chargePendingAccount] Error recargando ventas:', err);
+        console.warn('[chargePendingAccount] Error recargando cuentas pendientes:', err);
       }
     }
     return { success: true };
