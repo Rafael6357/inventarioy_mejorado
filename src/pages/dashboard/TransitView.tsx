@@ -502,7 +502,7 @@ export default function TransitView() {
                       const qtyInUnit = convertUnit(cancelModal.item.remaining * pct, baseUnit, cancelModal.unit);
                       return (
                         <button
-                          key={i}
+                          key={pct}
                           onClick={() => setCancelModal({ ...cancelModal, quantity: qtyInUnit })}
                           className="flex-1 rounded-lg border border-border bg-surface px-2 py-1 text-xs text-text-secondary hover:border-primary hover:text-primary transition-colors"
                         >
@@ -619,7 +619,7 @@ export default function TransitView() {
                       const qtyInUnit = convertUnit(wasteModal.item.remaining * pct, baseUnit, wasteModal.unit);
                       return (
                         <button
-                          key={i}
+                          key={`waste-${pct}`}
                           onClick={() => setWasteModal({ ...wasteModal, quantity: qtyInUnit })}
                           className="flex-1 rounded-lg border border-border bg-surface px-2 py-1 text-xs text-text-secondary hover:border-primary hover:text-primary transition-colors"
                         >

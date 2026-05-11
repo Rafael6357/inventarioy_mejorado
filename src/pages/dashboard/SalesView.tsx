@@ -746,8 +746,8 @@ setShowTicket(true);
                       <div className="mt-2 pt-2 border-t border-border/30 max-h-32 overflow-y-auto">
                         <p className="text-xs font-medium text-text-secondary mb-1">Productos:</p>
                         <div className="space-y-1">
-                          {accountItems.map((item, index) => (
-                            <div key={index} className="flex items-center justify-between text-xs pl-2">
+                          {accountItems.map((item) => (
+                            <div key={`${item.product_id}-${item.quantity}-${item.unit_price}`} className="flex items-center justify-between text-xs pl-2">
                               <span className="text-text">{item.name || item.product_name}</span>
                               <span className="text-text-secondary">
                                 x{item.quantity} ${((item.price || item.unit_price) * item.quantity).toFixed(2)}
@@ -1158,8 +1158,8 @@ setShowTicket(true);
                     Pedidos de {selectedAccount.client_name}:
                   </p>
                   <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {accountItems.map((item: any, index: number) => (
-                      <div key={index} className="flex justify-between text-sm">
+                    {accountItems.map((item: any) => (
+                      <div key={`${item.product_id}-${item.quantity}-${item.subtotal}`} className="flex justify-between text-sm">
                         <span className="text-text">{item.quantity}x {item.product_name}</span>
                         <span className="font-mono text-text-secondary">${item.subtotal.toFixed(2)}</span>
                       </div>

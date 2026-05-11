@@ -87,9 +87,12 @@ export function convertUnit(
   return Number(convertedValue.toFixed(precision));
 }
 
+const STORAGE_VERSION = 'v1';
+const STORAGE_KEY = `inventarioy_unit_preferences:${STORAGE_VERSION}`;
+
 export function getLastUsedUnit(productId: string): UnitAbbrev | null {
   try {
-    const stored = localStorage.getItem('inventarioy_unit_preferences');
+    const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) return null;
     const prefs = JSON.parse(stored);
     return prefs[productId]?.lastUnit || null;
@@ -100,13 +103,13 @@ export function getLastUsedUnit(productId: string): UnitAbbrev | null {
 
 export function saveLastUsedUnit(productId: string, unit: UnitAbbrev): void {
   try {
-    const stored = localStorage.getItem('inventarioy_unit_preferences');
+    const stored = localStorage.getItem(STORAGE_KEY);
     const prefs = stored ? JSON.parse(stored) : {};
     prefs[productId] = {
       lastUnit: unit,
       lastUsed: Date.now(),
     };
-    localStorage.setItem('inventarioy_unit_preferences', JSON.stringify(prefs));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
   } catch {
     // Silently fail if localStorage is not available
   }

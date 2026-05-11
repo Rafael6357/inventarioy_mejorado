@@ -117,7 +117,7 @@ export default function ChartsView() {
                   />
                   <Bar dataKey="quantity" fill="#d4af37" radius={[0, 4, 4, 0]} barSize={24}>
                     {topProducts.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      <Cell key={`cell-${entry.product_id || index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -157,7 +157,7 @@ export default function ChartsView() {
                       if (entry.name === 'ENTRADA') color = '#10b981';
                       if (entry.name === 'SALIDA') color = '#6366f1';
                       if (entry.name === 'MERMA') color = '#ef4444';
-                      return <Cell key={`cell-${index}`} fill={color} />;
+                      return <Cell key={`cell-${entry.name}`} fill={color} />;
                     })}
                   </Bar>
                 </BarChart>

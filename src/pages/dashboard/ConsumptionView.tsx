@@ -245,8 +245,8 @@ export default function ConsumptionView() {
                             {item.recipeQty.toFixed(4)} {item.product.unit}
                           </span>
                           <div className="flex flex-col gap-1 mt-1">
-                            {item.recipes.map((r, idx) => (
-                              <span key={idx} className="text-[10px] text-text-secondary">
+                            {item.recipes.map((r) => (
+                              <span key={r.recipeName} className="text-[10px] text-text-secondary">
                                 • {r.recipeName}: {r.qty.toFixed(4)} {item.product.unit}
                               </span>
                             ))}

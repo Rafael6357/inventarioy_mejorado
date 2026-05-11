@@ -146,7 +146,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     console.log('Inicializando autenticación...');
 
     // 1. Primero verificar si hay sesión offline guardada
-    const savedUserData = localStorage.getItem('inventarioy_user_offline');
+    const savedUserData = localStorage.getItem('inventarioy_user_offline:v1');
     const isOffline = !navigator.onLine;
     
     if (isOffline && savedUserData) {
@@ -339,7 +339,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       
       // Guardar sesión en localStorage para modo offline
       try {
-        localStorage.setItem('inventarioy_user_offline', JSON.stringify(user));
+        localStorage.setItem('inventarioy_user_offline:v1', JSON.stringify(user));
         console.log('[fetchUser] Sesión guardada en localStorage para offline');
       } catch (saveErr) {
         console.warn('[fetchUser] Error guardando sesión offline:', saveErr);

@@ -571,7 +571,7 @@ export default function AIView() {
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
           {messages.map((msg, idx) => (
             <div 
-              key={idx} 
+              key={`${msg.role}-${idx}-${msg.text.slice(0,20)}`} 
               className={`flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
             >
               <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${

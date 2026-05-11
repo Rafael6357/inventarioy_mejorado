@@ -120,8 +120,8 @@ export default function Landing() {
                   description: "Análisis inteligente de tus datos para predecir demanda y optimizar compras.",
                   icon: Sparkles,
                 },
-              ].map((feature, i) => (
-                <div key={i} className="relative overflow-hidden rounded-2xl border border-border bg-surface p-8 transition-all hover:border-primary/50 hover:shadow-[0_0_30px_-10px_rgba(255,193,7,0.3)]">
+              ].map((feature) => (
+                <div key={feature.title} className="relative overflow-hidden rounded-2xl border border-border bg-surface p-8 transition-all hover:border-primary/50 hover:shadow-[0_0_30px_-10px_rgba(255,193,7,0.3)]">
                   <div className="mb-6 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
                     <feature.icon className="h-6 w-6" />
                   </div>
@@ -166,8 +166,8 @@ export default function Landing() {
                     "Análisis con IA de tu negocio",
                     "Modo offline (para registrar ventas sin internet)",
                     "Soporte prioritario",
-                  ].map((item, i) => (
-                    <li key={i} className="flex items-center gap-3">
+                  ].map((item) => (
+                    <li key={item} className="flex items-center gap-3">
                       <CheckCircle2 className="h-5 w-5 text-primary shrink-0" />
                       <span className="text-text-secondary">{item}</span>
                     </li>
@@ -262,8 +262,8 @@ export default function Landing() {
                   q: "¿Cómo se realiza el pago?",
                   a: "El pago se realiza de forma manual y directa con nuestro equipo local. Una vez realizado el pago, activaremos tu suscripción en el sistema."
                 }
-              ].map((faq, i) => (
-                <details key={i} className="group rounded-xl border border-border bg-surface p-6 [&_summary::-webkit-details-marker]:hidden">
+              ].map((faq) => (
+                <details key={faq.q} className="group rounded-xl border border-border bg-surface p-6 [&_summary::-webkit-details-marker]:hidden">
                   <summary className="flex cursor-pointer items-center justify-between gap-1.5 font-medium text-text">
                     <h3 className="text-lg">{faq.q}</h3>
                     <span className="shrink-0 rounded-full bg-bg p-1.5 text-text-secondary sm:p-3">

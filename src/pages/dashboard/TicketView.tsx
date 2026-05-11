@@ -105,7 +105,7 @@ export default function TicketView({ ticketData, onClose, isPreticket = false }:
 
             <div className="space-y-1 mb-3">
               {ticketData.items.map((item, index) => (
-                <div key={index} className="flex justify-between">
+                <div key={`${item.name}-${item.quantity}-${index}`} className="flex justify-between">
                   <span>
                     {item.quantity}x {item.name}
                   </span>
