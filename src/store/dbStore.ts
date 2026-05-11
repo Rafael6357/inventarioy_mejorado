@@ -623,32 +623,36 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       const transitItems = (transitRes.data || []).filter(t => t.remaining > 0);
 
       const allDailyClosings = [...(dailyClosingsRes.data || [])];
+      const closingIds = new Set(allDailyClosings.map(c => c.id));
       for (const closing of localClosings) {
-        if (!allDailyClosings.find(c => c.id === closing.id)) {
+        if (!closingIds.has(closing.id)) {
           allDailyClosings.push(closing);
         }
       }
       allDailyClosings.sort((a, b) => new Date(b.closing_date).getTime() - new Date(a.closing_date).getTime());
 
       const allSales = [...sales];
+      const saleIds = new Set(allSales.map(s => s.id));
       for (const sale of localSales) {
-        if (!allSales.find(s => s.id === sale.id)) {
+        if (!saleIds.has(sale.id)) {
           allSales.push(sale);
         }
       }
       allSales.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
       const allMovements = [...(movementsRes.data || [])];
+      const movementIds = new Set(allMovements.map(m => m.id));
       for (const movement of localMovements) {
-        if (!allMovements.find(m => m.id === movement.id)) {
+        if (!movementIds.has(movement.id)) {
           allMovements.push(movement);
         }
       }
       allMovements.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
       const allTransitItems = [...transitItems];
+      const transitIds = new Set(allTransitItems.map(t => t.id));
       for (const item of localTransitItems) {
-        if (!allTransitItems.find(t => t.id === item.id)) {
+        if (!transitIds.has(item.id)) {
           allTransitItems.push(item);
         }
       }
@@ -1094,14 +1098,18 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     }
 
     const itemsToConsume: { productId: string; name: string; qtyNeeded: number; qtyAvailable: number }[] = [];
+    const productsMap = new Map(get().products.map(p => [p.id, p]));
+    const transitMap = new Map<string, number>();
+    for (const t of get().transitItems) {
+      const current = transitMap.get(t.product_id) || 0;
+      transitMap.set(t.product_id, current + t.remaining);
+    }
 
     for (const item of sale.items) {
       if (!item.is_recipe) {
-        const transitAvailable = get().transitItems
-          .filter(t => t.product_id === item.product_id)
-          .reduce((sum, t) => sum + t.remaining, 0);
-        
-        const productName = get().products.find(p => p.id === item.product_id)?.name || 'producto';
+        const transitAvailable = transitMap.get(item.product_id) || 0;
+        const product = productsMap.get(item.product_id);
+        const productName = product?.name || 'producto';
         
         if (transitAvailable < item.quantity) {
           return { 
@@ -1112,12 +1120,11 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
         itemsToConsume.push({ productId: item.product_id, name: productName, qtyNeeded: item.quantity, qtyAvailable: transitAvailable });
       } else if (item.is_recipe && item.recipe_snapshot) {
         for (const ing of item.recipe_snapshot.ingredients) {
-          const transitAvailable = get().transitItems
-            .filter(t => t.product_id === ing.product_id)
-            .reduce((sum, t) => sum + t.remaining, 0);
+          const transitAvailable = transitMap.get(ing.product_id) || 0;
           const needed = ing.quantity * item.quantity;
           
-          const ingProductName = get().products.find(p => p.id === ing.product_id)?.name || 'ingrediente';
+          const ingProduct = productsMap.get(ing.product_id);
+          const ingProductName = ingProduct?.name || 'ingrediente';
           
           if (transitAvailable < needed) {
             return { 
@@ -1125,9 +1132,9 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
               error: `No hay suficiente "${ingProductName}" en transito para la receta "${item.recipe_snapshot?.name}". Necesitas: ${needed}, Disponible: ${transitAvailable}` 
             };
           }
-          const existing = itemsToConsume.find(i => i.productId === ing.product_id);
-          if (existing) {
-            existing.qtyNeeded += needed;
+          const existingIdx = itemsToConsume.findIndex(i => i.productId === ing.product_id);
+          if (existingIdx >= 0) {
+            itemsToConsume[existingIdx].qtyNeeded += needed;
           } else {
             itemsToConsume.push({ productId: ing.product_id, name: ingProductName, qtyNeeded: needed, qtyAvailable: transitAvailable });
           }
@@ -1197,16 +1204,18 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
           },
         });
 
-        // Consumir del tránsito localmente
+        // Consumir del tránsito localmente (parallel)
+        const consumePromises: Promise<any>[] = [];
         for (const item of sale.items) {
           if (!item.is_recipe) {
-            await get().consumeFromTransit(item.product_id, item.quantity, `Venta offline`);
+            consumePromises.push(get().consumeFromTransit(item.product_id, item.quantity, `Venta offline`));
           } else if (item.is_recipe && item.recipe_snapshot) {
             for (const ing of item.recipe_snapshot.ingredients) {
-              await get().consumeFromTransit(ing.product_id, ing.quantity * item.quantity, `Venta offline (Receta)`);
+              consumePromises.push(get().consumeFromTransit(ing.product_id, ing.quantity * item.quantity, `Venta offline (Receta)`));
             }
           }
         }
+        await Promise.all(consumePromises);
 
         toast.success('Venta guardada offline. Se sincronizará cuando haya conexión.');
         return { success: true };
