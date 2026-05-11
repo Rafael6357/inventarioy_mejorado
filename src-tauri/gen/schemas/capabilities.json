@@ -1,0 +1,1 @@
+{"main":{"identifier":"main","description":"Permisos principales para InventarioY","local":true,"windows":["main"],"permissions":["sql:default","sql:allow-load","sql:allow-execute","sql:allow-select","sql:allow-close","updater:default","updater:allow-check","updater:allow-download-and-install","process:default","process:allow-restart"]}}

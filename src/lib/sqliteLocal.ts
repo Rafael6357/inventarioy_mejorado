@@ -212,6 +212,28 @@ async function createTables(): Promise<void> {
     )
   `);
 
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS user_session (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL,
+      name TEXT,
+      businessName TEXT,
+      role TEXT,
+      phone TEXT,
+      address TEXT,
+      businessHours TEXT,
+      subscriptionActive INTEGER DEFAULT 0,
+      subscriptionPlan TEXT,
+      ticketMessage TEXT,
+      usdEnabled INTEGER DEFAULT 0,
+      usdRate REAL DEFAULT 0,
+      eurEnabled INTEGER DEFAULT 0,
+      eurRate REAL DEFAULT 0,
+      cupTransferEnabled INTEGER DEFAULT 0,
+      created_at TEXT NOT NULL
+    )
+  `);
+
   console.log('Todas las tablas creadas');
 }
 
@@ -637,4 +659,83 @@ export async function getRecipesLocally(userId: string): Promise<any[]> {
     'SELECT * FROM recipes WHERE user_id = $1 ORDER BY name',
     [userId]
   );
+}
+
+export async function saveUserSession(user: any): Promise<void> {
+  const database = await getDB();
+  if (!database) {
+    console.warn('[saveUserSession] SQLite no disponible');
+    return;
+  }
+
+  await database.execute(
+    `INSERT OR REPLACE INTO user_session (
+      id, email, name, businessName, role, phone, address, businessHours,
+      subscriptionActive, subscriptionPlan, ticketMessage,
+      usdEnabled, usdRate, eurEnabled, eurRate, cupTransferEnabled, created_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
+    [
+      user.id,
+      user.email,
+      user.name || null,
+      user.businessName || null,
+      user.role || null,
+      user.phone || null,
+      user.address || null,
+      user.businessHours || null,
+      user.isSubscriptionActive ? 1 : 0,
+      user.subscriptionPlan || null,
+      user.ticketMessage || null,
+      user.usdEnabled ? 1 : 0,
+      user.usdRate || 0,
+      user.eurEnabled ? 1 : 0,
+      user.eurRate || 0,
+      user.cupTransferEnabled ? 1 : 0,
+      new Date().toISOString()
+    ]
+  );
+  console.log('[saveUserSession] Sesión guardada en SQLite');
+}
+
+export async function getUserSession(): Promise<any | null> {
+  const database = await getDB();
+  if (!database) {
+    console.warn('[getUserSession] SQLite no disponible');
+    return null;
+  }
+
+  const results = await database.select('SELECT * FROM user_session LIMIT 1');
+  if (results && results.length > 0) {
+    const session = results[0];
+    return {
+      id: session.id,
+      email: session.email,
+      name: session.name,
+      businessName: session.businessName,
+      role: session.role,
+      phone: session.phone,
+      address: session.address,
+      businessHours: session.businessHours,
+      isSubscriptionActive: session.subscriptionActive === 1,
+      subscriptionPlan: session.subscriptionPlan,
+      ticketMessage: session.ticketMessage,
+      usdEnabled: session.usdEnabled === 1,
+      usdRate: session.usdRate,
+      eurEnabled: session.eurEnabled === 1,
+      eurRate: session.eurRate,
+      cupTransferEnabled: session.cupTransferEnabled === 1
+    };
+  }
+  return null;
+}
+
+export async function clearUserSession(): Promise<void> {
+  const database = await getDB();
+  if (!database) {
+    console.warn('[clearUserSession] SQLite no disponible');
+    return;
+  }
+
+  await database.execute('DELETE FROM user_session');
+  console.log('[clearUserSession] Sesión eliminada de SQLite');
 }

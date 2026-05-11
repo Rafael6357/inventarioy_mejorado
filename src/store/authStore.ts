@@ -145,17 +145,20 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     _isInitializing = true;
     console.log('Inicializando autenticación...');
 
-    // 1. Primero verificar si hay sesión offline guardada
-    const savedUserData = localStorage.getItem('inventarioy_user_offline:v1');
     const isOffline = !navigator.onLine;
-    
-    if (isOffline && savedUserData) {
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+
+    // 1. Primero verificar si hay sesión offline guardada en SQLite (solo en desktop)
+    if (isOffline && isTauri) {
       try {
-        const userData = JSON.parse(savedUserData);
-        console.log('[initialize] Recuperando sesión offline desde localStorage');
-        set({ user: userData, isAuthenticated: true, isLoading: false });
-        _isInitializing = false;
-        return;
+        const { getUserSession } = await import('../lib/sqliteLocal');
+        const savedUserData = await getUserSession();
+        if (savedUserData) {
+          console.log('[initialize] Recuperando sesión offline desde SQLite');
+          set({ user: savedUserData, isAuthenticated: true, isLoading: false });
+          _isInitializing = false;
+          return;
+        }
       } catch (err) {
         console.warn('[initialize] Error recuperando sesión offline:', err);
       }
@@ -337,12 +340,15 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       console.log('Usuario cargado:', user.email, 'role:', user.role, 'subscriptionActive:', user.isSubscriptionActive);
       set({ user, isAuthenticated: true, isLoading: false });
       
-      // Guardar sesión en localStorage para modo offline
-      try {
-        localStorage.setItem('inventarioy_user_offline:v1', JSON.stringify(user));
-        console.log('[fetchUser] Sesión guardada en localStorage para offline');
-      } catch (saveErr) {
-        console.warn('[fetchUser] Error guardando sesión offline:', saveErr);
+      const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+      if (isTauri) {
+        try {
+          const { saveUserSession } = await import('../lib/sqliteLocal');
+          await saveUserSession(user);
+          console.log('[fetchUser] Sesión guardada en SQLite');
+        } catch (saveErr) {
+          console.warn('[fetchUser] Error guardando sesión en SQLite:', saveErr);
+        }
       }
     } catch (err) {
       console.error('Error en fetchUser:', err);
@@ -413,17 +419,25 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   logout: async () => {
     console.log('Logout llamado...');
     try {
-      // 1. Limpiar credenciales guardadas
+      const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+      
+      if (isTauri) {
+        try {
+          const { clearUserSession } = await import('../lib/sqliteLocal');
+          await clearUserSession();
+        } catch (clearErr) {
+          console.warn('[logout] Error limpiando sesión de SQLite:', clearErr);
+        }
+      }
+
       localStorage.removeItem('saved_credentials');
       localStorage.removeItem('saved_email');
       
-      // 2. Limpiar estado primero
       _isInitializing = false;
       _authListenerSubscription = null;
       set({ user: null, isAuthenticated: false, isLoading: false });
       console.log('Estado limpiado');
       
-      // 3. Luego hacer signOut
       await supabase.auth.signOut();
       console.log('SignOut exitoso');
     } catch (err) {
