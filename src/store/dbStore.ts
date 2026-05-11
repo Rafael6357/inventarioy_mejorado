@@ -773,6 +773,9 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
           if (dbReady) {
             await sqliteLocal.saveProductLocally(productData);
             console.log('[addProduct] Producto guardado en SQLite');
+            // AGREGAR A LA COLA DE SINCRONIZACIÓN
+            await sqliteLocal.addToSyncQueue('products', 'INSERT', productData);
+            console.log('[addProduct] Producto agregado a cola de sync');
           }
         } catch (sqliteErr) {
           console.warn('[addProduct] Error guardando en SQLite:', sqliteErr);
@@ -843,6 +846,9 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
             const values = [id, ...Object.values(capitalizedUpdates)];
             await database.execute(`UPDATE products SET ${fields} WHERE id = $1`, values);
             console.log('[updateProduct] Producto actualizado en SQLite');
+            // AGREGAR A LA COLA DE SINCRONIZACIÓN
+            await sqliteLocal.addToSyncQueue('products', 'UPDATE', { id, ...capitalizedUpdates });
+            console.log('[updateProduct] Producto agregado a cola de sync');
           }
         } catch (sqliteErr) {
           console.warn('[updateProduct] Error guardando en SQLite:', sqliteErr);
@@ -871,6 +877,38 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
   },
 
   deleteProduct: async (id) => {
+    const isOnline = navigator.onLine;
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+
+    // Si está offline, guardar en SQLite
+    if (!isOnline && isTauri) {
+      try {
+        const dbReady = await sqliteLocal.isDBReady();
+        if (dbReady) {
+          const database = await sqliteLocal.getDB();
+          await database.execute(
+            'UPDATE products SET is_active = 0, updated_at = $1 WHERE id = $2',
+            [new Date().toISOString(), id]
+          );
+          console.log('[deleteProduct] Producto marcado como inactivo en SQLite');
+          // AGREGAR A LA COLA DE SINCRONIZACIÓN
+          await sqliteLocal.addToSyncQueue('products', 'UPDATE', { 
+            id, 
+            is_active: false, 
+            updated_at: new Date().toISOString() 
+          });
+          console.log('[deleteProduct] Producto agregado a cola de sync');
+          set((state) => ({
+            products: state.products.map(p => p.id === id ? { ...p, is_active: false } : p),
+          }));
+          toast.success('Producto eliminado offline. Se sincronizará cuando haya conexión.');
+          return;
+        }
+      } catch (sqliteErr) {
+        console.warn('[deleteProduct] Error guardando en SQLite:', sqliteErr);
+      }
+    }
+
     const { error } = await supabase
       .from('products')
       .update({ is_active: false, updated_at: new Date().toISOString() })
@@ -1671,6 +1709,9 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
           if (dbReady) {
             await sqliteLocal.savePendingAccountLocally(account);
             console.log('[createPendingAccount] Cuenta guardada en SQLite');
+            // AGREGAR A LA COLA DE SINCRONIZACIÓN
+            await sqliteLocal.addToSyncQueue('pending_accounts', 'INSERT', account);
+            console.log('[createPendingAccount] Cuenta agregada a cola de sync');
           }
         } catch (sqliteErr) {
           console.warn('[createPendingAccount] Error guardando en SQLite:', sqliteErr);
@@ -1779,6 +1820,17 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
             is_account_house: accountIsAccountHouse,
             sale_type: accountSaleType,
           });
+          console.log('[addItemsToPendingAccount] Cuenta actualizada en SQLite');
+          // AGREGAR A LA COLA DE SINCRONIZACIÓN (UPDATE)
+          await sqliteLocal.addToSyncQueue('pending_accounts', 'UPDATE', {
+            id: accountId,
+            items: allItems,
+            total_amount: accountIsAccountHouse ? 0 : newTotal,
+            is_account_house: accountIsAccountHouse,
+            sale_type: accountSaleType,
+            updated_at: new Date().toISOString(),
+          });
+          console.log('[addItemsToPendingAccount] Cuenta agregada a cola de sync');
           set((state) => ({
             pendingAccounts: state.pendingAccounts.map(a => 
               a.id === accountId 
@@ -1874,6 +1926,17 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
             is_account_house: newIsAccountHouse,
             sale_type: (account as any).sale_type || 'SALON',
           });
+          console.log('[togglePendingAccountType] Cuenta actualizada en SQLite');
+          // AGREGAR A LA COLA DE SINCRONIZACIÓN (UPDATE)
+          await sqliteLocal.addToSyncQueue('pending_accounts', 'UPDATE', {
+            id: accountId,
+            items: accountItems,
+            total_amount: newTotal,
+            is_account_house: newIsAccountHouse,
+            sale_type: (account as any).sale_type || 'SALON',
+            updated_at: new Date().toISOString(),
+          });
+          console.log('[togglePendingAccountType] Cuenta agregada a cola de sync');
           set((state) => ({
             pendingAccounts: state.pendingAccounts.map(a => 
               a.id === accountId 
@@ -1939,6 +2002,14 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
             status: 'cancelled',
             updated_at: new Date().toISOString(),
           });
+          console.log('[deletePendingAccount] Cuenta marcada como cancelada en SQLite');
+          // AGREGAR A LA COLA DE SINCRONIZACIÓN (UPDATE)
+          await sqliteLocal.addToSyncQueue('pending_accounts', 'UPDATE', {
+            id: accountId,
+            status: 'cancelled',
+            updated_at: new Date().toISOString(),
+          });
+          console.log('[deletePendingAccount] Cuenta agregada a cola de sync');
           // Actualizar transit items localmente
           set({ transitItems: updatedTransitItems.filter(t => t.remaining > 0) });
           // Actualizar estado local - eliminar cuenta de la lista
@@ -2076,6 +2147,14 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
             status: 'paid',
             updated_at: new Date().toISOString(),
           });
+          console.log('[chargePendingAccount] Cuenta marcada como pagada en SQLite');
+          // AGREGAR A LA COLA DE SINCRONIZACIÓN (UPDATE)
+          await sqliteLocal.addToSyncQueue('pending_accounts', 'UPDATE', {
+            id: accountId,
+            status: 'paid',
+            updated_at: new Date().toISOString(),
+          });
+          console.log('[chargePendingAccount] Cuenta agregada a cola de sync');
           // Actualizar estado local - NO llamar fetchAll que intenta conectar a Supabase
           set((state) => ({
             pendingAccounts: state.pendingAccounts.filter(a => a.id !== accountId)
@@ -2356,6 +2435,9 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
           if (dbReady) {
             await sqliteLocal.saveRecipeLocally(recipeData);
             console.log('[addRecipe] Receta guardada en SQLite');
+            // AGREGAR A LA COLA DE SINCRONIZACIÓN
+            await sqliteLocal.addToSyncQueue('recipes', 'INSERT', recipeData);
+            console.log('[addRecipe] Receta agregada a cola de sync');
           }
         } catch (sqliteErr) {
           console.warn('[addRecipe] Error guardando en SQLite:', sqliteErr);
@@ -2398,6 +2480,56 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
   },
 
   updateRecipe: async (id, updates) => {
+    const isOnline = navigator.onLine;
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+
+    // Si está offline, guardar en SQLite
+    if (!isOnline && isTauri) {
+      try {
+        const dbReady = await sqliteLocal.isDBReady();
+        if (dbReady) {
+          const database = await sqliteLocal.getDB();
+          const updateFields = [];
+          const values = [];
+          let paramIndex = 1;
+          
+          if (updates.name !== undefined) {
+            updateFields.push(`name = $${paramIndex++}`);
+            values.push(capitalize(updates.name));
+          }
+          if (updates.selling_price !== undefined) {
+            updateFields.push(`selling_price = $${paramIndex++}`);
+            values.push(updates.selling_price);
+          }
+          updateFields.push(`updated_at = $${paramIndex++}`);
+          values.push(new Date().toISOString());
+          
+          values.push(id);
+          
+          await database.execute(
+            `UPDATE recipes SET ${updateFields.join(', ')} WHERE id = $${paramIndex}`,
+            values
+          );
+          console.log('[updateRecipe] Receta actualizada en SQLite');
+          // AGREGAR A LA COLA DE SINCRONIZACIÓN
+          await sqliteLocal.addToSyncQueue('recipes', 'UPDATE', { 
+            id, 
+            ...updates,
+            updated_at: new Date().toISOString()
+          });
+          console.log('[updateRecipe] Receta agregada a cola de sync');
+          
+          set((state) => ({
+            recipes: state.recipes.map(r => r.id === id ? { ...r, ...updates } : r),
+          }));
+          toast.success('Receta actualizada offline. Se sincronizará cuando haya conexión.');
+          return;
+        }
+      } catch (sqliteErr) {
+        console.warn('[updateRecipe] Error guardando en SQLite:', sqliteErr);
+      }
+    }
+
     const { error } = await supabase
       .from('recipes')
       .update({ 
@@ -2430,6 +2562,30 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
   },
 
   deleteRecipe: async (id) => {
+    const isOnline = navigator.onLine;
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+
+    // Si está offline, guardar en SQLite
+    if (!isOnline && isTauri) {
+      try {
+        const dbReady = await sqliteLocal.isDBReady();
+        if (dbReady) {
+          const database = await sqliteLocal.getDB();
+          await database.execute('DELETE FROM recipe_ingredients WHERE recipe_id = $1', [id]);
+          await database.execute('DELETE FROM recipes WHERE id = $1', [id]);
+          console.log('[deleteRecipe] Receta eliminada en SQLite');
+          // AGREGAR A LA COLA DE SINCRONIZACIÓN
+          await sqliteLocal.addToSyncQueue('recipes', 'DELETE', { id });
+          console.log('[deleteRecipe] Receta agregada a cola de sync');
+          set((state) => ({ recipes: state.recipes.filter(r => r.id !== id) }));
+          toast.success('Receta eliminada offline. Se sincronizará cuando haya conexión.');
+          return;
+        }
+      } catch (sqliteErr) {
+        console.warn('[deleteRecipe] Error guardando en SQLite:', sqliteErr);
+      }
+    }
+
     await supabase.from('recipe_ingredients').delete().eq('recipe_id', id);
     const { error } = await supabase.from('recipes').delete().eq('id', id);
 
@@ -3025,6 +3181,9 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
           if (dbReady) {
             await sqliteLocal.saveCategoryLocally(categoryData);
             console.log('[addCategory] Categoría guardada en SQLite');
+            // AGREGAR A LA COLA DE SINCRONIZACIÓN
+            await sqliteLocal.addToSyncQueue('categories', 'INSERT', categoryData);
+            console.log('[addCategory] Categoría agregada a cola de sync');
           }
         } catch (sqliteErr) {
           console.warn('[addCategory] Error guardando en SQLite:', sqliteErr);
