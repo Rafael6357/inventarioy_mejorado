@@ -1039,7 +1039,7 @@ setShowTicket(true);
                     className="font-mono"
                     value={salePaymentMethod.efectivo || ''}
                     onChange={e => {
-                      setSalePaymentMethod({...salePaymentMethod, efectivo: Number(e.target.value)});
+                      setSalePaymentMethod(prev => ({...prev, efectivo: Number(e.target.value)}));
                       setPaymentError(null);
                       setPaymentWarning(null);
                     }}
@@ -1055,7 +1055,7 @@ setShowTicket(true);
                     className="font-mono"
                     value={salePaymentMethod.transferencia || ''}
                     onChange={e => {
-                      setSalePaymentMethod({...salePaymentMethod, transferencia: Number(e.target.value)});
+                      setSalePaymentMethod(prev => ({...prev, transferencia: Number(e.target.value)}));
                       setPaymentError(null);
                       setPaymentWarning(null);
                     }}
@@ -1072,7 +1072,7 @@ setShowTicket(true);
                     className="font-mono"
                     value={salePaymentMethod.usd || ''}
                     onChange={e => {
-                      setSalePaymentMethod({...salePaymentMethod, usd: Number(e.target.value)});
+                      setSalePaymentMethod(prev => ({...prev, usd: Number(e.target.value)}));
                       setPaymentError(null);
                       setPaymentWarning(null);
                     }}
@@ -1089,7 +1089,7 @@ setShowTicket(true);
                     className="font-mono"
                     value={salePaymentMethod.eur || ''}
                     onChange={e => {
-                      setSalePaymentMethod({...salePaymentMethod, eur: Number(e.target.value)});
+                      setSalePaymentMethod(prev => ({...prev, eur: Number(e.target.value)}));
                       setPaymentError(null);
                       setPaymentWarning(null);
                     }}
@@ -1556,7 +1556,7 @@ setShowTicket(true);
                   min="0"
                   className="font-mono"
                   value={chargeBreakdown.efectivo || ''}
-                  onChange={e => setChargeBreakdown({...chargeBreakdown, efectivo: Number(e.target.value)})}
+                  onChange={e => setChargeBreakdown(prev => ({...prev, efectivo: Number(e.target.value)}))}
                   placeholder="0.00"
                 />
               </div>
@@ -1568,7 +1568,7 @@ setShowTicket(true);
                   min="0"
                   className="font-mono"
                   value={chargeBreakdown.transferencia || ''}
-                  onChange={e => setChargeBreakdown({...chargeBreakdown, transferencia: Number(e.target.value)})}
+                  onChange={e => setChargeBreakdown(prev => ({...prev, transferencia: Number(e.target.value)}))}
                   placeholder="0.00"
                 />
               </div>
@@ -1581,7 +1581,7 @@ setShowTicket(true);
                   min="0"
                   className="font-mono"
                   value={chargeBreakdown.usd || ''}
-                  onChange={e => setChargeBreakdown({...chargeBreakdown, usd: Number(e.target.value)})}
+                  onChange={e => setChargeBreakdown(prev => ({...prev, usd: Number(e.target.value)}))}
                   placeholder="0.00"
                 />
               </div>
@@ -1594,7 +1594,7 @@ setShowTicket(true);
                   min="0"
                   className="font-mono"
                   value={chargeBreakdown.eur || ''}
-                  onChange={e => setChargeBreakdown({...chargeBreakdown, eur: Number(e.target.value)})}
+                  onChange={e => setChargeBreakdown(prev => ({...prev, eur: Number(e.target.value)}))}
                   placeholder="0.00"
                 />
               </div>

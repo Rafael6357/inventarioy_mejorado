@@ -219,7 +219,7 @@ export default function SettingsView() {
                   <Input 
                     id="name" 
                     value={formData.name}
-                    onChange={e => setFormData({...formData, name: e.target.value})}
+                    onChange={e => setFormData(prev => ({...prev, name: e.target.value}))}
                     maxLength={100}
                     required
                   />
@@ -245,7 +245,7 @@ export default function SettingsView() {
                 <Input 
                   id="businessName" 
                   value={formData.businessName}
-                  onChange={e => setFormData({...formData, businessName: e.target.value})}
+                  onChange={e => setFormData(prev => ({...prev, businessName: e.target.value}))}
                   maxLength={100}
                   required
                 />
@@ -259,7 +259,7 @@ export default function SettingsView() {
                 <Input 
                   id="phone" 
                   value={formData.phone}
-                  onChange={e => setFormData({...formData, phone: e.target.value})}
+                  onChange={e => setFormData(prev => ({...prev, phone: e.target.value}))}
                   placeholder="+53 12345678"
                   maxLength={20}
                 />
@@ -273,7 +273,7 @@ export default function SettingsView() {
                 <Input 
                   id="address" 
                   value={formData.address}
-                  onChange={e => setFormData({...formData, address: e.target.value})}
+                  onChange={e => setFormData(prev => ({...prev, address: e.target.value}))}
                   placeholder="Calle 123, Ciudad"
                   maxLength={200}
                 />
@@ -287,7 +287,7 @@ export default function SettingsView() {
                 <Input 
                   id="businessHours" 
                   value={formData.businessHours}
-                  onChange={e => setFormData({...formData, businessHours: e.target.value})}
+                  onChange={e => setFormData(prev => ({...prev, businessHours: e.target.value}))}
                   placeholder="Lun-Vie: 9am-6pm"
                   maxLength={100}
                 />
@@ -308,7 +308,7 @@ export default function SettingsView() {
                   </div>
                   <Switch
                     checked={formData.generateTicket}
-                    onCheckedChange={(checked) => setFormData({...formData, generateTicket: checked})}
+                    onCheckedChange={(checked) => setFormData(prev => ({...prev, generateTicket: checked}))}
                   />
                 </div>
 
@@ -321,7 +321,7 @@ export default function SettingsView() {
                     <Input 
                       id="ticketMessage" 
                       value={formData.ticketMessage}
-                      onChange={e => setFormData({...formData, ticketMessage: e.target.value})}
+                      onChange={e => setFormData(prev => ({...prev, ticketMessage: e.target.value}))}
                       maxLength={100}
                       placeholder="¡Gracias por su visita!"
                     />
@@ -442,7 +442,7 @@ export default function SettingsView() {
                     </div>
                     <Switch
                       checked={currencySettings.usdEnabled}
-                      onCheckedChange={(checked) => setCurrencySettings({...currencySettings, usdEnabled: checked})}
+                      onCheckedChange={(checked) => setCurrencySettings(prev => ({...prev, usdEnabled: checked}))}
                     />
                   </div>
                   
@@ -453,7 +453,7 @@ export default function SettingsView() {
                         type="number"
                         min="1"
                         value={currencySettings.usdRate}
-                        onChange={e => setCurrencySettings({...currencySettings, usdRate: Number(e.target.value)})}
+                        onChange={e => setCurrencySettings(prev => ({...prev, usdRate: Number(e.target.value)}))}
                         className="w-32 mt-1"
                       />
                     </div>
@@ -468,7 +468,7 @@ export default function SettingsView() {
                     </div>
                     <Switch
                       checked={currencySettings.eurEnabled}
-                      onCheckedChange={(checked) => setCurrencySettings({...currencySettings, eurEnabled: checked})}
+                      onCheckedChange={(checked) => setCurrencySettings(prev => ({...prev, eurEnabled: checked}))}
                     />
                   </div>
                   
@@ -479,7 +479,7 @@ export default function SettingsView() {
                         type="number"
                         min="1"
                         value={currencySettings.eurRate}
-                        onChange={e => setCurrencySettings({...currencySettings, eurRate: Number(e.target.value)})}
+                        onChange={e => setCurrencySettings(prev => ({...prev, eurRate: Number(e.target.value)}))}
                         className="w-32 mt-1"
                       />
                     </div>
@@ -494,7 +494,7 @@ export default function SettingsView() {
                     </div>
                     <Switch
                       checked={currencySettings.cupTransferEnabled}
-                      onCheckedChange={(checked) => setCurrencySettings({...currencySettings, cupTransferEnabled: checked})}
+                      onCheckedChange={(checked) => setCurrencySettings(prev => ({...prev, cupTransferEnabled: checked}))}
                     />
                   </div>
                 </div>

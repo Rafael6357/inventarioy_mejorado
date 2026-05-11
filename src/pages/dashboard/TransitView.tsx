@@ -467,7 +467,7 @@ export default function TransitView() {
                         max={maxInCurrentUnit}
                         step="0.01"
                         value={cancelModal.quantity}
-                        onChange={(e) => setCancelModal({ ...cancelModal, quantity: Number(e.target.value) })}
+                        onChange={(e) => setCancelModal(prev => ({ ...prev, quantity: Number(e.target.value) }))}
                         className="no-spin"
                       />
                     </div>
@@ -478,7 +478,7 @@ export default function TransitView() {
                         onChange={(e) => {
                           const newUnit = e.target.value as UnitAbbrev;
                           const convertedQty = convertUnit(cancelModal.quantity, cancelModal.unit, newUnit);
-                          setCancelModal({ ...cancelModal, quantity: convertedQty, unit: newUnit });
+                          setCancelModal(prev => ({ ...prev, quantity: convertedQty, unit: newUnit }));
                           saveLastUsedUnit(cancelModal.item.product_id, newUnit);
                         }}
                         disabled={compatibleUnits.length <= 1}
@@ -503,7 +503,7 @@ export default function TransitView() {
                       return (
                         <button
                           key={pct}
-                          onClick={() => setCancelModal({ ...cancelModal, quantity: qtyInUnit })}
+                          onClick={() => setCancelModal(prev => ({ ...prev, quantity: qtyInUnit }))}
                           className="flex-1 rounded-lg border border-border bg-surface px-2 py-1 text-xs text-text-secondary hover:border-primary hover:text-primary transition-colors"
                         >
                           {i === 2 ? '100%' : `${i === 0 ? 25 : 50}%`}
@@ -520,7 +520,7 @@ export default function TransitView() {
                     rows={2}
                     placeholder="Ej: Producto en mal estado, cancelación de producción..."
                     value={cancelModal.reason}
-                    onChange={(e) => setCancelModal({ ...cancelModal, reason: e.target.value })}
+                    onChange={(e) => setCancelModal(prev => ({ ...prev, reason: e.target.value }))}
                   />
                 </div>
               </div>
@@ -584,7 +584,7 @@ export default function TransitView() {
                         max={maxInCurrentUnit}
                         step="0.01"
                         value={wasteModal.quantity}
-                        onChange={(e) => setWasteModal({ ...wasteModal, quantity: Number(e.target.value) })}
+                        onChange={(e) => setWasteModal(prev => ({ ...prev, quantity: Number(e.target.value) }))}
                         className="no-spin"
                       />
                     </div>
@@ -595,7 +595,7 @@ export default function TransitView() {
                         onChange={(e) => {
                           const newUnit = e.target.value as UnitAbbrev;
                           const convertedQty = convertUnit(wasteModal.quantity, wasteModal.unit, newUnit);
-                          setWasteModal({ ...wasteModal, quantity: convertedQty, unit: newUnit });
+                          setWasteModal(prev => ({ ...prev, quantity: convertedQty, unit: newUnit }));
                           saveLastUsedUnit(wasteModal.item.product_id, newUnit);
                         }}
                         disabled={compatibleUnits.length <= 1}
@@ -620,7 +620,7 @@ export default function TransitView() {
                       return (
                         <button
                           key={`waste-${pct}`}
-                          onClick={() => setWasteModal({ ...wasteModal, quantity: qtyInUnit })}
+                          onClick={() => setWasteModal(prev => ({ ...prev, quantity: qtyInUnit }))}
                           className="flex-1 rounded-lg border border-border bg-surface px-2 py-1 text-xs text-text-secondary hover:border-primary hover:text-primary transition-colors"
                         >
                           {i === 2 ? '100%' : `${i === 0 ? 25 : 50}%`}
@@ -637,7 +637,7 @@ export default function TransitView() {
                     rows={2}
                     placeholder="Ej: Producto dañado, caducado, perdido..."
                     value={wasteModal.reason}
-                    onChange={(e) => setWasteModal({ ...wasteModal, reason: e.target.value })}
+                    onChange={(e) => setWasteModal(prev => ({ ...prev, reason: e.target.value }))}
                   />
                 </div>
               </div>
