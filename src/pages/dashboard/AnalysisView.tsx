@@ -5,6 +5,18 @@ import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
+function parseSaleItems(items: any): any[] {
+  if (Array.isArray(items)) return items;
+  if (typeof items === 'string') {
+    try {
+      return JSON.parse(items);
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 export default function AnalysisView() {
   const { products, sales, movements, isLoading } = useDatabaseStore();
   
@@ -119,7 +131,8 @@ export default function AnalysisView() {
 
   const totalCostOfGoodsSold = useMemo(() => {
     return safeSales.reduce((sum, s) => {
-      return sum + ((s?.items || []).reduce((itemSum, item) => itemSum + ((item?.quantity || 0) * (item?.unit_cost || 0)), 0));
+      const items = parseSaleItems(s?.items);
+      return sum + items.reduce((itemSum: number, item: any) => itemSum + ((item?.quantity || 0) * (item?.unit_cost || 0)), 0);
     }, 0);
   }, [safeSales]);
 

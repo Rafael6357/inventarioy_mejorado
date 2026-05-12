@@ -1,6 +1,21 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 
+const checkRealInternetConnection = async (): Promise<boolean> => {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    
+    // Usar el propio endpoint de Supabase - si responde, hay internet real
+    const { error } = await supabase.from('products').select('id').limit(1).maybeSingle();
+    
+    clearTimeout(timeoutId);
+    return !error;
+  } catch {
+    return false;
+  }
+};
+
 export interface User {
   id: string;
   email: string;
@@ -101,6 +116,9 @@ const translateError = (message: string): string => {
     'Network request failed': 'Error de solicitud de red',
     'Invalid URL': 'URL inválida',
     'Missing requirements for Sozial Login': 'Requisitos faltantes para inicio de sesión social',
+    'Failed to fetch': 'Sin conexión a internet',
+    'Failed to fetch (offline)': 'Sin conexión a internet',
+    'NetworkError': 'Sin conexión a internet',
   };
 
   if (errorTranslations[message]) {
@@ -148,21 +166,27 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
 
     // 1. En desktop, primero buscar sesión guardada en SQLite
+    console.log('[initialize] isTauri:', isTauri);
     if (isTauri) {
       try {
         const { getUserSession } = await import('../lib/sqliteLocal');
+        console.log('[initialize] Llamando getUserSession()...');
         const savedUserData = await getUserSession();
+        console.log('[initialize] getUserSession result:', savedUserData);
         if (savedUserData) {
           console.log('[initialize] Sesión encontrada en SQLite, restaurando...');
           set({ user: savedUserData, isAuthenticated: true, isLoading: false });
           _isInitializing = false;
           return;
+        } else {
+          console.log('[initialize] No hay sesión en SQLite');
         }
       } catch (err) {
         console.warn('[initialize] Error buscando sesión en SQLite:', err);
       }
     }
 
+    console.log('[initialize] No se encontró sesión en SQLite, continuando con Supabase...');
     const isOffline = !navigator.onLine;
 
     try {
@@ -358,6 +382,11 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 
   login: async (email: string, password: string) => {
+    const isOnline = navigator.onLine && await checkRealInternetConnection();
+    if (!isOnline) {
+      return { success: false, error: 'Sin conexión a internet. Inicia sesión cuando tengas internet.' };
+    }
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,

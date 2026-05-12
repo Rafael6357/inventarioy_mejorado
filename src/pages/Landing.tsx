@@ -44,7 +44,6 @@ export default function Landing() {
           <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-text-secondary">
             <a href="#features" className="hover:text-primary transition-colors">Características</a>
             <a href="#pricing" className="hover:text-primary transition-colors">Plan</a>
-            <a href="#download" className="hover:text-primary transition-colors">Descargar</a>
             <a href="#faq" className="hover:text-primary transition-colors">FAQ</a>
           </nav>
           <div className="flex items-center gap-4">
@@ -178,62 +177,6 @@ export default function Landing() {
                   <Button className="w-full h-12 text-base">Comenzar Prueba Gratis</Button>
                 </Link>
               </div>
-            </div>
-          </div>
-        </section>
-
-        <section id="download" className="py-24 bg-surface/30">
-          <div className="container mx-auto px-4">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">Descarga la App de Escritorio</h2>
-              <p className="text-text-secondary max-w-xl mx-auto">
-                Disfruta de una experiencia más fluida y trabaja sin conexión a internet.
-              </p>
-            </div>
-            
-            <div className="grid gap-6 md:grid-cols-3 max-w-3xl mx-auto mb-10">
-              <div className="text-center p-6">
-                <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary mb-4">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                </div>
-                <h3 className="font-semibold mb-2">Sin conexión</h3>
-                <p className="text-sm text-text-secondary">Funciona sin internet - registra ventas offline</p>
-              </div>
-              <div className="text-center p-6">
-                <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary mb-4">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <h3 className="font-semibold mb-2">Más rápido</h3>
-                <p className="text-sm text-text-secondary">Interfaz más fluida y respuesta inmediata</p>
-              </div>
-              <div className="text-center p-6">
-                <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary mb-4">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                </div>
-                <h3 className="font-semibold mb-2">Auto-actualización</h3>
-                <p className="text-sm text-text-secondary">Recibe actualizaciones automáticamente</p>
-              </div>
-            </div>
-
-            <div className="text-center">
-              <a 
-                href="https://github.com/Rafael6357/inventarioy_mejorado/releases/latest" 
-                target="_blank" 
-                rel="noopener noreferrer"
-              >
-                <Button size="lg" className="h-12 px-8 text-base">
-                  Descargar para Windows
-                </Button>
-              </a>
-              <p className="text-xs text-text-secondary mt-4">
-                Requiere Windows 10 o superior
-              </p>
             </div>
           </div>
         </section>

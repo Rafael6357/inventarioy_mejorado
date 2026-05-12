@@ -8,6 +8,7 @@ export const STORES = {
   PENDING_TRANSIT_CONSUMPTIONS: 'pending_transit_consumptions',
   CACHED_PRODUCTS: 'cached_products',
   SYNC_LOG: 'sync_log',
+  COMPLETED_SALES: 'completed_sales',
 };
 
 let db: IDBDatabase | null = null;
@@ -47,6 +48,9 @@ export async function initOfflineDB(): Promise<IDBDatabase> {
         store.createIndex('type', 'type', { unique: false });
         store.createIndex('timestamp', 'timestamp', { unique: false });
         store.createIndex('synced', 'synced', { unique: false });
+      }
+      if (!database.objectStoreNames.contains(STORES.COMPLETED_SALES)) {
+        database.createObjectStore(STORES.COMPLETED_SALES, { keyPath: 'id' });
       }
     };
   });
@@ -403,5 +407,98 @@ export async function checkClosingExists(userId: string, closingDate: string): P
     .eq('closing_date', closingDate)
     .single();
   
-  return !!data && !error;
+  return !!data;
+}
+
+export interface CompletedSale {
+  id: string;
+  user_id: string;
+  employee_id: string;
+  items: any[];
+  total_amount: number;
+  date: string;
+  sale_type: string;
+  is_account_house: boolean;
+  notes: string;
+  discount: number;
+  efectivo?: number;
+  transferencia?: number;
+  usd?: number;
+  eur?: number;
+  payment_method?: string;
+  created_at: string;
+  synced: boolean;
+}
+
+export async function saveCompletedSaleLocally(sale: CompletedSale): Promise<void> {
+  const store = await getStore(STORES.COMPLETED_SALES, 'readwrite');
+  return new Promise((resolve, reject) => {
+    const request = store.put(sale);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function getCompletedSalesLocally(): Promise<CompletedSale[]> {
+  const store = await getStore(STORES.COMPLETED_SALES);
+  return new Promise((resolve, reject) => {
+    const request = store.getAll();
+    request.onsuccess = () => resolve(request.result || []);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function deleteCompletedSaleLocally(saleId: string): Promise<void> {
+  const store = await getStore(STORES.COMPLETED_SALES, 'readwrite');
+  return new Promise((resolve, reject) => {
+    const request = store.delete(saleId);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function syncPendingSalesToSupabase(): Promise<{ success: boolean; synced: number; failed: number }> {
+  const { supabase } = await import('./supabase');
+  const pendingSales = await getAllPendingSales();
+  
+  let synced = 0;
+  let failed = 0;
+  
+  for (const sale of pendingSales) {
+    try {
+      const saleData = sale.data;
+      const { error } = await supabase
+        .from('sales')
+        .insert({
+          user_id: saleData.user_id,
+          employee_id: saleData.employee_id,
+          items: saleData.items,
+          total_amount: saleData.total_amount,
+          date: saleData.date,
+          sale_type: saleData.sale_type,
+          is_account_house: saleData.is_account_house,
+          notes: saleData.notes || null,
+          discount: saleData.discount || 0,
+          efectivo: saleData.efectivo || 0,
+          transferencia: saleData.transferencia || 0,
+          usd: saleData.usd || 0,
+          eur: saleData.eur || 0,
+          payment_method: saleData.payment_method || null,
+        });
+      
+      if (error) {
+        console.error('[syncPendingSales] Error sincronizando venta:', error);
+        failed++;
+      } else {
+        await markSaleAsSynced(sale.id);
+        synced++;
+        console.log('[syncPendingSales] Venta sincronizada:', sale.id);
+      }
+    } catch (err) {
+      console.error('[syncPendingSales] Error:', err);
+      failed++;
+    }
+  }
+  
+  return { success: failed === 0, synced, failed };
 }

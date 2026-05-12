@@ -50,6 +50,21 @@ export default function PaymentsView() {
   
   // Filtro por estado de suscripción
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'trialing' | 'past_due' | 'canceled'>('all');
+  const [isOffline, setIsOffline] = useState(false);
+
+  useEffect(() => {
+    const checkOnline = () => {
+      const online = navigator.onLine;
+      setIsOffline(!online);
+    };
+    checkOnline();
+    window.addEventListener('online', checkOnline);
+    window.addEventListener('offline', checkOnline);
+    return () => {
+      window.removeEventListener('online', checkOnline);
+      window.removeEventListener('offline', checkOnline);
+    };
+  }, []);
 
   const getDaysRemaining = (profile: ProfilePayment): number => {
     if (profile.subscription_status === 'active' && profile.valid_until) {
@@ -327,6 +342,21 @@ export default function PaymentsView() {
           <ShieldCheck className="mx-auto h-12 w-12 text-danger mb-4" />
           <h2 className="text-2xl font-bold text-text">Acceso Denegado</h2>
           <p className="mt-2 text-text-secondary">No tienes permisos para ver este módulo.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isOffline) {
+    return (
+      <div className="flex h-full items-center justify-center p-8">
+        <div className="text-center">
+          <AlertCircle className="mx-auto h-12 w-12 text-warning mb-4" />
+          <h2 className="text-2xl font-bold text-text">Sin Conexión</h2>
+          <p className="mt-2 text-text-secondary">
+            Este módulo requiere conexión a internet.<br />
+            Por favor, conéctate a internet para acceder a la gestión de pagos.
+          </p>
         </div>
       </div>
     );

@@ -303,13 +303,12 @@ const isRateLimitError = (err: any): boolean => {
 const checkRealInternetConnection = async (): Promise<boolean> => {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
-    await fetch('https://www.google.com/generate_204', { 
-      method: 'HEAD',
-      signal: controller.signal 
-    });
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    
+    const { error } = await supabase.from('products').select('id').limit(1).maybeSingle();
+    
     clearTimeout(timeoutId);
-    return true;
+    return !error;
   } catch {
     return false;
   }
@@ -541,11 +540,13 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     }
 
     const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+    const isOffline = !navigator.onLine;
     
     let localClosings: any[] = [];
     let localSales: any[] = [];
     let localMovements: any[] = [];
     let localTransitItems: any[] = [];
+    let localProducts: any[] = [];
     
     if (isTauri) {
       try {
@@ -566,6 +567,38 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       } catch (err) {
         console.warn('[fetchAll] Error cargando datos locales:', err);
       }
+    } else if (isOffline) {
+      try {
+        console.log('[fetchAll] App Web - Cargando datos desde IndexedDB...');
+        const { getCachedProducts, getCompletedSalesLocally } = await import('../lib/offlineDB');
+        
+        localProducts = await getCachedProducts();
+        localSales = await getCompletedSalesLocally();
+        
+        console.log('[fetchAll] Datos desde IndexedDB:', {
+          products: localProducts.length,
+          sales: localSales.length
+        });
+      } catch (err) {
+        console.warn('[fetchAll] Error cargando desde IndexedDB:', err);
+      }
+    }
+
+    // Si está offline o no hay datos locales, no intentar cargar desde Supabase
+    if (isOffline) {
+      console.log('[fetchAll] Modo offline - cargando solo datos locales');
+      const productsToUse = (isTauri && localProducts.length > 0) || (!isTauri && localProducts.length > 0) 
+        ? localProducts 
+        : (localClosings.length > 0 || localSales.length > 0 ? get().products : []);
+      
+      set({
+        products: productsToUse,
+        movements: localMovements,
+        sales: localSales,
+        transitItems: localTransitItems,
+        isLoading: false
+      });
+      return;
     }
 
     set({ isLoading: true });
@@ -573,7 +606,6 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
     try {
-      // Grupo 1: Datos principales (los más importantes)
       console.log('📥 Cargando datos principales...');
       const [productsRes, movementsRes] = await Promise.all([
         supabase.from('products').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(limit),
@@ -1204,6 +1236,12 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
           },
         });
 
+        const { saveCompletedSaleLocally } = await import('../lib/offlineDB');
+        await saveCompletedSaleLocally({
+          ...saleToSave,
+          synced: false,
+        });
+
         // Consumir del tránsito localmente (parallel)
         const consumePromises: Promise<any>[] = [];
         for (const item of sale.items) {
@@ -1688,6 +1726,12 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
         if (dbReady) {
           const localAccounts = await sqliteLocal.getPendingAccountsLocally(user.id);
           const pendingOnly = (localAccounts || []).filter((a: any) => a.status === 'pending');
+          
+          const allAccounts = await sqliteLocal.getAllPendingAccountsDebug(user.id);
+          const syncQueue = await sqliteLocal.getSyncQueueItemsDebug();
+          
+          console.log('[getPendingAccounts] DEBUG - Cuentas locales:', allAccounts.length, '| Pending:', pendingOnly.length, '| Sync queue:', syncQueue.length);
+          
           set({ pendingAccounts: pendingOnly });
           console.log('[getPendingAccounts] Cargadas cuentas pendientes desde SQLite:', pendingOnly.length);
           return;
@@ -3782,5 +3826,27 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     resetConnectionCooldown();
     await get().fetchAll();
     toast.success('Datos actualizados correctamente');
+  },
+
+  syncOfflineData: async () => {
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+    if (isTauri) return;
+    
+    try {
+      const { syncPendingSalesToSupabase, getPendingCounts } = await import('../lib/offlineDB');
+      const counts = await getPendingCounts();
+      
+      if (counts.sales > 0) {
+        const result = await syncPendingSalesToSupabase();
+        console.log('[syncOfflineData] Resultado:', result);
+        
+        if (result.synced > 0) {
+          toast.success(`Sincronizadas ${result.synced} ventas offline`);
+          await get().fetchAll();
+        }
+      }
+    } catch (err) {
+      console.error('[syncOfflineData] Error:', err);
+    }
   },
 }));

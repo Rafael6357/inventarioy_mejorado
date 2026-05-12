@@ -4,7 +4,7 @@ import { useAuthStore } from '../../store/authStore';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
-import { PackagePlus, ArrowRightLeft, Settings2, RefreshCw, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { PackagePlus, ArrowRightLeft, Settings2, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   convertUnit,
@@ -33,7 +33,7 @@ const DEFAULT_CATEGORIES = [
 
 export default function InventoryView() {
   const { user } = useAuthStore();
-  const { products, addProduct, addMovement, logAction, forceRefreshData } = useDatabaseStore();
+  const { products, addProduct, addMovement, logAction } = useDatabaseStore();
   
   const activeProducts = products.filter(p => p.is_active !== false);
 
@@ -224,15 +224,6 @@ export default function InventoryView() {
         <p className="text-sm text-text-secondary">
           Alta de productos y registro de movimientos
         </p>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => forceRefreshData()}
-          className="gap-1 text-text-secondary hover:text-text mt-2"
-        >
-          <Loader2 className="h-3 w-3" />
-          Actualizar Datos
-        </Button>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

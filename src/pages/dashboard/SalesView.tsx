@@ -9,7 +9,7 @@ import TicketView from './TicketView';
 
 export default function SalesView() {
   const { user } = useAuthStore();
-  const { products, recipes, employees, sales, dailyClosings, pendingAccounts, addSale, createDailyClosing, getDailyClosings, createPendingAccount, addItemsToPendingAccount, chargePendingAccount, getPendingAccounts, togglePendingAccountType, logAction, forceRefreshData } = useDatabaseStore();
+  const { products, recipes, employees, sales, dailyClosings, pendingAccounts, addSale, createDailyClosing, getDailyClosings, createPendingAccount, addItemsToPendingAccount, chargePendingAccount, getPendingAccounts, togglePendingAccountType, logAction, forceRefreshData, syncOfflineData } = useDatabaseStore();
   
   const activeProducts = products.filter(p => p.is_active !== false);
 
@@ -34,6 +34,34 @@ export default function SalesView() {
   const [selectedPendingAccount, setSelectedPendingAccount] = useState<string>('');
   const [showNewPendingModal, setShowNewPendingModal] = useState(false);
   const [newPendingName, setNewPendingName] = useState('');
+  const [pendingSyncCount, setPendingSyncCount] = useState(0);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  useEffect(() => {
+    const checkPendingSync = async () => {
+      try {
+        const { getPendingCounts } = await import('../../lib/offlineDB');
+        const counts = await getPendingCounts();
+        setPendingSyncCount(counts.sales);
+      } catch {}
+    };
+    checkPendingSync();
+    const interval = setInterval(checkPendingSync, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleManualSync = async () => {
+    setIsSyncing(true);
+    try {
+      await syncOfflineData();
+      const { getPendingCounts } = await import('../../lib/offlineDB');
+      const counts = await getPendingCounts();
+      setPendingSyncCount(counts.sales);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const [salePaymentMethod, setSalePaymentMethod] = useState({
     efectivo: 0,
     transferencia: 0,
@@ -578,6 +606,19 @@ setShowTicket(true);
   const sellerName = selectedEmployee ? selectedEmployee.name : '(Yo)';
 
   return (
+    <>
+      {pendingSyncCount > 0 && (
+        <div className="mb-4 p-3 bg-warning/10 border border-warning/30 rounded-lg flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-warning">⚠️</span>
+            <span className="text-sm text-text">{pendingSyncCount} venta(s) pendientes de sincronizar</span>
+          </div>
+          <Button size="sm" variant="outline" onClick={handleManualSync} disabled={isSyncing} className="gap-1">
+            <Loader2 className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+            {isSyncing ? 'Sincronizando...' : 'Sincronizar'}
+          </Button>
+        </div>
+      )}
     <div className="flex h-[calc(100vh-8rem)] flex-col gap-6 lg:flex-row">
       {/* Panel Izquierdo - Catálogo de Productos */}
       <div className="flex flex-1 flex-col rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(255,193,7,0.15)]">
@@ -746,8 +787,8 @@ setShowTicket(true);
                       <div className="mt-2 pt-2 border-t border-border/30 max-h-32 overflow-y-auto">
                         <p className="text-xs font-medium text-text-secondary mb-1">Productos:</p>
                         <div className="space-y-1">
-                          {accountItems.map((item) => (
-                            <div key={`${item.product_id}-${item.quantity}-${item.unit_price}`} className="flex items-center justify-between text-xs pl-2">
+                          {accountItems.map((item, index) => (
+                            <div key={`${item.product_id}-${index}`} className="flex items-center justify-between text-xs pl-2">
                               <span className="text-text">{item.name || item.product_name}</span>
                               <span className="text-text-secondary">
                                 x{item.quantity} ${((item.price || item.unit_price) * item.quantity).toFixed(2)}
@@ -1158,8 +1199,8 @@ setShowTicket(true);
                     Pedidos de {selectedAccount.client_name}:
                   </p>
                   <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {accountItems.map((item: any) => (
-                      <div key={`${item.product_id}-${item.quantity}-${item.subtotal}`} className="flex justify-between text-sm">
+                    {accountItems.map((item: any, index: number) => (
+                      <div key={`${item.product_id}-${index}`} className="flex justify-between text-sm">
                         <span className="text-text">{item.quantity}x {item.product_name}</span>
                         <span className="font-mono text-text-secondary">${item.subtotal.toFixed(2)}</span>
                       </div>
@@ -1848,5 +1889,6 @@ setShowTicket(true);
         </div>
       )}
     </div>
+  </>
   );
 }

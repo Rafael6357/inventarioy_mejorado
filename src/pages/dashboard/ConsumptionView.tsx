@@ -42,7 +42,10 @@ export default function ConsumptionView() {
     // Initialize map with all products to 0? No, only show consumed ones.
     
     dailySales.forEach(sale => {
-      sale.items?.forEach(item => {
+      const items = typeof sale.items === 'string' 
+        ? JSON.parse(sale.items || '[]') 
+        : (sale.items || []);
+      items.forEach(item => {
         // Is it a direct product?
         const product = products.find(p => p.id === item.product_id);
         if (product) {

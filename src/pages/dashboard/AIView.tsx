@@ -16,6 +16,18 @@ interface PersistedMessage {
   created_at: string;
 }
 
+function parseSaleItems(items: any): any[] {
+  if (Array.isArray(items)) return items;
+  if (typeof items === 'string') {
+    try {
+      return JSON.parse(items);
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 export default function AIView() {
   const { user } = useAuthStore();
   const { products, sales, movements, employees, recipes } = useDatabaseStore();
@@ -90,17 +102,20 @@ export default function AIView() {
     const monthlyRevenue = monthlySalesData.reduce((sum, s) => sum + Number(s.total_amount), 0);
 
     const totalCOGS = sales.reduce((sum, s) => {
-      return sum + (s.items || []).reduce((itemSum, item) => itemSum + (item.quantity * item.unit_cost), 0);
+      const items = parseSaleItems(s.items);
+      return sum + items.reduce((itemSum: number, item: any) => itemSum + (item.quantity * item.unit_cost), 0);
     }, 0);
     const overallMargin = totalSalesRevenue > 0
       ? ((totalSalesRevenue - totalCOGS) / totalSalesRevenue) * 100
       : 0;
 
     const weeklyCOGS = weeklySalesData.reduce((sum, s) => {
-      return sum + (s.items || []).reduce((itemSum, item) => itemSum + (item.quantity * item.unit_cost), 0);
+      const items = parseSaleItems(s.items);
+      return sum + items.reduce((itemSum: number, item: any) => itemSum + (item.quantity * item.unit_cost), 0);
     }, 0);
     const monthlyCOGS = monthlySalesData.reduce((sum, s) => {
-      return sum + (s.items || []).reduce((itemSum, item) => itemSum + (item.quantity * item.unit_cost), 0);
+      const items = parseSaleItems(s.items);
+      return sum + items.reduce((itemSum: number, item: any) => itemSum + (item.quantity * item.unit_cost), 0);
     }, 0);
 
     const weeklyMargin = weeklyRevenue > 0 ? ((weeklyRevenue - weeklyCOGS) / weeklyRevenue) * 100 : 0;
@@ -263,7 +278,8 @@ export default function AIView() {
   const buildGreeting = (): { role: 'user'|'assistant', text: string } => {
     const totalSalesRevenue = sales.reduce((sum, s) => sum + Number(s.total_amount), 0);
     const totalCOGS = sales.reduce((sum, s) => {
-      return sum + (s.items || []).reduce((itemSum, item) => itemSum + (item.quantity * item.unit_cost), 0);
+      const items = typeof s.items === 'string' ? JSON.parse(s.items || '[]') : (s.items || []);
+      return sum + items.reduce((itemSum: number, item: any) => itemSum + (item.quantity * item.unit_cost), 0);
     }, 0);
     const overallMargin = totalSalesRevenue > 0 ? ((totalSalesRevenue - totalCOGS) / totalSalesRevenue) * 100 : 0;
 

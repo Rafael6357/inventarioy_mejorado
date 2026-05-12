@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { useDatabaseStore } from '../../store/dbStore';
-import { Settings, Save, Building2, User, Shield, Printer, MessageSquare, DollarSign, QrCode, Copy, ExternalLink, Download, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
-import { useAutoUpdater } from '../../hooks/useAutoUpdater';
+import { Settings, Save, Building2, User, Shield, Printer, MessageSquare, DollarSign, QrCode, Copy, ExternalLink, Download, RefreshCw } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
@@ -10,6 +9,7 @@ import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
 import { Switch } from '../../components/ui/switch';
 import AccessPinsConfig from '../../components/AccessPinsConfig';
+import SyncQueuePanel from '../../components/SyncQueuePanel';
 import QRCode from 'react-qr-code';
 
 export default function SettingsView() {
@@ -191,14 +191,14 @@ export default function SettingsView() {
             <div>
               <p className="text-text-secondary">Plan Actual</p>
               <div className="mt-1 inline-flex items-center rounded-full border border-primary/50 bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary shadow-[0_0_10px_rgba(205,164,52,0.2)]">
-                {user?.subscription.status === 'trialing' ? 'Prueba Gratuita' : 'Plan Profesional'}
+                {user?.subscription?.status === 'trialing' ? 'Prueba Gratuita' : 'Plan Profesional'}
               </div>
             </div>
-            {user?.subscription.status === 'trialing' && (
+            {user?.subscription?.status === 'trialing' && (
               <div>
                 <p className="text-text-secondary">Fin de prueba</p>
                 <p className="font-medium text-text">
-                  {new Date(user.subscription.trialEndsAt).toLocaleDateString('es-ES')}
+                  {new Date(user?.subscription?.trialEndsAt || Date.now()).toLocaleDateString('es-ES')}
                 </p>
               </div>
             )}
@@ -500,20 +500,19 @@ export default function SettingsView() {
                 </div>
               </div>
 
-              <div className="pt-6 border-t border-border mt-4">
-                <h3 className="text-lg font-semibold text-text mb-4 flex items-center gap-2">
-                  <Download className="h-5 w-5" />
-                  Actualizaciones
-                </h3>
-                
-                <ActualizacionesSection />
-              </div>
-
               <div className="pt-4 flex justify-end">
                 <Button type="submit" className="gap-2" disabled={isSaving || isSubmitting}>
                   <Save className="h-4 w-4" />
                   {isSaving ? 'Guardando...' : 'Guardar Cambios'}
                 </Button>
+              </div>
+
+              <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-8 shadow-sm mt-6">
+                <h2 className="text-xl font-semibold text-text mb-6 flex items-center gap-2">
+                  <RefreshCw className="h-5 w-5 text-primary drop-shadow-[0_0_5px_rgba(205,164,52,0.8)]" />
+                  Sincronización
+                </h2>
+                <SyncQueuePanel />
               </div>
             </form>
           </div>
@@ -525,124 +524,5 @@ export default function SettingsView() {
         </div>
       </div>
     </>
-  );
-}
-
-function ActualizacionesSection() {
-  const { 
-    updateInfo, 
-    isChecking, 
-    error, 
-    settings, 
-    checkForUpdates,
-    downloadAndInstall,
-    toggleAutoUpdate,
-    toggleEnabled 
-  } = useAutoUpdater();
-
-  const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-
-  if (!isTauri) {
-    return (
-      <div className="bg-bg/50 rounded-lg p-4">
-        <p className="text-sm text-text-secondary">
-          Las actualizaciones automáticas están disponibles solo en la aplicación de escritorio.
-        </p>
-      </div>
-    );
-  }
-
-  const hasUpdate = updateInfo?.available;
-
-  return (
-    <div className="bg-bg/50 rounded-lg p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-text-secondary">Aplicación de escritorio</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {hasUpdate ? (
-            <span className="flex items-center gap-1 text-sm text-warning font-medium">
-              <AlertCircle className="h-4 w-4" />
-              Nueva versión disponible
-            </span>
-          ) : (
-            <span className="flex items-center gap-1 text-sm text-success font-medium">
-              <CheckCircle className="h-4 w-4" />
-              Estás actualizado
-            </span>
-          )}
-        </div>
-      </div>
-
-      {hasUpdate && updateInfo?.version && (
-        <div className="p-3 bg-warning/10 rounded-lg border border-warning/30">
-          <p className="text-sm text-text">
-            <span className="font-medium">Nueva versión:</span> {updateInfo.version}
-          </p>
-          {updateInfo.body && (
-            <p className="text-xs text-text-secondary mt-1">{updateInfo.body}</p>
-          )}
-        </div>
-      )}
-
-      {error && (
-        <div className="p-3 bg-danger/10 rounded-lg border border-danger/30">
-          <p className="text-sm text-danger">{error.message}</p>
-        </div>
-      )}
-
-      <div className="flex flex-wrap gap-3">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={checkForUpdates}
-          disabled={isChecking}
-          className="gap-2"
-        >
-          <RefreshCw className={`h-4 w-4 ${isChecking ? 'animate-spin' : ''}`} />
-          {isChecking ? 'Verificando...' : 'Verificar Actualizaciones'}
-        </Button>
-
-        {hasUpdate && (
-          <Button
-            size="sm"
-            onClick={downloadAndInstall}
-            className="gap-2"
-          >
-            <Download className="h-4 w-4" />
-            Descargar e Instalar
-          </Button>
-        )}
-      </div>
-
-      <div className="pt-4 border-t border-border space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <Label className="text-base">Auto-actualizar</Label>
-            <p className="text-sm text-text-secondary">
-              Descargar e instalar actualizaciones automáticamente
-            </p>
-          </div>
-          <Switch
-            checked={settings.autoUpdate}
-            onCheckedChange={toggleAutoUpdate}
-          />
-        </div>
-
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <Label className="text-base">Verificar al iniciar</Label>
-            <p className="text-sm text-text-secondary">
-              Buscar actualizaciones al abrir la aplicación
-            </p>
-          </div>
-          <Switch
-            checked={settings.enabled}
-            onCheckedChange={toggleEnabled}
-          />
-        </div>
-      </div>
-    </div>
   );
 }

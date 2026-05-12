@@ -1,4 +1,6 @@
 let db: any = null;
+let initPromise: Promise<any> | null = null;
+let isInitialized = false;
 
 const DB_NAME = 'inventarioy.db';
 
@@ -16,21 +18,42 @@ async function getDatabase() {
 }
 
 export async function initLocalDB(): Promise<any> {
-  if (db) return db;
+  if (db && isInitialized) return db;
 
-  try {
-    db = await getDatabase();
-    await createTables();
-    console.log('Base de datos SQLite local inicializada');
-    return db;
-  } catch (error: any) {
-    if (error.message === 'SQLite solo disponible en la app de escritorio') {
-      console.log('Modo web: SQLite no disponible, usando Supabase directamente');
-      return null;
-    }
-    console.error('Error al inicializar SQLite:', error);
-    throw error;
+  if (initPromise) {
+    console.log('[initLocalDB] Ya hay una inicialización en progreso, esperando...');
+    return await initPromise;
   }
+
+  initPromise = (async () => {
+    try {
+      if (db && isInitialized) {
+        return db;
+      }
+      
+      console.log('[initLocalDB] Iniciando base de datos...');
+      const database = await getDatabase();
+      await createTables();
+      isInitialized = true;
+      console.log('[initLocalDB] Base de datos SQLite local inicializada correctamente');
+      return database;
+    } catch (error: any) {
+      initPromise = null;
+      isInitialized = false;
+      if (error.message === 'SQLite solo disponible en la app de escritorio') {
+        console.log('Modo web: SQLite no disponible, usando Supabase directamente');
+        return null;
+      }
+      console.error('[initLocalDB] Error al inicializar SQLite:', error);
+      throw error;
+    }
+  })();
+
+  return await initPromise;
+}
+
+export async function ensureInitialized(): Promise<any> {
+  return await initLocalDB();
 }
 
 async function createTables(): Promise<void> {
@@ -93,7 +116,7 @@ async function createTables(): Promise<void> {
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
       employee_id TEXT,
-      items TEXT NOT NULL,
+      items TEXT,
       total_amount REAL NOT NULL,
       date TEXT NOT NULL,
       sale_type TEXT DEFAULT 'SALON',
@@ -115,7 +138,7 @@ async function createTables(): Promise<void> {
       user_id TEXT NOT NULL,
       name TEXT NOT NULL,
       selling_price REAL DEFAULT 0,
-      ingredients TEXT NOT NULL,
+      ingredients TEXT DEFAULT '[]',
       created_at TEXT NOT NULL
     )
   `);
@@ -208,7 +231,17 @@ async function createTables(): Promise<void> {
       data TEXT NOT NULL,
       created_at TEXT NOT NULL,
       synced INTEGER DEFAULT 0,
-      retry_count INTEGER DEFAULT 0
+      retry_count INTEGER DEFAULT 0,
+      failed INTEGER DEFAULT 0,
+      error_message TEXT
+    )
+  `);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS schema_versions (
+      version INTEGER PRIMARY KEY,
+      applied_at TEXT NOT NULL,
+      description TEXT
     )
   `);
 
@@ -235,24 +268,196 @@ async function createTables(): Promise<void> {
   `);
 
   console.log('Todas las tablas creadas');
+
+  await runMigrations();
+}
+
+async function addColumnIfNotExists(table: string, column: string, definition: string): Promise<void> {
+  if (!db) return;
+  try {
+    await db.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    console.log(`[Migration] Added column ${table}.${column}`);
+  } catch (e: any) {
+    if (e.message && e.message.includes('duplicate column name')) {
+      console.log(`[Migration] Column ${table}.${column} already exists, skipping`);
+    } else if (e.message && e.message.includes('no such table')) {
+      console.warn(`[Migration] Table ${table} does not exist, skipping`);
+    } else {
+      console.warn(`[Migration] ${table}.${column}:`, e.message?.substring(0, 100));
+    }
+  }
+}
+
+async function createIndexIfNotExists(indexName: string, table: string, column: string): Promise<void> {
+  if (!db) return;
+  try {
+    await db.execute(`CREATE INDEX IF NOT EXISTS ${indexName} ON ${table} (${column})`);
+    console.log(`[Migration] Created index ${indexName}`);
+  } catch (e: any) {
+    console.warn(`[Migration] Index ${indexName}:`, e.message?.substring(0, 100));
+  }
+}
+
+async function getSchemaVersion(): Promise<number> {
+  if (!db) return 0;
+  try {
+    const result = await db.select('SELECT MAX(version) as version FROM schema_versions');
+    return result[0]?.version || 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function setSchemaVersion(version: number, description: string): Promise<void> {
+  if (!db) return;
+  try {
+    await db.execute(
+      'INSERT INTO schema_versions (version, applied_at, description) VALUES ($1, $2, $3)',
+      [version, new Date().toISOString(), description]
+    );
+    console.log(`[Migration] Schema version set to ${version}`);
+  } catch (e: any) {
+    console.warn(`[Migration] Failed to set version ${version}:`, e.message?.substring(0, 100));
+  }
+}
+
+async function runMigrations(): Promise<void> {
+  if (!db) return;
+  
+  console.log('[Migration] Running database migrations...');
+  
+  const currentVersion = await getSchemaVersion();
+  console.log(`[Migration] Current schema version: ${currentVersion}`);
+  
+  await addColumnIfNotExists('products', 'stock_min', 'REAL DEFAULT 0');
+  await addColumnIfNotExists('products', 'stock_max', 'REAL DEFAULT 0');
+  await addColumnIfNotExists('products', 'updated_at', 'TEXT');
+  await addColumnIfNotExists('products', 'category', 'TEXT');
+
+  await addColumnIfNotExists('categories', 'updated_at', 'TEXT');
+
+  await addColumnIfNotExists('movements', 'updated_at', 'TEXT');
+
+  if (currentVersion < 1) {
+    await addColumnIfNotExists('products', 'stock_min', 'REAL DEFAULT 0');
+    await addColumnIfNotExists('products', 'stock_max', 'REAL DEFAULT 0');
+    await addColumnIfNotExists('products', 'updated_at', 'TEXT');
+    await addColumnIfNotExists('products', 'category', 'TEXT');
+
+    await addColumnIfNotExists('categories', 'updated_at', 'TEXT');
+
+    await addColumnIfNotExists('movements', 'updated_at', 'TEXT');
+
+    await addColumnIfNotExists('recipes', 'updated_at', 'TEXT');
+    await addColumnIfNotExists('recipes', 'is_active', 'INTEGER DEFAULT 1');
+    await addColumnIfNotExists('recipes', 'category', 'TEXT');
+    await addColumnIfNotExists('recipes', 'ingredients', "TEXT DEFAULT '[]'");
+
+    try {
+      await db.execute("UPDATE recipes SET ingredients = '[]' WHERE ingredients IS NULL OR ingredients = ''");
+    } catch (e) {
+      console.log('[Migration] recipes ingredients update skipped:', e);
+    }
+
+    await addColumnIfNotExists('employees', 'updated_at', 'TEXT');
+    await addColumnIfNotExists('employees', 'category', 'TEXT');
+
+    await addColumnIfNotExists('departments', 'updated_at', 'TEXT');
+
+    await addColumnIfNotExists('sales', 'updated_at', 'TEXT');
+
+    await addColumnIfNotExists('daily_closings', 'updated_at', 'TEXT');
+
+    await addColumnIfNotExists('transit_items', 'updated_at', 'TEXT');
+
+    await setSchemaVersion(1, 'Initial migrations - products, categories, movements, recipes, employees, departments, sales, daily_closings, transit_items');
+  }
+
+  if (currentVersion < 2) {
+    await addColumnIfNotExists('sales', 'efectivo', 'REAL DEFAULT 0');
+    await addColumnIfNotExists('sales', 'transferencia', 'REAL DEFAULT 0');
+    await addColumnIfNotExists('sales', 'usd', 'REAL DEFAULT 0');
+    await addColumnIfNotExists('sales', 'eur', 'REAL DEFAULT 0');
+    await addColumnIfNotExists('sales', 'payment_method', 'TEXT');
+
+    await addColumnIfNotExists('sync_queue', 'failed', 'INTEGER DEFAULT 0');
+    await addColumnIfNotExists('sync_queue', 'error_message', 'TEXT');
+
+    await setSchemaVersion(2, 'Payment columns in sales table, sync queue error tracking');
+  }
+
+  if (currentVersion < 3) {
+    await createIndexIfNotExists('idx_products_user_id', 'products', 'user_id');
+    await createIndexIfNotExists('idx_categories_user_id', 'categories', 'user_id');
+    await createIndexIfNotExists('idx_movements_product_id', 'movements', 'product_id');
+    await createIndexIfNotExists('idx_movements_date', 'movements', 'date');
+    await createIndexIfNotExists('idx_movements_user_id', 'movements', 'user_id');
+    await createIndexIfNotExists('idx_sales_date', 'sales', 'date');
+    await createIndexIfNotExists('idx_sales_user_id', 'sales', 'user_id');
+    await createIndexIfNotExists('idx_recipes_user_id', 'recipes', 'user_id');
+    await createIndexIfNotExists('idx_employees_user_id', 'employees', 'user_id');
+    await createIndexIfNotExists('idx_daily_closings_user_id', 'daily_closings', 'user_id');
+    await createIndexIfNotExists('idx_transit_items_user_id', 'transit_items', 'user_id');
+    await createIndexIfNotExists('idx_sync_queue_synced', 'sync_queue', 'synced');
+
+    await setSchemaVersion(3, 'Database indexes for performance optimization');
+  }
+
+  if (currentVersion < 4) {
+    try {
+      await db.execute('ALTER TABLE sales ALTER COLUMN items DROP NOT NULL');
+      console.log('[Migration] Made sales.items column nullable');
+    } catch (e: any) {
+      console.log('[Migration] sales.items nullable skip:', e.message?.substring(0, 50));
+    }
+    await setSchemaVersion(4, 'Make sales.items nullable for Supabase sync');
+  }
+
+  console.log('[Migration] Database migrations completed (version ' + await getSchemaVersion() + ')');
 }
 
 export async function getDB(): Promise<any> {
-  if (!db) {
+  if (db && isInitialized) {
+    return db;
+  }
+  
+  if (initPromise) {
     try {
-      const result = await initLocalDB();
-      return result;
+      return await initPromise;
     } catch (error) {
       console.warn('SQLite no disponible, getDB retorna null');
       return null;
     }
   }
-  return db;
+  
+  try {
+    const result = await initLocalDB();
+    return result;
+  } catch (error) {
+    console.warn('SQLite no disponible, getDB retorna null');
+    return null;
+  }
 }
 
 export async function isDBReady(): Promise<boolean> {
   const database = await getDB();
   return database !== null;
+}
+
+export async function withTransaction<T>(callback: (db: any) => Promise<T>): Promise<T | null> {
+  const database = await getDB();
+  if (!database) return null;
+  
+  try {
+    await database.execute('BEGIN TRANSACTION');
+    const result = await callback(database);
+    await database.execute('COMMIT');
+    return result;
+  } catch (error) {
+    await database.execute('ROLLBACK');
+    console.error('[Transaction] Error, rollback performed:', error);
+    throw error;
+  }
 }
 
 export async function isTauri(): Promise<boolean> {
@@ -326,6 +531,12 @@ export async function getPendingSyncItems(): Promise<any[]> {
     console.log('SQLite no disponible, retornando array vacío');
     return [];
   }
+  return await database.select('SELECT * FROM sync_queue WHERE synced = 0 AND (failed = 0 OR failed IS NULL) ORDER BY created_at');
+}
+
+export async function getAllPendingItems(): Promise<any[]> {
+  const database = await getDB();
+  if (!database) return [];
   return await database.select('SELECT * FROM sync_queue WHERE synced = 0 ORDER BY created_at');
 }
 
@@ -345,6 +556,39 @@ export async function clearSyncedItems(): Promise<void> {
   const database = await getDB();
   if (!database) return;
   await database.execute('DELETE FROM sync_queue WHERE synced = 1');
+}
+
+export async function markAsFailed(id: number, errorMessage: string): Promise<void> {
+  const database = await getDB();
+  if (!database) return;
+  await database.execute(
+    'UPDATE sync_queue SET failed = 1, error_message = $1 WHERE id = $2',
+    [errorMessage.substring(0, 500), id]
+  );
+}
+
+export async function getFailedSyncItems(): Promise<any[]> {
+  const database = await getDB();
+  if (!database) return [];
+  return await database.select('SELECT * FROM sync_queue WHERE failed = 1 ORDER BY created_at DESC');
+}
+
+export async function retryFailedItem(id: number): Promise<void> {
+  const database = await getDB();
+  if (!database) return;
+  await database.execute(
+    'UPDATE sync_queue SET failed = 0, retry_count = 0, error_message = NULL WHERE id = $1',
+    [id]
+  );
+}
+
+export async function retryAllFailedItems(): Promise<number> {
+  const database = await getDB();
+  if (!database) return 0;
+  const result = await database.execute(
+    'UPDATE sync_queue SET failed = 0, retry_count = 0, error_message = NULL WHERE failed = 1'
+  );
+  return result.rowsAffected || 0;
 }
 
 export async function saveDailyClosingLocally(closing: any): Promise<void> {
@@ -531,6 +775,29 @@ export async function getPendingAccountsLocally(userId: string): Promise<any[]> 
   );
 }
 
+export async function getAllPendingAccountsDebug(userId: string): Promise<any[]> {
+  const database = await getDB();
+  if (!database) return [];
+  
+  const all = await database.select(
+    'SELECT * FROM pending_accounts WHERE user_id = $1 ORDER BY created_at DESC',
+    [userId]
+  );
+  console.log('[DEBUG] Todas las cuentas en SQLite:', all.length, all.map(a => ({ id: a.id, status: a.status, client: a.client_name })));
+  return all;
+}
+
+export async function getSyncQueueItemsDebug(): Promise<any[]> {
+  const database = await getDB();
+  if (!database) return [];
+  
+  const pending = await database.select(
+    'SELECT * FROM sync_queue WHERE synced = 0 ORDER BY created_at DESC'
+  );
+  console.log('[DEBUG] Items pendientes en sync_queue:', pending.length, pending.map(p => ({ table: p.table_name, op: p.operation })));
+  return pending;
+}
+
 export async function updatePendingAccountLocally(accountId: string, updates: any): Promise<void> {
   const database = await getDB();
   if (!database) return;
@@ -668,6 +935,8 @@ export async function saveUserSession(user: any): Promise<void> {
     return;
   }
 
+  console.log('[saveUserSession] Guardando usuario:', user.email, 'id:', user.id);
+
   await database.execute(
     `INSERT OR REPLACE INTO user_session (
       id, email, name, businessName, role, phone, address, businessHours,
@@ -694,19 +963,24 @@ export async function saveUserSession(user: any): Promise<void> {
       new Date().toISOString()
     ]
   );
-  console.log('[saveUserSession] Sesión guardada en SQLite');
+  console.log('[saveUserSession] Sesión guardada en SQLite correctamente');
 }
 
 export async function getUserSession(): Promise<any | null> {
+  console.log('[getUserSession] Iniciando búsqueda de sesión...');
   const database = await getDB();
   if (!database) {
     console.warn('[getUserSession] SQLite no disponible');
     return null;
   }
 
+  console.log('[getUserSession] Ejecutando query...');
   const results = await database.select('SELECT * FROM user_session LIMIT 1');
+  console.log('[getUserSession] Resultados:', results);
+
   if (results && results.length > 0) {
     const session = results[0];
+    console.log('[getUserSession] Sesión encontrada:', session.email);
     return {
       id: session.id,
       email: session.email,
@@ -726,6 +1000,7 @@ export async function getUserSession(): Promise<any | null> {
       cupTransferEnabled: session.cupTransferEnabled === 1
     };
   }
+  console.log('[getUserSession] No se encontró sesión en la tabla');
   return null;
 }
 
@@ -738,4 +1013,62 @@ export async function clearUserSession(): Promise<void> {
 
   await database.execute('DELETE FROM user_session');
   console.log('[clearUserSession] Sesión eliminada de SQLite');
+}
+
+export async function verifyDataIntegrity(): Promise<{ valid: boolean; issues: string[] }> {
+  const database = await getDB();
+  const issues: string[] = [];
+
+  if (!database) {
+    issues.push('SQLite no disponible');
+    return { valid: false, issues };
+  }
+
+  try {
+    const tables = ['products', 'categories', 'movements', 'sales', 'recipes', 'employees', 'departments', 'daily_closings', 'transit_items'];
+
+    for (const table of tables) {
+      try {
+        const countResult = await database.select(`SELECT COUNT(*) as count FROM ${table}`);
+        const count = countResult[0]?.count || 0;
+
+        if (count === 0) continue;
+
+        const nullIds = await database.select(`SELECT COUNT(*) as count FROM ${table} WHERE id IS NULL OR id = ''`);
+        if ((nullIds[0]?.count || 0) > 0) {
+          issues.push(`${table}: ${nullIds[0].count} registros con id inválido`);
+        }
+      } catch (e: any) {
+        issues.push(`${table}: Error al verificar - ${e.message?.substring(0, 50)}`);
+      }
+    }
+
+    const syncQueueIssues = await database.select('SELECT COUNT(*) as count FROM sync_queue WHERE failed = 1');
+    if ((syncQueueIssues[0]?.count || 0) > 0) {
+      issues.push(`sync_queue: ${syncQueueIssues[0].count} operaciones fallidas`);
+    }
+
+    const duplicateSync = await database.select(`
+      SELECT table_name, COUNT(*) as count
+      FROM sync_queue
+      WHERE synced = 0
+      GROUP BY table_name, data
+      HAVING COUNT(*) > 1
+    `);
+    if (duplicateSync.length > 0) {
+      for (const dup of duplicateSync) {
+        issues.push(`sync_queue: ${dup.count} operaciones duplicadas en ${dup.table_name}`);
+      }
+    }
+
+    const version = await getSchemaVersion();
+    if (version === 0) {
+      issues.push('schema_versions: No hay versión registrada');
+    }
+
+  } catch (e: any) {
+    issues.push(`Error general: ${e.message?.substring(0, 100)}`);
+  }
+
+  return { valid: issues.length === 0, issues };
 }
