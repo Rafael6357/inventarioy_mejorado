@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { useDatabaseStore } from '../../store/dbStore';
-import { Settings, Save, Building2, User, Shield, Printer, MessageSquare, DollarSign, QrCode, Copy, ExternalLink, Download, RefreshCw } from 'lucide-react';
+import { Settings, Save, Building2, User, Shield, Printer, MessageSquare, DollarSign, QrCode, Copy, ExternalLink, Download, RefreshCw, Sparkles, RotateCcw } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
@@ -9,7 +9,6 @@ import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
 import { Switch } from '../../components/ui/switch';
 import AccessPinsConfig from '../../components/AccessPinsConfig';
-import SyncQueuePanel from '../../components/SyncQueuePanel';
 import QRCode from 'react-qr-code';
 
 export default function SettingsView() {
@@ -509,10 +508,24 @@ export default function SettingsView() {
 
               <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-8 shadow-sm mt-6">
                 <h2 className="text-xl font-semibold text-text mb-6 flex items-center gap-2">
-                  <RefreshCw className="h-5 w-5 text-primary drop-shadow-[0_0_5px_rgba(205,164,52,0.8)]" />
-                  Sincronización
+                  <Sparkles className="h-5 w-5 text-primary drop-shadow-[0_0_5px_rgba(205,164,52,0.8)]" />
+                  Onboarding
                 </h2>
-                <SyncQueuePanel />
+                <p className="text-sm text-text-secondary mb-4">
+                  ¿Quieres ver nuevamente el tour de bienvenida?
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    localStorage.removeItem('onboarding_completed');
+                    toast.success('Onboarding reiniciado. Recarga la página para verlo.');
+                  }}
+                  className="gap-2"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Reiniciar Onboarding
+                </Button>
               </div>
             </form>
           </div>
