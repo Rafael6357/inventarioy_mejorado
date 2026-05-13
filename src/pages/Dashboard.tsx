@@ -45,8 +45,10 @@ import SettingsView from './dashboard/SettingsView';
 import ActionLogsView from './dashboard/ActionLogsView';
 import PaymentsView from './dashboard/PaymentsView';
 import DailyClosingsView from './dashboard/DailyClosingsView';
+import OnboardingWizard, { shouldShowOnboarding } from '../components/OnboardingWizard';
 
 export default function Dashboard() {
+  const [showOnboarding, setShowOnboarding] = useState(() => shouldShowOnboarding());
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const sidebarTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -389,6 +391,11 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+
+        <OnboardingWizard
+          isOpen={showOnboarding}
+          onClose={() => setShowOnboarding(false)}
+        />
       </div>
     </div>
   );
