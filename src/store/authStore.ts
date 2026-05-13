@@ -341,10 +341,6 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
       console.log('Usuario cargado:', user.email, 'role:', user.role, 'subscriptionActive:', user.isSubscriptionActive);
       set({ user, isAuthenticated: true, isLoading: false });
-      
-      // Código SQLite eliminado
-      // const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
-      // if (isTauri) { try { await saveUserSession(user); } catch (e) {} }
     } catch (err) {
       console.error('Error en fetchUser:', err);
       set({ isLoading: false });
