@@ -163,7 +163,7 @@ export default function Landing() {
                     "Control de empleados y nómina",
                     "Gráficos y estadísticas en tiempo real",
                     "Análisis con IA de tu negocio",
-                    "Modo offline (para registrar ventas sin internet)",
+                    "Acceso desde cualquier dispositivo con internet",
                     "Soporte prioritario",
                   ].map((item) => (
                     <li key={item} className="flex items-center gap-3">

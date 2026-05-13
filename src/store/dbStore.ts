@@ -2,28 +2,6 @@ import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from './authStore';
 import { toast } from 'sonner';
-import * as sqliteLocal from '../lib/sqliteLocal';
-import {
-  initOfflineDB,
-  savePendingSale,
-  savePendingMovement,
-  savePendingClosing,
-  savePendingTransitConsumption,
-  getAllPendingSales,
-  getAllPendingMovements,
-  getAllPendingClosings,
-  getAllPendingTransitConsumptions,
-  markSaleAsSynced,
-  markMovementAsSynced,
-  markClosingAsSynced,
-  markTransitConsumptionAsSynced,
-  incrementRetryCount,
-  deletePendingItem,
-  cacheProducts,
-  getCachedProducts,
-  checkClosingExists,
-  STORES,
-} from '../lib/offlineDB';
 
 export interface Product {
   id: string;
@@ -314,51 +292,28 @@ const checkRealInternetConnection = async (): Promise<boolean> => {
   }
 };
 
-const withTimeout = <T>(
+const withTimeout = async <T>(
   promise: Promise<T>, 
-  timeoutMs: number = DEFAULT_TIMEOUT,
-  maxRetries: number = 5
+  timeoutMs: number = DEFAULT_TIMEOUT
 ): Promise<T> => {
-  const executeWithRetry = async (attempt: number): Promise<T> => {
-    try {
-      const result = await Promise.race([
-        promise,
-        new Promise<T>((_, reject) => 
-          setTimeout(() => reject(new Error(`TIMEOUT_ATTEMPT_${attempt}`)), timeoutMs)
-        )
-      ]);
-      return result;
-    } catch (err: any) {
-      if (isRateLimitError(err)) {
-        if (attempt < maxRetries) {
-          const delay = attempt === 1 ? 3000 : attempt * 2000;
-          console.log(`⚠️ Rate limit detectado. Reintentando en ${delay}ms (intento ${attempt}/${maxRetries})`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          return executeWithRetry(attempt + 1);
-        }
-        throw new Error('Supabase está procesando muchas solicitudes. Por favor, espera un momento e intenta de nuevo.');
-      }
-      
-      if (attempt < maxRetries && err.message?.includes('TIMEOUT_ATTEMPT_')) {
-        const delay = attempt === 1 ? 2000 : (attempt + 1) * 1000;
-        console.log(`⏳ Reintentando... (intento ${attempt}/${maxRetries}) en ${delay}ms`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        return executeWithRetry(attempt + 1);
-      }
-      
-      if (err.message?.includes('TIMEOUT_ATTEMPT_')) {
-        throw new Error(`La conexión está lenta. Si el problema persiste, recarga la página (F5) e intenta de nuevo.`);
-      }
-      
-      throw err;
+  try {
+    const result = await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => 
+        setTimeout(() => reject(new Error(`TIMEOUT`)), timeoutMs)
+      )
+    ]);
+    return result;
+  } catch (err: any) {
+    if (err.message === 'TIMEOUT') {
+      throw new Error('La conexión está lenta. Intenta de nuevo.');
     }
-  };
-  
-  return executeWithRetry(1);
+    throw err;
+  }
 };
 
 let lastOperationTime: Record<string, number> = {};
-const operationCooldown = 2000; // 2 segundos entre operaciones del mismo tipo
+const operationCooldown = 1000; // 1 segundo entre operaciones del mismo tipo
 
 const withCooldown = async <T>(
   operationKey: string,
@@ -369,9 +324,7 @@ const withCooldown = async <T>(
   const timeSinceLastOp = now - lastTime;
   
   if (timeSinceLastOp < operationCooldown) {
-    const waitTime = operationCooldown - timeSinceLastOp;
-    console.log(`⏸️ Cooldown: esperando ${waitTime}ms antes de continuar...`);
-    await new Promise(resolve => setTimeout(resolve, waitTime));
+    await new Promise(resolve => setTimeout(resolve, operationCooldown - timeSinceLastOp));
   }
   
   lastOperationTime[operationKey] = Date.now();
@@ -380,7 +333,6 @@ const withCooldown = async <T>(
 
 export const resetConnectionCooldown = () => {
   lastOperationTime = {};
-  console.log('🔄 Cooldown de operaciones reseteado');
 };
 
 export const forceRefreshData = async () => {
@@ -490,6 +442,8 @@ addItemsToPendingAccount: (accountId: string, items: { product_id: string; produ
   
   // Logging de acciones
   logAction: (module: string, action: string, details?: Record<string, any>) => Promise<void>;
+  getActionLogs: () => Promise<void>;
+  hashPin: (pin: string) => Promise<string>;
 }
 
 export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
@@ -536,68 +490,6 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
 
     const isFetchingAll = get().isLoading && get().products.length > 0;
     if (isFetchingAll) {
-      return;
-    }
-
-    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
-    const isOffline = !navigator.onLine;
-    
-    let localClosings: any[] = [];
-    let localSales: any[] = [];
-    let localMovements: any[] = [];
-    let localTransitItems: any[] = [];
-    let localProducts: any[] = [];
-    
-    if (isTauri) {
-      try {
-        const dbReady = await sqliteLocal.isDBReady();
-        if (dbReady) {
-          console.log('[fetchAll] Cargando datos locales desde SQLite...');
-          localClosings = await sqliteLocal.getDailyClosingsLocally(user.id);
-          localSales = await sqliteLocal.getSalesLocally(user.id);
-          localMovements = await sqliteLocal.getMovementsLocally(user.id);
-          localTransitItems = await sqliteLocal.getTransitItemsLocally(user.id);
-          console.log('[fetchAll] Datos locales cargados:', {
-            closings: localClosings.length,
-            sales: localSales.length,
-            movements: localMovements.length,
-            transit: localTransitItems.length
-          });
-        }
-      } catch (err) {
-        console.warn('[fetchAll] Error cargando datos locales:', err);
-      }
-    } else if (isOffline) {
-      try {
-        console.log('[fetchAll] App Web - Cargando datos desde IndexedDB...');
-        const { getCachedProducts, getCompletedSalesLocally } = await import('../lib/offlineDB');
-        
-        localProducts = await getCachedProducts();
-        localSales = await getCompletedSalesLocally();
-        
-        console.log('[fetchAll] Datos desde IndexedDB:', {
-          products: localProducts.length,
-          sales: localSales.length
-        });
-      } catch (err) {
-        console.warn('[fetchAll] Error cargando desde IndexedDB:', err);
-      }
-    }
-
-    // Si está offline o no hay datos locales, no intentar cargar desde Supabase
-    if (isOffline) {
-      console.log('[fetchAll] Modo offline - cargando solo datos locales');
-      const productsToUse = (isTauri && localProducts.length > 0) || (!isTauri && localProducts.length > 0) 
-        ? localProducts 
-        : (localClosings.length > 0 || localSales.length > 0 ? get().products : []);
-      
-      set({
-        products: productsToUse,
-        movements: localMovements,
-        sales: localSales,
-        transitItems: localTransitItems,
-        isLoading: false
-      });
       return;
     }
 
@@ -654,51 +546,15 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
 
       const transitItems = (transitRes.data || []).filter(t => t.remaining > 0);
 
-      const allDailyClosings = [...(dailyClosingsRes.data || [])];
-      const closingIds = new Set(allDailyClosings.map(c => c.id));
-      for (const closing of localClosings) {
-        if (!closingIds.has(closing.id)) {
-          allDailyClosings.push(closing);
-        }
-      }
-      allDailyClosings.sort((a, b) => new Date(b.closing_date).getTime() - new Date(a.closing_date).getTime());
-
-      const allSales = [...sales];
-      const saleIds = new Set(allSales.map(s => s.id));
-      for (const sale of localSales) {
-        if (!saleIds.has(sale.id)) {
-          allSales.push(sale);
-        }
-      }
-      allSales.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-      const allMovements = [...(movementsRes.data || [])];
-      const movementIds = new Set(allMovements.map(m => m.id));
-      for (const movement of localMovements) {
-        if (!movementIds.has(movement.id)) {
-          allMovements.push(movement);
-        }
-      }
-      allMovements.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-      const allTransitItems = [...transitItems];
-      const transitIds = new Set(allTransitItems.map(t => t.id));
-      for (const item of localTransitItems) {
-        if (!transitIds.has(item.id)) {
-          allTransitItems.push(item);
-        }
-      }
-      const filteredTransit = allTransitItems.filter(t => t.remaining > 0);
-
       set({
         products: productsRes.data || [],
-        movements: allMovements,
-        sales: allSales,
+        movements: movementsRes.data || [],
+        sales,
         recipes,
         employees: employeesRes.data || [],
         categories: categoriesRes.data || [],
-        transitItems: filteredTransit,
-        dailyClosings: allDailyClosings,
+        transitItems,
+        dailyClosings: dailyClosingsRes.data || [],
         hrDocuments: hrDocsRes.data || [],
         departments: departmentsRes.data || [],
         payrollConfig: payrollConfigRes.data || null,
@@ -772,7 +628,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     }
   },
 
-  addProduct: async (product) => {
+addProduct: async (product) => {
     const { user } = useAuthStore.getState();
     if (!user) return;
 
@@ -787,10 +643,9 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       throw new Error(`¡Ups! El producto "${product.name}" ya existe. Intenta con otro nombre.`);
     }
 
-    const isOnline = navigator.onLine;
-    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
-    const productId = `offline-${Date.now()}`;
-
+    // Solo modo online - insertar en Supabase
+    const productId = crypto.randomUUID();
+    
     const productData = {
       ...product,
       id: productId,
@@ -801,27 +656,6 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-
-    if (!isOnline) {
-      if (isTauri) {
-        try {
-          const dbReady = await sqliteLocal.isDBReady();
-          if (dbReady) {
-            await sqliteLocal.saveProductLocally(productData);
-            console.log('[addProduct] Producto guardado en SQLite');
-            // AGREGAR A LA COLA DE SINCRONIZACIÓN
-            await sqliteLocal.addToSyncQueue('products', 'INSERT', productData);
-            console.log('[addProduct] Producto agregado a cola de sync');
-          }
-        } catch (sqliteErr) {
-          console.warn('[addProduct] Error guardando en SQLite:', sqliteErr);
-        }
-      }
-
-      set((state) => ({ products: [productData, ...state.products] }));
-      toast.success('Producto guardado offline. Se sincronizará cuando haya conexión.');
-      return;
-    }
 
     const productPromise = supabase
       .from('products')
@@ -858,12 +692,12 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     }
 
     set((state) => ({ products: [data, ...state.products] }));
-    await get().fetchAll(); // Refrescar todo para asegurar consistencia
+    toast.success('Producto guardado exitosamente');
+    await get().fetchAll();
   },
 
   updateProduct: async (id, updates) => {
     const isOnline = navigator.onLine;
-    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
 
     const capitalizedUpdates = {
       ...updates,
@@ -872,32 +706,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       updated_at: new Date().toISOString(),
     };
 
-    if (!isOnline) {
-      if (isTauri) {
-        try {
-          const dbReady = await sqliteLocal.isDBReady();
-          if (dbReady) {
-            const database = await sqliteLocal.getDB();
-            const fields = Object.keys(capitalizedUpdates).map((k, i) => `${k} = $${i + 2}`).join(', ');
-            const values = [id, ...Object.values(capitalizedUpdates)];
-            await database.execute(`UPDATE products SET ${fields} WHERE id = $1`, values);
-            console.log('[updateProduct] Producto actualizado en SQLite');
-            // AGREGAR A LA COLA DE SINCRONIZACIÓN
-            await sqliteLocal.addToSyncQueue('products', 'UPDATE', { id, ...capitalizedUpdates });
-            console.log('[updateProduct] Producto agregado a cola de sync');
-          }
-        } catch (sqliteErr) {
-          console.warn('[updateProduct] Error guardando en SQLite:', sqliteErr);
-        }
-      }
-
-      set((state) => ({
-        products: state.products.map(p => p.id === id ? { ...p, ...updates, updated_at: new Date().toISOString() } : p),
-      }));
-      toast.success('Producto actualizado offline. Se sincronizará cuando haya conexión.');
-      return;
-    }
-
+    // Solo modo online
     const { error } = await supabase
       .from('products')
       .update(capitalizedUpdates)
@@ -913,38 +722,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
   },
 
   deleteProduct: async (id) => {
-    const isOnline = navigator.onLine;
-    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
-
-    // Si está offline, guardar en SQLite
-    if (!isOnline && isTauri) {
-      try {
-        const dbReady = await sqliteLocal.isDBReady();
-        if (dbReady) {
-          const database = await sqliteLocal.getDB();
-          await database.execute(
-            'UPDATE products SET is_active = 0, updated_at = $1 WHERE id = $2',
-            [new Date().toISOString(), id]
-          );
-          console.log('[deleteProduct] Producto marcado como inactivo en SQLite');
-          // AGREGAR A LA COLA DE SINCRONIZACIÓN
-          await sqliteLocal.addToSyncQueue('products', 'UPDATE', { 
-            id, 
-            is_active: false, 
-            updated_at: new Date().toISOString() 
-          });
-          console.log('[deleteProduct] Producto agregado a cola de sync');
-          set((state) => ({
-            products: state.products.map(p => p.id === id ? { ...p, is_active: false } : p),
-          }));
-          toast.success('Producto eliminado offline. Se sincronizará cuando haya conexión.');
-          return;
-        }
-      } catch (sqliteErr) {
-        console.warn('[deleteProduct] Error guardando en SQLite:', sqliteErr);
-      }
-    }
-
+    // Solo modo online
     const { error } = await supabase
       .from('products')
       .update({ is_active: false, updated_at: new Date().toISOString() })
@@ -957,6 +735,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     set((state) => ({
       products: state.products.map(p => p.id === id ? { ...p, is_active: false } : p),
     }));
+    toast.success('Producto eliminado');
   },
 
   addMovement: async (movement) => {
@@ -968,75 +747,17 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     // Usar la fecha tal cual viene del frontend (ya en formato local)
     const movementDate = movement.date || new Date().toISOString();
 
-    // Si está offline, guardar en IndexedDB y/o SQLite
-    if (!isOnline) {
-      const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
-      
-      const movementToSave = {
-        id: `offline-${Date.now()}`,
-        user_id: user.id,
-        product_id: movement.product_id,
-        type: movement.type,
-        quantity: movement.quantity,
-        unit: movement.unit,
-        date: movementDate,
-        cost: movement.cost || 0,
-        reason: movement.reason || null,
-        status: 'COMPLETED',
-        created_at: new Date().toISOString(),
-      };
-
-      if (isTauri) {
-        try {
-          const dbReady = await sqliteLocal.isDBReady();
-          if (dbReady) {
-            await sqliteLocal.saveMovementLocally(movementToSave);
-            console.log('[addMovement] Movimiento guardado en SQLite');
-            // AGREGAR A LA COLA DE SINCRONIZACIÓN
-            await sqliteLocal.addToSyncQueue('movements', 'INSERT', movementToSave);
-            console.log('[addMovement] Movimiento agregado a cola de sync');
-          }
-        } catch (sqliteErr) {
-          console.warn('[addMovement] Error guardando en SQLite:', sqliteErr);
-        }
-      }
-
-      try {
-        await initOfflineDB();
-        await savePendingMovement({ data: { ...movement, user_id: user.id, date: movementDate } });
-        
-        // Actualizar stock localmente para que el usuario vea el cambio inmediatamente
-        const product = get().products.find(p => p.id === movement.product_id);
-        if (product && movement.type === 'ENTRADA') {
-          let newQuantity = Number(product.quantity) + Number(movement.quantity);
-          set((state) => ({
-            products: state.products.map(p => 
-              p.id === movement.product_id 
-                ? { ...p, quantity: newQuantity, updated_at: new Date().toISOString() } 
-                : p
-            ),
-          }));
-        }
-        
-        toast.success('Movimiento guardado. Se sincronizará cuando haya conexión.');
-      } catch (err) {
-        console.error('Error saving movement offline:', err);
-        throw new Error('No se pudo guardar el movimiento offline');
-      }
-      return;
-    }
-
+    // Sin código offline - solo modo online
+    
     // Si está online, proceder normalmente
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
-    const movementPromise = supabase
+    const { data: newMovement, error: movementError } = await supabase
       .from('movements')
       .insert({ ...movement, user_id: user.id, date: movementDate })
       .select()
       .single();
-
-    const { data: newMovement, error: movementError } = await withTimeout(movementPromise);
 
     if (movementError) {
       console.error('Error addMovement:', movementError);
@@ -1174,94 +895,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       }
     }
 
-    // Si está offline, guardar en IndexedDB y/o SQLite
-    if (!isOnline) {
-      const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
-      const saleId = `offline-${Date.now()}`;
-      
-      const saleToSave = {
-        id: saleId,
-        user_id: user.id,
-        employee_id: sale.employee_id,
-        items: JSON.stringify(sale.items),
-        total_amount: sale.total_amount,
-        date: sale.date,
-        sale_type: sale.sale_type || 'SALON',
-        is_account_house: sale.is_account_house || false,
-        notes: sale.notes,
-        discount: sale.discount || 0,
-        efectivo: sale.efectivo || 0,
-        transferencia: sale.transferencia || 0,
-        usd: sale.usd || 0,
-        eur: sale.eur || 0,
-        payment_method: sale.payment_method || null,
-        created_at: new Date().toISOString(),
-      };
-
-      if (isTauri) {
-        try {
-          const dbReady = await sqliteLocal.isDBReady();
-          if (dbReady) {
-            await sqliteLocal.saveSaleLocally(saleToSave);
-            console.log('[addSale] Venta guardada en SQLite');
-            // AGREGAR A LA COLA DE SINCRONIZACIÓN
-            await sqliteLocal.addToSyncQueue('sales', 'INSERT', {
-              ...saleToSave,
-              created_at: new Date().toISOString()
-            });
-            console.log('[addSale] Venta agregada a cola de sync');
-          }
-        } catch (sqliteErr) {
-          console.warn('[addSale] Error guardando en SQLite:', sqliteErr);
-        }
-      }
-
-      try {
-        await initOfflineDB();
-        await savePendingSale({
-          data: {
-            employee_id: sale.employee_id,
-            items: sale.items,
-            total_amount: sale.total_amount,
-            date: sale.date,
-            sale_type: sale.sale_type as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA',
-            is_account_house: sale.is_account_house || false,
-            notes: sale.notes,
-            discount: sale.discount,
-            payment_method: sale.payment_method,
-            efectivo: sale.efectivo || 0,
-            transferencia: sale.transferencia || 0,
-            usd: sale.usd || 0,
-            eur: sale.eur || 0,
-          },
-        });
-
-        const { saveCompletedSaleLocally } = await import('../lib/offlineDB');
-        await saveCompletedSaleLocally({
-          ...saleToSave,
-          synced: false,
-        });
-
-        // Consumir del tránsito localmente (parallel)
-        const consumePromises: Promise<any>[] = [];
-        for (const item of sale.items) {
-          if (!item.is_recipe) {
-            consumePromises.push(get().consumeFromTransit(item.product_id, item.quantity, `Venta offline`));
-          } else if (item.is_recipe && item.recipe_snapshot) {
-            for (const ing of item.recipe_snapshot.ingredients) {
-              consumePromises.push(get().consumeFromTransit(ing.product_id, ing.quantity * item.quantity, `Venta offline (Receta)`));
-            }
-          }
-        }
-        await Promise.all(consumePromises);
-
-        toast.success('Venta guardada offline. Se sincronizará cuando haya conexión.');
-        return { success: true };
-      } catch (err) {
-        console.error('Error saving sale offline:', err);
-        return { success: false, error: 'No se pudo guardar la venta offline' };
-      }
-    }
+    // Solo modo online
 
     // Si está online, proceder normalmente
     const salePromise = supabase
@@ -1284,7 +918,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       .select()
       .single();
 
-    const { data: newSale, error: saleError } = await withTimeout(salePromise, 15000); // 15 segundos para ventas
+    const { data: newSale, error: saleError } = await salePromise;
 
     if (saleError) {
       console.error('Error adding sale:', saleError);
@@ -1351,36 +985,6 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
         if (error) {
           throw new Error('No se pudo actualizar el item en tránsito');
         }
-      } else {
-        const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
-        
-        if (isTauri) {
-          try {
-            const dbReady = await sqliteLocal.isDBReady();
-            if (dbReady) {
-              const database = await sqliteLocal.getDB();
-              await database.execute(
-                'UPDATE transit_items SET remaining = $1, consumed = $2 WHERE id = $3',
-                [newRemaining, newConsumed, item.id]
-              );
-              console.log('[consumeFromTransit] Transit item actualizado en SQLite');
-            }
-          } catch (sqliteErr) {
-            console.warn('[consumeFromTransit] Error guardando en SQLite:', sqliteErr);
-          }
-        }
-
-        await initOfflineDB();
-        await savePendingTransitConsumption({
-          data: {
-            product_id: productId,
-            transit_item_id: item.id,
-            quantity: toConsume,
-            reason: reason || 'Venta offline',
-            unit: product.unit,
-            cost: Number(product.cost),
-          },
-        });
       }
       updatedItems.push({ id: item.id, newRemaining, newConsumed });
     }
@@ -1459,7 +1063,6 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const user = useAuthStore.getState().user;
     if (!user) return { success: false, error: 'No autenticado' };
 
-    const isOnline = navigator.onLine;
     const transitItem = get().transitItems.find(t => t.id === transitItemId);
     if (!transitItem) return { success: false, error: 'Item no encontrado' };
 
@@ -1474,83 +1077,43 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const newRemaining = transitItem.remaining - quantity;
     const newInTransit = Math.max(0, Number(product.in_transit || 0) - quantity);
 
-    if (isOnline) {
-      const { error: updateError } = await supabase
-        .from('transit_items')
-        .update({ 
-          remaining: newRemaining
-        })
-        .eq('id', transitItemId);
+    const { error: updateError } = await supabase
+      .from('transit_items')
+      .update({ 
+        remaining: newRemaining
+      })
+      .eq('id', transitItemId);
 
-      if (updateError) {
-        return { success: false, error: 'No se pudo actualizar el item en tránsito' };
-      }
+    if (updateError) {
+      return { success: false, error: 'No se pudo actualizar el item en tránsito' };
+    }
 
-      const { error: productUpdateError } = await supabase
-        .from('products')
-        .update({ in_transit: newInTransit })
-        .eq('id', product.id);
+    const { error: productUpdateError } = await supabase
+      .from('products')
+      .update({ in_transit: newInTransit })
+      .eq('id', product.id);
 
-      if (productUpdateError) {
-        await supabase.from('transit_items').update({ remaining: transitItem.remaining, consumed: transitItem.consumed }).eq('id', transitItemId);
-        return { success: false, error: 'No se pudo devolver al stock' };
-      }
+    if (productUpdateError) {
+      await supabase.from('transit_items').update({ remaining: transitItem.remaining, consumed: transitItem.consumed }).eq('id', transitItemId);
+      return { success: false, error: 'No se pudo devolver al stock' };
+    }
 
-      const { error: movementError } = await supabase
-        .from('movements')
-        .insert({
-          user_id: user.id,
-          product_id: product.id,
-          type: 'ENTRADA',
-          quantity,
-          unit: product.unit,
-          date: new Date().toISOString(),
-          cost: Number(product.cost),
-          reason: `Devolución de tránsito: ${reason}`,
-          status: 'NORMAL',
-        });
-
-      if (movementError) {
-        if (import.meta.env.DEV) console.error('Error registering return movement:', movementError);
-      }
-    } else {
-      const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
-      
-      if (isTauri) {
-        try {
-          const dbReady = await sqliteLocal.isDBReady();
-          if (dbReady) {
-            const database = await sqliteLocal.getDB();
-            await database.execute(
-              'UPDATE transit_items SET remaining = $1 WHERE id = $2',
-              [newRemaining, transitItemId]
-            );
-            await database.execute(
-              'UPDATE products SET in_transit = $1 WHERE id = $2',
-              [newInTransit, product.id]
-            );
-            console.log('[cancelTransit] Transit item y producto actualizados en SQLite');
-          }
-        } catch (sqliteErr) {
-          console.warn('[cancelTransit] Error guardando en SQLite:', sqliteErr);
-        }
-      }
-
-      await initOfflineDB();
-      await savePendingMovement({
-        data: {
-          user_id: user.id,
-          product_id: product.id,
-          type: 'ENTRADA',
-          quantity,
-          unit: product.unit,
-          date: new Date().toISOString(),
-          cost: Number(product.cost),
-          reason: `Devolución de tránsito offline: ${reason}`,
-          status: 'NORMAL',
-        },
+    const { error: movementError } = await supabase
+      .from('movements')
+      .insert({
+        user_id: user.id,
+        product_id: product.id,
+        type: 'ENTRADA',
+        quantity,
+        unit: product.unit,
+        date: new Date().toISOString(),
+        cost: Number(product.cost),
+        reason: `Devolución de tránsito: ${reason}`,
+        status: 'NORMAL',
       });
-      toast.success('Devolución guardada offline. Se sincronizará cuando haya conexión.');
+
+    if (movementError) {
+      if (import.meta.env.DEV) console.error('Error registering return movement:', movementError);
     }
 
     set((state) => {
@@ -1586,7 +1149,6 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const user = useAuthStore.getState().user;
     if (!user) return { success: false, error: 'No autenticado' };
 
-    const isOnline = navigator.onLine;
     const transitItem = get().transitItems.find(t => t.id === transitItemId);
     if (!transitItem) return { success: false, error: 'Item no encontrado' };
 
@@ -1600,91 +1162,48 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
 
     const newRemaining = transitItem.remaining - quantity;
 
-    if (isOnline) {
-      const { error: updateError } = await supabase
-        .from('transit_items')
-        .update({ remaining: newRemaining })
-        .eq('id', transitItemId);
+    const { error: updateError } = await supabase
+      .from('transit_items')
+      .update({ remaining: newRemaining })
+      .eq('id', transitItemId);
 
-      if (updateError) {
-        return { success: false, error: 'No se pudo actualizar el item en tránsito' };
-      }
+    if (updateError) {
+      return { success: false, error: 'No se pudo actualizar el item en tránsito' };
+    }
 
-      const newInTransit = Math.max(0, Number(product.in_transit || 0) - quantity);
-      const newQuantity = Math.max(0, Number(product.quantity || 0) - quantity);
+    const newInTransit = Math.max(0, Number(product.in_transit || 0) - quantity);
+    const newQuantity = Math.max(0, Number(product.quantity || 0) - quantity);
 
-      const { error: productUpdateError } = await supabase
-        .from('products')
-        .update({ in_transit: newInTransit, quantity: newQuantity })
-        .eq('id', product.id);
+    const { error: productUpdateError } = await supabase
+      .from('products')
+      .update({ in_transit: newInTransit, quantity: newQuantity })
+      .eq('id', product.id);
 
-      if (productUpdateError) {
-        await supabase.from('transit_items').update({ remaining: transitItem.remaining }).eq('id', transitItemId);
-        return { success: false, error: 'No se pudo actualizar el tránsito del producto' };
-      }
+    if (productUpdateError) {
+      await supabase.from('transit_items').update({ remaining: transitItem.remaining }).eq('id', transitItemId);
+      return { success: false, error: 'No se pudo actualizar el tránsito del producto' };
+    }
 
-      const { data: movementData, error: movementError } = await supabase
-        .from('movements')
-        .insert({
-          user_id: user.id,
-          product_id: product.id,
-          type: 'MERMA',
-          quantity,
-          unit: product.unit,
-          date: new Date().toISOString(),
-          cost: Number(product.cost),
-          reason: `Merma en tránsito: ${reason}`,
-          status: 'NORMAL',
-        })
-        .select()
-        .single();
+    const { data: movementData, error: movementError } = await supabase
+      .from('movements')
+      .insert({
+        user_id: user.id,
+        product_id: product.id,
+        type: 'MERMA',
+        quantity,
+        unit: product.unit,
+        date: new Date().toISOString(),
+        cost: Number(product.cost),
+        reason: `Merma en tránsito: ${reason}`,
+        status: 'NORMAL',
+      })
+      .select()
+      .single();
 
-      if (movementError) {
-        if (import.meta.env.DEV) console.error('Error registering waste movement:', movementError);
-      } else if (movementData) {
-        set((state) => ({ movements: [movementData, ...state.movements] }));
-      }
-    } else {
-      const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
-      
-      const newInTransit = Math.max(0, Number(product.in_transit || 0) - quantity);
-      const newQuantity = Math.max(0, Number(product.quantity || 0) - quantity);
-
-      if (isTauri) {
-        try {
-          const dbReady = await sqliteLocal.isDBReady();
-          if (dbReady) {
-            const database = await sqliteLocal.getDB();
-            await database.execute(
-              'UPDATE transit_items SET remaining = $1 WHERE id = $2',
-              [newRemaining, transitItemId]
-            );
-            await database.execute(
-              'UPDATE products SET in_transit = $1, quantity = $2 WHERE id = $3',
-              [newInTransit, newQuantity, product.id]
-            );
-            console.log('[registerWasteFromTransit] Transit item y producto actualizados en SQLite');
-          }
-        } catch (sqliteErr) {
-          console.warn('[registerWasteFromTransit] Error guardando en SQLite:', sqliteErr);
-        }
-      }
-
-      await initOfflineDB();
-      await savePendingMovement({
-        data: {
-          user_id: user.id,
-          product_id: product.id,
-          type: 'MERMA',
-          quantity,
-          unit: product.unit,
-          date: new Date().toISOString(),
-          cost: Number(product.cost),
-          reason: `Merma en tránsito offline: ${reason}`,
-          status: 'NORMAL',
-        },
-      });
-      toast.success('Merma guardada offline. Se sincronizará cuando haya conexión.');
+    if (movementError) {
+      if (import.meta.env.DEV) console.error('Error registering waste movement:', movementError);
+    } else if (movementData) {
+      set((state) => ({ movements: [movementData, ...state.movements] }));
     }
 
     set((state) => {
@@ -1717,30 +1236,6 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const user = useAuthStore.getState().user;
     if (!user) return;
 
-    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
-    const isOnline = navigator.onLine;
-
-    if (!isOnline && isTauri) {
-      try {
-        const dbReady = await sqliteLocal.isDBReady();
-        if (dbReady) {
-          const localAccounts = await sqliteLocal.getPendingAccountsLocally(user.id);
-          const pendingOnly = (localAccounts || []).filter((a: any) => a.status === 'pending');
-          
-          const allAccounts = await sqliteLocal.getAllPendingAccountsDebug(user.id);
-          const syncQueue = await sqliteLocal.getSyncQueueItemsDebug();
-          
-          console.log('[getPendingAccounts] DEBUG - Cuentas locales:', allAccounts.length, '| Pending:', pendingOnly.length, '| Sync queue:', syncQueue.length);
-          
-          set({ pendingAccounts: pendingOnly });
-          console.log('[getPendingAccounts] Cargadas cuentas pendientes desde SQLite:', pendingOnly.length);
-          return;
-        }
-      } catch (sqliteErr) {
-        console.warn('[getPendingAccounts] Error cargando desde SQLite:', sqliteErr);
-      }
-    }
-
     const { data, error } = await supabase
       .from('pending_accounts')
       .select('*')
@@ -1757,45 +1252,8 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const user = useAuthStore.getState().user;
     if (!user) return { success: false, error: 'No hay usuario autenticado' };
 
-    const isOnline = navigator.onLine;
-    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
-
-    if (!isOnline) {
-      const tempId = `offline-${Date.now()}`;
-      const account = {
-        id: tempId,
-        user_id: user.id,
-        client_name: clientName,
-        items: [],
-        total_amount: 0,
-        status: 'pending',
-        is_account_house: false,
-        sale_type: 'SALON',
-        created_at: new Date().toISOString(),
-      };
-
-      if (isTauri) {
-        try {
-          const dbReady = await sqliteLocal.isDBReady();
-          if (dbReady) {
-            await sqliteLocal.savePendingAccountLocally(account);
-            console.log('[createPendingAccount] Cuenta guardada en SQLite');
-            // AGREGAR A LA COLA DE SINCRONIZACIÓN
-            await sqliteLocal.addToSyncQueue('pending_accounts', 'INSERT', account);
-            console.log('[createPendingAccount] Cuenta agregada a cola de sync');
-          }
-        } catch (sqliteErr) {
-          console.warn('[createPendingAccount] Error guardando en SQLite:', sqliteErr);
-        }
-      }
-
-      set((state) => ({ pendingAccounts: [account, ...state.pendingAccounts] }));
-      toast.success('Cuenta guardada offline. Se sincronizará cuando haya conexión.');
-      return { success: true, accountId: tempId };
-    }
-
-    const operation = async () => {
-      const promise = supabase
+    try {
+      const { data, error } = await supabase
         .from('pending_accounts')
         .insert({
           user_id: user.id,
@@ -1807,20 +1265,17 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
         .select()
         .single();
 
-      const { data, error } = await withTimeout(promise);
-
       if (error) {
         console.error('Error createPendingAccount:', error);
         throw new Error(error.message || 'Error al crear la cuenta');
       }
 
-      return data;
-    };
-
-    const data = await withCooldown('createPendingAccount', operation);
-
-    await get().getPendingAccounts();
-    return { success: true, accountId: data.id };
+      await get().getPendingAccounts();
+      return { success: true, accountId: data.id };
+    } catch (err: any) {
+      console.error('Error en createPendingAccount:', err);
+      return { success: false, error: err.message || 'Error al crear la cuenta' };
+    }
   },
 
   addItemsToPendingAccount: async (accountId: string, items: { product_id: string; product_name: string; quantity: number; unit_price: number; subtotal: number }[], isAccountHouse: boolean = false, saleType: 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA' = 'SALON') => {
@@ -1878,44 +1333,6 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const allItems = [...(account.items as any[]), ...newItems];
     const newTotal = allItems.reduce((sum, item) => sum + item.subtotal, 0);
 
-    const isOnline = navigator.onLine;
-    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
-
-    if (!isOnline && isTauri) {
-      try {
-        const dbReady = await sqliteLocal.isDBReady();
-        if (dbReady) {
-          await sqliteLocal.updatePendingAccountLocally(accountId, {
-            items: allItems,
-            total_amount: accountIsAccountHouse ? 0 : newTotal,
-            is_account_house: accountIsAccountHouse,
-            sale_type: accountSaleType,
-          });
-          console.log('[addItemsToPendingAccount] Cuenta actualizada en SQLite');
-          // AGREGAR A LA COLA DE SINCRONIZACIÓN (UPDATE)
-          await sqliteLocal.addToSyncQueue('pending_accounts', 'UPDATE', {
-            id: accountId,
-            items: allItems,
-            total_amount: accountIsAccountHouse ? 0 : newTotal,
-            is_account_house: accountIsAccountHouse,
-            sale_type: accountSaleType,
-            updated_at: new Date().toISOString(),
-          });
-          console.log('[addItemsToPendingAccount] Cuenta agregada a cola de sync');
-          set((state) => ({
-            pendingAccounts: state.pendingAccounts.map(a => 
-              a.id === accountId 
-                ? { ...a, items: allItems, total_amount: newTotal, is_account_house: accountIsAccountHouse, sale_type: accountSaleType }
-                : a
-            )
-          }));
-          return { success: true };
-        }
-      } catch (sqliteErr) {
-        console.warn('[addItemsToPendingAccount] Error guardando en SQLite:', sqliteErr);
-      }
-    }
-
     const { error } = await supabase
       .from('pending_accounts')
       .update({
@@ -1936,31 +1353,6 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
   },
 
   updatePendingAccount: async (accountId: string, updates: Partial<PendingAccount>) => {
-    const isOnline = navigator.onLine;
-    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
-
-    // Si está offline, guardar en SQLite
-    if (!isOnline && isTauri) {
-      try {
-        const dbReady = await sqliteLocal.isDBReady();
-        if (dbReady) {
-          await sqliteLocal.updatePendingAccountLocally(accountId, {
-            ...updates,
-            updated_at: new Date().toISOString(),
-          });
-          // Actualizar estado local
-          set((state) => ({
-            pendingAccounts: state.pendingAccounts.map(a =>
-              a.id === accountId ? { ...a, ...updates, updated_at: new Date().toISOString() } : a
-            )
-          }));
-          return { success: true };
-        }
-      } catch (sqliteErr) {
-        console.warn('[updatePendingAccount] Error guardando en SQLite:', sqliteErr);
-      }
-    }
-
     const { error } = await supabase
       .from('pending_accounts')
       .update({ ...updates, updated_at: new Date().toISOString() })
@@ -1984,44 +1376,6 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const accountItems = (account.items as any[]) || [];
     const newTotal = newIsAccountHouse ? 0 : accountItems.reduce((sum, item) => sum + item.subtotal, 0);
 
-    const isOnline = navigator.onLine;
-    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
-
-    if (!isOnline && isTauri) {
-      try {
-        const dbReady = await sqliteLocal.isDBReady();
-        if (dbReady) {
-          await sqliteLocal.updatePendingAccountLocally(accountId, {
-            items: accountItems,
-            total_amount: newTotal,
-            is_account_house: newIsAccountHouse,
-            sale_type: (account as any).sale_type || 'SALON',
-          });
-          console.log('[togglePendingAccountType] Cuenta actualizada en SQLite');
-          // AGREGAR A LA COLA DE SINCRONIZACIÓN (UPDATE)
-          await sqliteLocal.addToSyncQueue('pending_accounts', 'UPDATE', {
-            id: accountId,
-            items: accountItems,
-            total_amount: newTotal,
-            is_account_house: newIsAccountHouse,
-            sale_type: (account as any).sale_type || 'SALON',
-            updated_at: new Date().toISOString(),
-          });
-          console.log('[togglePendingAccountType] Cuenta agregada a cola de sync');
-          set((state) => ({
-            pendingAccounts: state.pendingAccounts.map(a => 
-              a.id === accountId 
-                ? { ...a, is_account_house: newIsAccountHouse, total_amount: newTotal }
-                : a
-            )
-          }));
-          return { success: true };
-        }
-      } catch (sqliteErr) {
-        console.warn('[togglePendingAccountType] Error guardando en SQLite:', sqliteErr);
-      }
-    }
-    
     const { error } = await supabase
       .from('pending_accounts')
       .update({ 
@@ -2037,64 +1391,12 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     return { success: true };
   },
 
-  deletePendingAccount: async (accountId: string) => {
+deletePendingAccount: async (accountId: string) => {
     const account = get().pendingAccounts.find(a => a.id === accountId);
     if (!account) return { success: false, error: 'Cuenta no encontrada' };
 
-    const isOnline = navigator.onLine;
-    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
-
-    // Devolver productos al tránsito (actualizar estado local)
     const accountItems = account.items as any[] || [];
-    const updatedTransitItems = get().transitItems.map(t => {
-      let additionalQty = 0;
-      for (const item of accountItems) {
-        const product = get().products.find(p => p.id === item.product_id);
-        if (product?.is_recipe && product.recipe_ingredients) {
-          for (const ing of product.recipe_ingredients) {
-            if (t.product_id === ing.product_id) {
-              additionalQty += ing.quantity * item.quantity;
-            }
-          }
-        } else if (t.product_id === item.product_id) {
-          additionalQty += item.quantity;
-        }
-      }
-      return additionalQty > 0 ? { ...t, remaining: t.remaining + additionalQty } : t;
-    });
 
-    // Si está offline, guardar en SQLite
-    if (!isOnline && isTauri) {
-      try {
-        const dbReady = await sqliteLocal.isDBReady();
-        if (dbReady) {
-          // Marcar cuenta como cancelada en SQLite
-          await sqliteLocal.updatePendingAccountLocally(accountId, {
-            status: 'cancelled',
-            updated_at: new Date().toISOString(),
-          });
-          console.log('[deletePendingAccount] Cuenta marcada como cancelada en SQLite');
-          // AGREGAR A LA COLA DE SINCRONIZACIÓN (UPDATE)
-          await sqliteLocal.addToSyncQueue('pending_accounts', 'UPDATE', {
-            id: accountId,
-            status: 'cancelled',
-            updated_at: new Date().toISOString(),
-          });
-          console.log('[deletePendingAccount] Cuenta agregada a cola de sync');
-          // Actualizar transit items localmente
-          set({ transitItems: updatedTransitItems.filter(t => t.remaining > 0) });
-          // Actualizar estado local - eliminar cuenta de la lista
-          set((state) => ({
-            pendingAccounts: state.pendingAccounts.filter(a => a.id !== accountId)
-          }));
-          return { success: true };
-        }
-      } catch (sqliteErr) {
-        console.warn('[deletePendingAccount] Error guardando en SQLite:', sqliteErr);
-      }
-    }
-
-    // Online: devolver productos al tránsito
     for (const item of accountItems) {
       const product = get().products.find(p => p.id === item.product_id);
       
@@ -2200,63 +1502,19 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       return { success: false, error: result.error };
     }
 
-    // Verificación robusta de conexión - navigator.onLine puede ser engañoso en Tauri
-    const isNavigatorOnline = navigator.onLine;
-    const isRealOnline = await checkRealInternetConnection();
-    const isOnline = isNavigatorOnline && isRealOnline;
-    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
-
-    console.log('[chargePendingAccount] Estado de conexión:', { isNavigatorOnline, isRealOnline, isOnline, isTauri });
-
-    if (!isOnline && isTauri) {
-      try {
-        console.log('[chargePendingAccount] Modo offline detectado, guardando en SQLite...');
-        const dbReady = await sqliteLocal.isDBReady();
-        if (dbReady) {
-          // Marcar cuenta como pagada en SQLite
-          await sqliteLocal.updatePendingAccountLocally(accountId, {
-            status: 'paid',
-            updated_at: new Date().toISOString(),
-          });
-          console.log('[chargePendingAccount] Cuenta marcada como pagada en SQLite');
-          // AGREGAR A LA COLA DE SINCRONIZACIÓN (UPDATE)
-          await sqliteLocal.addToSyncQueue('pending_accounts', 'UPDATE', {
-            id: accountId,
-            status: 'paid',
-            updated_at: new Date().toISOString(),
-          });
-          console.log('[chargePendingAccount] Cuenta agregada a cola de sync');
-          // Actualizar estado local - NO llamar fetchAll que intenta conectar a Supabase
-          set((state) => ({
-            pendingAccounts: state.pendingAccounts.filter(a => a.id !== accountId)
-          }));
-          console.log('[chargePendingAccount] Cobro offline completado exitosamente');
-          return { success: true };
-        }
-      } catch (sqliteErr) {
-        console.warn('[chargePendingAccount] Error guardando en SQLite:', sqliteErr);
-      }
-    }
-
-    // Agregar timeout para evitar que se cuelgue si Supabase no responde
-    const updatePromise = supabase
+const { error } = await supabase
       .from('pending_accounts')
       .update({ status: 'paid', updated_at: new Date().toISOString() })
       .eq('id', accountId);
-
-    const { error } = await withTimeout(updatePromise, 8000); // 8 segundos timeout
 
     if (error) {
       return { success: false, error: error.message };
     }
 
-    // Solo recargar si hay conexión real (usar la variable ya calculada)
-    if (isOnline) {
-      try {
-        await get().getPendingAccounts();
-      } catch (err) {
-        console.warn('[chargePendingAccount] Error recargando cuentas pendientes:', err);
-      }
+    try {
+      await get().getPendingAccounts();
+    } catch (err) {
+      console.warn('[chargePendingAccount] Error recargando cuentas pendientes:', err);
     }
     return { success: true };
   },
@@ -2463,40 +1721,6 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const user = useAuthStore.getState().user;
     if (!user) return;
 
-    const isOnline = navigator.onLine;
-    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
-
-    const recipeId = `offline-${Date.now()}`;
-    const recipeData = {
-      id: recipeId,
-      user_id: user.id,
-      name: capitalize(recipe.name),
-      selling_price: recipe.selling_price,
-      ingredients: JSON.stringify(recipe.ingredients || []),
-      created_at: new Date().toISOString(),
-    };
-
-    if (!isOnline) {
-      if (isTauri) {
-        try {
-          const dbReady = await sqliteLocal.isDBReady();
-          if (dbReady) {
-            await sqliteLocal.saveRecipeLocally(recipeData);
-            console.log('[addRecipe] Receta guardada en SQLite');
-            // AGREGAR A LA COLA DE SINCRONIZACIÓN
-            await sqliteLocal.addToSyncQueue('recipes', 'INSERT', recipeData);
-            console.log('[addRecipe] Receta agregada a cola de sync');
-          }
-        } catch (sqliteErr) {
-          console.warn('[addRecipe] Error guardando en SQLite:', sqliteErr);
-        }
-      }
-
-      set((state) => ({ recipes: [{ ...recipeData, ingredients: recipe.ingredients }, ...state.recipes] }));
-      toast.success('Receta guardada offline. Se sincronizará cuando haya conexión.');
-      return;
-    }
-
     const { data: newRecipe, error } = await supabase
       .from('recipes')
       .insert({ 
@@ -2528,56 +1752,6 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
   },
 
   updateRecipe: async (id, updates) => {
-    const isOnline = navigator.onLine;
-    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
-
-    // Si está offline, guardar en SQLite
-    if (!isOnline && isTauri) {
-      try {
-        const dbReady = await sqliteLocal.isDBReady();
-        if (dbReady) {
-          const database = await sqliteLocal.getDB();
-          const updateFields = [];
-          const values = [];
-          let paramIndex = 1;
-          
-          if (updates.name !== undefined) {
-            updateFields.push(`name = $${paramIndex++}`);
-            values.push(capitalize(updates.name));
-          }
-          if (updates.selling_price !== undefined) {
-            updateFields.push(`selling_price = $${paramIndex++}`);
-            values.push(updates.selling_price);
-          }
-          updateFields.push(`updated_at = $${paramIndex++}`);
-          values.push(new Date().toISOString());
-          
-          values.push(id);
-          
-          await database.execute(
-            `UPDATE recipes SET ${updateFields.join(', ')} WHERE id = $${paramIndex}`,
-            values
-          );
-          console.log('[updateRecipe] Receta actualizada en SQLite');
-          // AGREGAR A LA COLA DE SINCRONIZACIÓN
-          await sqliteLocal.addToSyncQueue('recipes', 'UPDATE', { 
-            id, 
-            ...updates,
-            updated_at: new Date().toISOString()
-          });
-          console.log('[updateRecipe] Receta agregada a cola de sync');
-          
-          set((state) => ({
-            recipes: state.recipes.map(r => r.id === id ? { ...r, ...updates } : r),
-          }));
-          toast.success('Receta actualizada offline. Se sincronizará cuando haya conexión.');
-          return;
-        }
-      } catch (sqliteErr) {
-        console.warn('[updateRecipe] Error guardando en SQLite:', sqliteErr);
-      }
-    }
-
     const { error } = await supabase
       .from('recipes')
       .update({ 
@@ -2610,30 +1784,6 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
   },
 
   deleteRecipe: async (id) => {
-    const isOnline = navigator.onLine;
-    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
-
-    // Si está offline, guardar en SQLite
-    if (!isOnline && isTauri) {
-      try {
-        const dbReady = await sqliteLocal.isDBReady();
-        if (dbReady) {
-          const database = await sqliteLocal.getDB();
-          await database.execute('DELETE FROM recipe_ingredients WHERE recipe_id = $1', [id]);
-          await database.execute('DELETE FROM recipes WHERE id = $1', [id]);
-          console.log('[deleteRecipe] Receta eliminada en SQLite');
-          // AGREGAR A LA COLA DE SINCRONIZACIÓN
-          await sqliteLocal.addToSyncQueue('recipes', 'DELETE', { id });
-          console.log('[deleteRecipe] Receta agregada a cola de sync');
-          set((state) => ({ recipes: state.recipes.filter(r => r.id !== id) }));
-          toast.success('Receta eliminada offline. Se sincronizará cuando haya conexión.');
-          return;
-        }
-      } catch (sqliteErr) {
-        console.warn('[deleteRecipe] Error guardando en SQLite:', sqliteErr);
-      }
-    }
-
     await supabase.from('recipe_ingredients').delete().eq('recipe_id', id);
     const { error } = await supabase.from('recipes').delete().eq('id', id);
 
@@ -2648,56 +1798,16 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const user = useAuthStore.getState().user;
     if (!user) throw new Error('No hay usuario autenticado');
 
-    const isOnline = navigator.onLine;
-    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+    const { data, error } = await supabase
+      .from('employees')
+      .insert({ ...employee, name: capitalize(employee.name), user_id: user.id })
+      .select()
+      .single();
 
-    const employeeData = {
-      ...employee,
-      name: capitalize(employee.name),
-      user_id: user.id,
-      id: `offline-${Date.now()}`,
-      created_at: new Date().toISOString(),
-    };
-
-    if (!isOnline) {
-      if (isTauri) {
-        try {
-          const dbReady = await sqliteLocal.isDBReady();
-          if (dbReady) {
-            await sqliteLocal.saveEmployeeLocally(employeeData);
-            console.log('[addEmployee] Empleado guardado en SQLite');
-            // AGREGAR A LA COLA DE SINCRONIZACIÓN
-            await sqliteLocal.addToSyncQueue('employees', 'INSERT', employeeData);
-            console.log('[addEmployee] Empleado agregado a cola de sync');
-          }
-        } catch (sqliteErr) {
-          console.warn('[addEmployee] Error guardando en SQLite:', sqliteErr);
-        }
-      }
-
-      set((state) => ({ employees: [employeeData, ...state.employees] }));
-      toast.success('Empleado guardado offline. Se sincronizará cuando haya conexión.');
-      return;
+    if (error) {
+      console.error('Error addEmployee:', error);
+      throw new Error(error.message || 'No se pudo agregar el empleado');
     }
-
-    const operation = async () => {
-      const promise = supabase
-        .from('employees')
-        .insert({ ...employee, name: capitalize(employee.name), user_id: user.id })
-        .select()
-        .single();
-
-      const { data, error } = await withTimeout(promise);
-
-      if (error) {
-        console.error('Error addEmployee:', error);
-        throw new Error(error.message || 'No se pudo agregar el empleado');
-      }
-
-      return data;
-    };
-
-    const data = await withCooldown('addEmployee', operation);
 
     set((state) => ({ employees: [data, ...state.employees] }));
   },
@@ -2732,24 +1842,16 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const user = useAuthStore.getState().user;
     if (!user) throw new Error('No hay usuario autenticado');
 
-    const operation = async () => {
-      const promise = supabase
-        .from('departments')
-        .insert({ name: capitalize(name), user_id: user.id })
-        .select()
-        .single();
+    const { data, error } = await supabase
+      .from('departments')
+      .insert({ name: capitalize(name), user_id: user.id })
+      .select()
+      .single();
 
-      const { data, error } = await withTimeout(promise);
-
-      if (error) {
-        console.error('Error addDepartment:', error);
-        throw new Error(error.message || 'No se pudo agregar el departamento');
-      }
-
-      return data;
-    };
-
-    const data = await withCooldown('addDepartment', operation);
+    if (error) {
+      console.error('Error addDepartment:', error);
+      throw new Error(error.message || 'No se pudo agregar el departamento');
+    }
 
     set((state) => ({ departments: [data, ...state.departments] }));
   },
@@ -3212,37 +2314,6 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const user = useAuthStore.getState().user;
     if (!user) return;
 
-    const isOnline = navigator.onLine;
-    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
-
-    const categoryData = {
-      id: `offline-${Date.now()}`,
-      user_id: user.id,
-      name: capitalize(name),
-      created_at: new Date().toISOString(),
-    };
-
-    if (!isOnline) {
-      if (isTauri) {
-        try {
-          const dbReady = await sqliteLocal.isDBReady();
-          if (dbReady) {
-            await sqliteLocal.saveCategoryLocally(categoryData);
-            console.log('[addCategory] Categoría guardada en SQLite');
-            // AGREGAR A LA COLA DE SINCRONIZACIÓN
-            await sqliteLocal.addToSyncQueue('categories', 'INSERT', categoryData);
-            console.log('[addCategory] Categoría agregada a cola de sync');
-          }
-        } catch (sqliteErr) {
-          console.warn('[addCategory] Error guardando en SQLite:', sqliteErr);
-        }
-      }
-
-      set((state) => ({ categories: [categoryData, ...state.categories] }));
-      toast.success('Categoría guardada offline. Se sincronizará cuando haya conexión.');
-      return;
-    }
-
     const { data, error } = await supabase
       .from('categories')
       .insert({ user_id: user.id, name: capitalize(name) })
@@ -3270,21 +2341,6 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const user = useAuthStore.getState().user;
     if (!user) return;
 
-    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
-    let localClosings: any[] = [];
-
-    if (isTauri) {
-      try {
-        const dbReady = await sqliteLocal.isDBReady();
-        if (dbReady) {
-          localClosings = await sqliteLocal.getDailyClosingsLocally(user.id);
-          console.log('[getDailyClosings] Cierres desde SQLite:', localClosings.length);
-        }
-      } catch (err) {
-        console.warn('[getDailyClosings] Error leyendo cierres de SQLite:', err);
-      }
-    }
-
     const { data, error } = await supabase
       .from('daily_closings')
       .select('*')
@@ -3292,89 +2348,21 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       .order('closing_date', { ascending: false });
 
     if (error) {
-      if (localClosings.length > 0) {
-        set({ dailyClosings: localClosings });
-        console.log('[getDailyClosings] Error de Supabase, usando cierres locales:', localClosings.length);
-        return;
-      }
       throw new Error('No se pudieron cargar los cierres de caja');
     }
 
-    const allClosings = [...localClosings];
-    for (const closing of (data || [])) {
-      if (!allClosings.find(c => c.id === closing.id)) {
-        allClosings.push(closing);
-      }
-    }
-
-    allClosings.sort((a, b) => new Date(b.closing_date).getTime() - new Date(a.closing_date).getTime());
-
-    set({ dailyClosings: allClosings });
+    set({ dailyClosings: data || [] });
   },
 
   createDailyClosing: async (closing) => {
     const user = useAuthStore.getState().user;
     if (!user) return { success: false, error: 'No autenticado' };
 
-    const isOnline = navigator.onLine;
-    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
-
-    // Si está offline, guardar en IndexedDB y/o SQLite
-    if (!isOnline) {
-      try {
-        const closingWithId = {
-          id: `offline-${Date.now()}`,
-          user_id: user.id,
-          ...closing,
-          created_at: new Date().toISOString(),
-        };
-
-        if (isTauri) {
-          try {
-            const dbReady = await sqliteLocal.isDBReady();
-            if (dbReady) {
-              await sqliteLocal.saveDailyClosingLocally(closingWithId);
-              console.log('[createDailyClosing] Cierre guardado en SQLite');
-              // AGREGAR A LA COLA DE SINCRONIZACIÓN
-              await sqliteLocal.addToSyncQueue('daily_closings', 'INSERT', closingWithId);
-              console.log('[createDailyClosing] Cierre agregado a cola de sync');
-            }
-          } catch (sqliteErr) {
-            console.warn('[createDailyClosing] Error guardando en SQLite:', sqliteErr);
-          }
-        }
-
-        await initOfflineDB();
-        await savePendingClosing({
-          data: {
-            closing_date: closing.closing_date,
-            total_sales: closing.total_sales,
-            total_discounts: closing.total_discounts,
-            total_refunds: closing.total_refunds,
-            closing_amount: closing.closing_amount,
-            notes: closing.notes,
-            created_by: closing.created_by,
-            created_by_name: closing.created_by_name,
-          },
-        });
-
-        set((state) => ({ dailyClosings: [closingWithId, ...state.dailyClosings] }));
-        toast.success('Cierre de caja guardado offline. Se sincronizará cuando haya conexión.');
-        return { success: true };
-      } catch (err) {
-        console.error('Error saving closing offline:', err);
-        return { success: false, error: 'No se pudo guardar el cierre offline' };
-      }
-    }
-
-    // Si está online, proceder normalmente
-    const closingPromise = supabase
+    const { data, error } = await supabase
       .from('daily_closings')
       .insert({ ...closing, user_id: user.id })
       .select()
       .single();
-
-    const { data, error } = await withTimeout(closingPromise);
 
     if (error) {
       console.error('Error createDailyClosing:', error);
@@ -3581,272 +2569,12 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
   },
 
   syncPendingData: async () => {
-    if (!navigator.onLine) return;
-    
-    const user = useAuthStore.getState().user;
-    if (!user) return;
-
-    try {
-      await initOfflineDB();
-
-      if (import.meta.env.DEV) {
-        console.log('[syncPendingData] Waiting for token refresh stabilization...');
-      }
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      const pendingSales = await getAllPendingSales();
-      const pendingMovements = await getAllPendingMovements();
-      const pendingClosings = await getAllPendingClosings();
-      const pendingTransitConsumptions = await getAllPendingTransitConsumptions();
-
-      for (const sale of pendingSales) {
-        if (sale.retryCount >= 3) continue;
-        
-        const delay = Math.min(1000 * Math.pow(2, sale.retryCount), 8000);
-        await new Promise(resolve => setTimeout(resolve, delay));
-
-        try {
-          const { data, error } = await supabase
-            .from('sales')
-            .insert({
-              user_id: user.id,
-              employee_id: sale.data.employee_id,
-              total_amount: sale.data.total_amount,
-              date: sale.data.date,
-              sale_type: sale.data.sale_type,
-              notes: sale.data.notes,
-              discount: sale.data.discount,
-              efectivo: sale.data.efectivo || 0,
-              transferencia: sale.data.transferencia || 0,
-              usd: sale.data.usd || 0,
-              eur: sale.data.eur || 0,
-              payment_method: sale.data.payment_method || null,
-              is_account_house: sale.data.is_account_house || false,
-            })
-            .select()
-            .single();
-
-          if (error) {
-            if (import.meta.env.DEV) {
-              console.error('[syncPendingData] Sale insert error:', error);
-            }
-            if (error.code === '23505') {
-              await markSaleAsSynced(sale.id);
-              continue;
-            }
-            await incrementRetryCount(sale.id, STORES.PENDING_SALES);
-            continue;
-          }
-
-          if (sale.data.items && sale.data.items.length > 0) {
-            const saleItems = sale.data.items.map(item => ({
-              sale_id: data.id,
-              product_id: item.product_id,
-              quantity: item.quantity,
-              unit_cost: item.unit_cost,
-              selling_price: item.selling_price,
-              subtotal: item.subtotal,
-              is_recipe: item.is_recipe || false,
-              recipe_snapshot: item.recipe_snapshot,
-            }));
-            await supabase.from('sale_items').insert(saleItems);
-          }
-
-          await markSaleAsSynced(sale.id);
-        } catch (err) {
-          console.error('Error syncing sale:', err);
-          await incrementRetryCount(sale.id, STORES.PENDING_SALES);
-        }
-      }
-
-      for (const movement of pendingMovements) {
-        if (movement.retryCount >= 3) continue;
-
-        const delay = Math.min(1000 * Math.pow(2, movement.retryCount), 8000);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        
-        try {
-          const { error } = await supabase
-            .from('movements')
-            .insert({
-              user_id: user.id,
-              product_id: movement.data.product_id,
-              type: movement.data.type,
-              quantity: movement.data.quantity,
-              unit: movement.data.unit,
-              date: movement.data.date,
-              cost: movement.data.cost,
-              reason: movement.data.reason,
-            });
-
-          if (error) {
-            if (import.meta.env.DEV) {
-              console.error('[syncPendingData] Movement insert error:', error);
-            }
-            if (error.code === '23505') {
-              await markMovementAsSynced(movement.id);
-              continue;
-            }
-            await incrementRetryCount(movement.id, STORES.PENDING_MOVEMENTS);
-            continue;
-          }
-
-          await markMovementAsSynced(movement.id);
-        } catch (err) {
-          console.error('Error syncing movement:', err);
-          await incrementRetryCount(movement.id, STORES.PENDING_MOVEMENTS);
-        }
-      }
-
-      for (const closing of pendingClosings) {
-        if (closing.retryCount >= 3) continue;
-
-        const delay = Math.min(1000 * Math.pow(2, closing.retryCount), 8000);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        
-        try {
-          const exists = await checkClosingExists(user.id, closing.data.closing_date);
-          if (exists) {
-            if (import.meta.env.DEV) {
-              console.log('[syncPendingData] Closing already exists, marking as synced:', closing.data.closing_date);
-            }
-            await markClosingAsSynced(closing.id);
-            continue;
-          }
-
-          const { error } = await supabase
-            .from('daily_closings')
-            .insert({
-              user_id: user.id,
-              closing_date: closing.data.closing_date,
-              total_sales: closing.data.total_sales,
-              total_discounts: closing.data.total_discounts,
-              total_refunds: closing.data.total_refunds,
-              closing_amount: closing.data.closing_amount,
-              notes: closing.data.notes,
-              created_by: closing.data.created_by,
-              created_by_name: closing.data.created_by_name,
-            });
-
-          if (error) {
-            if (import.meta.env.DEV) {
-              console.error('[syncPendingData] Closing insert error:', error);
-            }
-            if (error.code === '23505') {
-              await markClosingAsSynced(closing.id);
-              continue;
-            }
-            await incrementRetryCount(closing.id, STORES.PENDING_CLOSINGS);
-            continue;
-          }
-
-          await markClosingAsSynced(closing.id);
-        } catch (err) {
-          console.error('Error syncing closing:', err);
-          await incrementRetryCount(closing.id, STORES.PENDING_CLOSINGS);
-        }
-      }
-
-      for (const consumption of pendingTransitConsumptions) {
-        if (consumption.retryCount >= 3) continue;
-
-        const delay = Math.min(1000 * Math.pow(2, consumption.retryCount), 8000);
-        await new Promise(resolve => setTimeout(resolve, delay));
-
-        try {
-          const transitItemRes = await supabase
-            .from('transit_items')
-            .select('*')
-            .eq('id', consumption.data.transit_item_id)
-            .single();
-
-          if (transitItemRes.error || !transitItemRes.data) {
-            await markTransitConsumptionAsSynced(consumption.id);
-            continue;
-          }
-
-          const transitItem = transitItemRes.data;
-          const newRemaining = transitItem.remaining - consumption.data.quantity;
-          const newConsumed = transitItem.consumed + consumption.data.quantity;
-
-          const { error: transitError } = await supabase
-            .from('transit_items')
-            .update({ 
-              remaining: Math.max(0, newRemaining), 
-              consumed: newConsumed,
-              updated_at: new Date().toISOString() 
-            })
-            .eq('id', consumption.data.transit_item_id);
-
-          if (transitError) {
-            if (import.meta.env.DEV) {
-              console.error('[syncPendingData] Transit item update error:', transitError);
-            }
-            await incrementRetryCount(consumption.id, STORES.PENDING_TRANSIT_CONSUMPTIONS);
-            continue;
-          }
-
-          const productRes = await supabase
-            .from('products')
-            .select('*')
-            .eq('id', consumption.data.product_id)
-            .single();
-
-          if (!productRes.error && productRes.data) {
-            const currentInTransit = Number(productRes.data.in_transit) || 0;
-            const currentQuantity = Number(productRes.data.quantity) || 0;
-            
-            await supabase
-              .from('products')
-              .update({ 
-                in_transit: Math.max(0, currentInTransit - consumption.data.quantity),
-                quantity: Math.max(0, currentQuantity - consumption.data.quantity),
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', consumption.data.product_id);
-          }
-
-          await markTransitConsumptionAsSynced(consumption.id);
-        } catch (err) {
-          console.error('Error syncing transit consumption:', err);
-          await incrementRetryCount(consumption.id, STORES.PENDING_TRANSIT_CONSUMPTIONS);
-        }
-      }
-
-      if (pendingSales.length > 0 || pendingMovements.length > 0 || pendingClosings.length > 0 || pendingTransitConsumptions.length > 0) {
-        await get().fetchAll();
-        toast.success('Datos sincronizados correctamente');
-      }
-    } catch (err) {
-      console.error('Error in syncPendingData:', err);
-    }
+    console.log('[syncPendingData] Offline sync disabled - using Supabase only');
   },
 
-  forceRefreshData: async () => {
-    resetConnectionCooldown();
-    await get().fetchAll();
-    toast.success('Datos actualizados correctamente');
-  },
-
-  syncOfflineData: async () => {
-    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
-    if (isTauri) return;
-    
-    try {
-      const { syncPendingSalesToSupabase, getPendingCounts } = await import('../lib/offlineDB');
-      const counts = await getPendingCounts();
-      
-      if (counts.sales > 0) {
-        const result = await syncPendingSalesToSupabase();
-        console.log('[syncOfflineData] Resultado:', result);
-        
-        if (result.synced > 0) {
-          toast.success(`Sincronizadas ${result.synced} ventas offline`);
-          await get().fetchAll();
-        }
-      }
-    } catch (err) {
-      console.error('[syncOfflineData] Error:', err);
-    }
+forceRefreshData: async () => {
+    console.log('[forceRefreshData] Refreshing data from Supabase...');
+    const { fetchAll } = useDatabaseStore.getState();
+    await fetchAll();
   },
 }));

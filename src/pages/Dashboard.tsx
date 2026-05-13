@@ -45,15 +45,8 @@ import SettingsView from './dashboard/SettingsView';
 import ActionLogsView from './dashboard/ActionLogsView';
 import PaymentsView from './dashboard/PaymentsView';
 import DailyClosingsView from './dashboard/DailyClosingsView';
-import { UpdateSettings } from '../types/updater';
 
-interface DashboardProps {
-  updateSettings?: UpdateSettings;
-  onToggleAutoUpdate?: (enabled: boolean) => void;
-  onToggleEnabled?: (enabled: boolean) => void;
-}
-
-export default function Dashboard({ updateSettings, onToggleAutoUpdate, onToggleEnabled }: DashboardProps) {
+export default function Dashboard() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const sidebarTimeoutRef = useRef<NodeJS.Timeout | null>(null);

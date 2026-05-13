@@ -163,31 +163,8 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     _isInitializing = true;
     console.log('Inicializando autenticación...');
 
-    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
-
-    // 1. En desktop, primero buscar sesión guardada en SQLite
-    console.log('[initialize] isTauri:', isTauri);
-    if (isTauri) {
-      try {
-        const { getUserSession } = await import('../lib/sqliteLocal');
-        console.log('[initialize] Llamando getUserSession()...');
-        const savedUserData = await getUserSession();
-        console.log('[initialize] getUserSession result:', savedUserData);
-        if (savedUserData) {
-          console.log('[initialize] Sesión encontrada en SQLite, restaurando...');
-          set({ user: savedUserData, isAuthenticated: true, isLoading: false });
-          _isInitializing = false;
-          return;
-        } else {
-          console.log('[initialize] No hay sesión en SQLite');
-        }
-      } catch (err) {
-        console.warn('[initialize] Error buscando sesión en SQLite:', err);
-      }
-    }
-
-    console.log('[initialize] No se encontró sesión en SQLite, continuando con Supabase...');
-    const isOffline = !navigator.onLine;
+    // Solo modo online - sin SQLite
+    const savedUserData = localStorage.getItem('inventarioy_user');
 
     try {
       const controller = new AbortController();
@@ -365,16 +342,9 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       console.log('Usuario cargado:', user.email, 'role:', user.role, 'subscriptionActive:', user.isSubscriptionActive);
       set({ user, isAuthenticated: true, isLoading: false });
       
-      const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
-      if (isTauri) {
-        try {
-          const { saveUserSession } = await import('../lib/sqliteLocal');
-          await saveUserSession(user);
-          console.log('[fetchUser] Sesión guardada en SQLite');
-        } catch (saveErr) {
-          console.warn('[fetchUser] Error guardando sesión en SQLite:', saveErr);
-        }
-      }
+      // Código SQLite eliminado
+      // const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+      // if (isTauri) { try { await saveUserSession(user); } catch (e) {} }
     } catch (err) {
       console.error('Error en fetchUser:', err);
       set({ isLoading: false });
@@ -449,17 +419,8 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   logout: async () => {
     console.log('Logout llamado...');
     try {
-      const isTauri = typeof window !== 'undefined' && (window as any).__TAURI__;
+      // Código SQLite eliminado
       
-      if (isTauri) {
-        try {
-          const { clearUserSession } = await import('../lib/sqliteLocal');
-          await clearUserSession();
-        } catch (clearErr) {
-          console.warn('[logout] Error limpiando sesión de SQLite:', clearErr);
-        }
-      }
-
       localStorage.removeItem('saved_credentials');
       localStorage.removeItem('saved_email');
       
@@ -473,7 +434,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     } catch (err) {
       console.error('Error en logout:', err);
     } finally {
-      // 4. Forzar redirección
+      // Forzar redirección
       console.log('Redireccionando...');
       window.location.href = '/';
     }

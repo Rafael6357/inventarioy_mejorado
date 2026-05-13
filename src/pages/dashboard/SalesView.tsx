@@ -9,7 +9,7 @@ import TicketView from './TicketView';
 
 export default function SalesView() {
   const { user } = useAuthStore();
-  const { products, recipes, employees, sales, dailyClosings, pendingAccounts, addSale, createDailyClosing, getDailyClosings, createPendingAccount, addItemsToPendingAccount, chargePendingAccount, getPendingAccounts, togglePendingAccountType, logAction, forceRefreshData, syncOfflineData } = useDatabaseStore();
+  const { products, recipes, employees, sales, dailyClosings, pendingAccounts, addSale, createDailyClosing, getDailyClosings, createPendingAccount, addItemsToPendingAccount, chargePendingAccount, getPendingAccounts, togglePendingAccountType, logAction, forceRefreshData } = useDatabaseStore();
   
   const activeProducts = products.filter(p => p.is_active !== false);
 
@@ -38,25 +38,13 @@ export default function SalesView() {
   const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
-    const checkPendingSync = async () => {
-      try {
-        const { getPendingCounts } = await import('../../lib/offlineDB');
-        const counts = await getPendingCounts();
-        setPendingSyncCount(counts.sales);
-      } catch {}
-    };
-    checkPendingSync();
-    const interval = setInterval(checkPendingSync, 30000);
-    return () => clearInterval(interval);
+    // Código offline eliminado - modo online únicamente
   }, []);
 
   const handleManualSync = async () => {
     setIsSyncing(true);
     try {
-      await syncOfflineData();
-      const { getPendingCounts } = await import('../../lib/offlineDB');
-      const counts = await getPendingCounts();
-      setPendingSyncCount(counts.sales);
+      // Sincronización online - sin código offline
     } finally {
       setIsSyncing(false);
     }

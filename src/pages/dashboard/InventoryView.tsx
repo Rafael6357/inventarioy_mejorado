@@ -391,6 +391,15 @@ export default function InventoryView() {
                   <Label htmlFor="order_cost" className="text-xs">Costo de Pedido</Label>
                   <Input id="order_cost" type="number" min="0" value={newProduct.order_cost} onChange={e => setNewProduct({...newProduct, order_cost: Number(e.target.value)})} />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="expiration_date" className="text-xs">Fecha de Vencimiento</Label>
+                  <Input 
+                    id="expiration_date" 
+                    type="date" 
+                    value={newProduct.expiration_date} 
+                    onChange={e => setNewProduct({...newProduct, expiration_date: e.target.value})}
+                  />
+                </div>
               </div>
             )}
 
