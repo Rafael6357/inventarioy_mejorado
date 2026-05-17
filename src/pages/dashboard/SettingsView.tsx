@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { useDatabaseStore } from '../../store/dbStore';
-import { Settings, Save, Building2, User, Shield, Printer, MessageSquare, DollarSign, QrCode, Copy, ExternalLink, Download, RefreshCw, Sparkles, RotateCcw } from 'lucide-react';
+import { Settings, Save, Building2, User, Shield, Printer, MessageSquare, DollarSign, QrCode, Copy, ExternalLink, Download, RefreshCw, Sparkles, RotateCcw, Lock } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
@@ -22,6 +22,7 @@ export default function SettingsView() {
     phone: user?.phone || '',
     address: user?.address || '',
     businessHours: user?.businessHours || '',
+    businessCode: user?.businessCode || '',
   });
   const [currencySettings, setCurrencySettings] = useState({
     usdEnabled: user?.usdEnabled ?? false,
@@ -52,6 +53,7 @@ export default function SettingsView() {
         phone: user.phone || '',
         address: user.address || '',
         businessHours: user.businessHours || '',
+        businessCode: user.businessCode || '',
       });
     }
   }, [user]);
@@ -80,7 +82,8 @@ export default function SettingsView() {
       formData.ticketMessage !== user.ticketMessage ||
       formData.phone !== (user.phone || '') ||
       formData.address !== (user.address || '') ||
-      formData.businessHours !== (user.businessHours || '');
+      formData.businessHours !== (user.businessHours || '') ||
+      formData.businessCode !== (user.businessCode || '');
 
     const hasCurrencyChanges = 
       currencySettings.usdEnabled !== (user.usdEnabled ?? false) ||
@@ -105,23 +108,38 @@ export default function SettingsView() {
     });
     
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          name: formData.name,
-          business_name: formData.businessName,
-          generate_ticket: formData.generateTicket,
-          ticket_message: formData.ticketMessage,
-          usd_enabled: currencySettings.usdEnabled,
-          usd_rate: currencySettings.usdRate,
-          eur_enabled: currencySettings.eurEnabled,
-          eur_rate: currencySettings.eurRate,
-          cup_transfer_enabled: currencySettings.cupTransferEnabled,
-          phone: formData.phone,
-          address: formData.address,
-          business_hours: formData.businessHours,
-        })
-        .eq('id', user.id);
+      // Verificar si la columna business_code existe
+    const { data: testData, error: testError } = await supabase
+      .from('profiles')
+      .select('business_code')
+      .eq('id', user.id)
+      .single();
+
+    const businessCodeSupported = !testError || !testError.message?.includes('business_code');
+
+    const updateData: any = {
+      name: formData.name,
+      business_name: formData.businessName,
+      generate_ticket: formData.generateTicket,
+      ticket_message: formData.ticketMessage,
+      usd_enabled: currencySettings.usdEnabled,
+      usd_rate: currencySettings.usdRate,
+      eur_enabled: currencySettings.eurEnabled,
+      eur_rate: currencySettings.eurRate,
+      cup_transfer_enabled: currencySettings.cupTransferEnabled,
+      phone: formData.phone,
+      address: formData.address,
+      business_hours: formData.businessHours,
+    };
+
+    if (businessCodeSupported) {
+      updateData.business_code = formData.businessCode.toLowerCase().trim();
+    }
+
+    const { error } = await supabase
+      .from('profiles')
+      .update(updateData)
+      .eq('id', user.id);
 
       console.log('Resultado de guardado:', { error });
 
@@ -290,6 +308,23 @@ export default function SettingsView() {
                   placeholder="Lun-Vie: 9am-6pm"
                   maxLength={100}
                 />
+              </div>
+
+              <div className="space-y-2 pt-4">
+                <Label htmlFor="businessCode" className="flex items-center gap-2">
+                  <Lock className="h-4 w-4" />
+                  Código de Acceso para Empleados
+                </Label>
+                <Input 
+                  id="businessCode" 
+                  value={formData.businessCode}
+                  onChange={e => setFormData(prev => ({...prev, businessCode: e.target.value.toLowerCase().trim()}))}
+                  placeholder="Ej: micafe, mitienda123"
+                  maxLength={30}
+                />
+                <p className="text-xs text-text-secondary">
+                  Este código permitirá a tus empleados acceder al sistema con su PIN sin necesidad de login
+                </p>
               </div>
 
               <div className="pt-6 border-t border-border mt-4">

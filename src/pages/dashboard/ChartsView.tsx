@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
 import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend
+  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend
 } from 'recharts';
 import { BarChart3, TrendingUp, Activity } from 'lucide-react';
 
@@ -74,7 +74,7 @@ export default function ChartsView() {
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={salesOverTime} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                <LineChart data={salesOverTime} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
                   <XAxis dataKey="date" stroke="#888" fontSize={12} tickLine={false} axisLine={false} />
                   <YAxis stroke="#888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `$${value}`} />
@@ -83,8 +83,8 @@ export default function ChartsView() {
                     itemStyle={{ color: '#fff' }}
                     formatter={(value: number) => [`$${value.toFixed(2)}`, 'Ventas']}
                   />
-                  <Bar dataKey="total" fill="#d4af37" radius={[4, 4, 0, 0]} barSize={32} />
-                </BarChart>
+                  <Line type="monotone" dataKey="total" stroke="#d4af37" strokeWidth={3} dot={{ fill: '#d4af37', strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                </LineChart>
               </ResponsiveContainer>
             )}
           </div>

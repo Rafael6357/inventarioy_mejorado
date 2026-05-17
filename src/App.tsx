@@ -10,6 +10,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import MenuView from './pages/MenuView';
+import AccessPage from './pages/AccessPage';
 import ConnectionStatus from './components/ConnectionStatus';
 import { useEffect } from 'react';
 import { useAuthStore } from './store/authStore';
@@ -42,6 +43,8 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/menu" element={<MenuView />} />
+        <Route path="/acceso" element={<AccessPage />} />
+        <Route path="/acceso/:businessCode" element={<AccessPage />} />
         <Route path="/dashboard/*" element={<Dashboard />} />
       </Routes>
     </Router>

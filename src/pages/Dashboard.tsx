@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Link, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 import { 
   LayoutDashboard, 
   Package, 
@@ -55,10 +56,16 @@ export default function Dashboard() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, isLoading: authLoading, initialize } = useAuthStore();
-  const { fetchAll, isLoading: dbLoading, accessPins, verifiedRole, clearVerifiedRole, verifyPinSimple } = useDatabaseStore();
+  const { fetchAll, isLoading: dbLoading, accessPins, verifiedRole, clearVerifiedRole, verifyPinSimple, setAccessPins } = useDatabaseStore();
   const [localVerifiedRole, setLocalVerifiedRole] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('verifiedRole');
+    }
+    return null;
+  });
+  const [localVerifiedRoleName, setLocalVerifiedRoleName] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('verifiedRoleName') || null;
     }
     return null;
   });
@@ -66,6 +73,7 @@ export default function Dashboard() {
   const [showInitialPinModal, setShowInitialPinModal] = useState(false);
   const [pendingModule, setPendingModule] = useState('');
   const [moduleAllowed, setModuleAllowed] = useState<Record<string, boolean>>({});
+  const [isPinAccess, setIsPinAccess] = useState(false);
 
   const baseNav = useMemo(() => [
     // INVENTARIO
@@ -97,6 +105,29 @@ export default function Dashboard() {
     }
     return baseNav;
   }, [user?.role, baseNav]);
+
+  // Detectar acceso por PIN y cargar datos del negocio
+  useEffect(() => {
+    const tempAccess = localStorage.getItem('temp_access');
+    const tempUserId = localStorage.getItem('temp_user_id');
+    
+    if (tempAccess && tempUserId) {
+      try {
+        const accessData = JSON.parse(tempAccess);
+        if (accessData.role) {
+          setIsPinAccess(true);
+          setLocalVerifiedRole(accessData.role);
+          localStorage.setItem('verifiedRole', accessData.role);
+          if (accessData.pinName) {
+            localStorage.setItem('verifiedRoleName', accessData.pinName);
+            setLocalVerifiedRoleName(accessData.pinName);
+          }
+        }
+      } catch (e) {
+        console.error('Error parsing temp_access:', e);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     initialize();
@@ -153,6 +184,19 @@ export default function Dashboard() {
       return;
     }
 
+    // Si hay un rol verificado (del PIN), verificar solo ese rol
+    if (verifiedRole) {
+      if (requiredRoles.includes(verifiedRole)) {
+        setModuleAllowed(prev => ({ ...prev, [currentPath]: true }));
+      } else {
+        setModuleAllowed(prev => ({ ...prev, [currentPath]: false }));
+        setPendingModule(currentPath);
+        setShowPinModal(true);
+      }
+      return;
+    }
+
+    // Solo si no hay rol verificado, buscar pines (para usuarios dueñologueados)
     const userPin = accessPins.find(p => p.is_active && requiredRoles.includes(p.role));
     if (!userPin) {
       setModuleAllowed(prev => ({ ...prev, [currentPath]: false }));
@@ -199,7 +243,8 @@ export default function Dashboard() {
     );
   }
 
-  if (!user) {
+  // Permitir acceso si es PIN access o si hay usuario logueado
+  if (!user && !isPinAccess) {
     return <Navigate to="/login" replace />;
   }
 
@@ -207,8 +252,19 @@ export default function Dashboard() {
     console.log('handleLogout ejecutado');
     clearVerifiedRole();
     localStorage.removeItem('verifiedRole');
+    localStorage.removeItem('verifiedRoleName');
     setLocalVerifiedRole(null);
-    await logout();
+    setLocalVerifiedRoleName(null);
+    
+    // Limpiar datos de acceso por PIN
+    if (isPinAccess) {
+      localStorage.removeItem('temp_access');
+      localStorage.removeItem('temp_user_id');
+      setIsPinAccess(false);
+      navigate('/acceso');
+    } else {
+      await logout();
+    }
     console.log('logout completado');
   };
 
@@ -290,11 +346,19 @@ export default function Dashboard() {
             {verifiedRole && (
               <div className="mb-3 px-3">
                 <div className="flex items-center justify-between rounded-lg bg-warning/10 border border-warning/30 px-3 py-2">
-                  <div className="flex items-center gap-2">
-                    <LockOpen className="h-4 w-4 text-warning" />
-                    <span className="text-sm font-medium text-warning">
-                      Sesión: {verifiedRole === 'owner' ? 'Dueño/a' : verifiedRole === 'economist' ? 'Económico/a' : verifiedRole === 'admin' ? 'Administrador/a' : verifiedRole === 'supervisor' ? 'Supervisor/a' : 'Dependiente/a'}
-                    </span>
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      <LockOpen className="h-4 w-4 text-warning" />
+                      <span className="text-sm font-medium text-warning">
+                        Sesión: {verifiedRole === 'owner' ? 'Dueño/a' : verifiedRole === 'economist' ? 'Económico/a' : verifiedRole === 'admin' ? 'Administrador/a' : verifiedRole === 'supervisor' ? 'Supervisor/a' : 'Dependiente/a'}
+                        {localVerifiedRoleName && <span className="text-warning/80"> - {localVerifiedRoleName}</span>}
+                      </span>
+                    </div>
+                    {localVerifiedRoleName && (
+                      <span className="text-xs text-text-secondary ml-6">
+                        Accedido por PIN
+                      </span>
+                    )}
                   </div>
                   <button
                     onClick={() => {
@@ -363,6 +427,7 @@ export default function Dashboard() {
           onSuccess={() => {
             setShowPinModal(false);
             setLocalVerifiedRole(localStorage.getItem('verifiedRole'));
+            setLocalVerifiedRoleName(localStorage.getItem('verifiedRoleName'));
             setModuleAllowed(prev => ({ ...prev, [pendingModule]: true }));
           }}
           onCancel={() => {
@@ -378,6 +443,7 @@ export default function Dashboard() {
           onSuccess={() => {
             setShowInitialPinModal(false);
             setLocalVerifiedRole(localStorage.getItem('verifiedRole'));
+            setLocalVerifiedRoleName(localStorage.getItem('verifiedRoleName'));
           }}
           onCancel={() => {
             logout();

@@ -32,6 +32,7 @@ export default function AccessPinsConfig() {
   const [selectedRole, setSelectedRole] = useState('');
   const [pinValue, setPinValue] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
+  const [pinName, setPinName] = useState('');
   const [showPin, setShowPin] = useState(false);
   const [showConfirmPin, setShowConfirmPin] = useState(false);
 
@@ -45,18 +46,28 @@ export default function AccessPinsConfig() {
       return;
     }
     if (role) {
-      setEditingPin(role);
-      setSelectedRole(role);
+      if (role === 'owner' && accessPins.some(p => p.role === 'owner')) {
+        setEditingPin(role);
+        setSelectedRole(role);
+      } else {
+        setEditingPin(null);
+        setSelectedRole(role);
+      }
     } else {
       setEditingPin(null);
       setSelectedRole('');
     }
     setPinValue('');
     setConfirmPin('');
+    setPinName('');
     setShowModal(true);
   };
 
   const handleSavePin = async () => {
+    if (!pinName.trim()) {
+      toast.error('El nombre es obligatorio');
+      return;
+    }
     if (pinValue.length !== 4) {
       toast.error('El PIN debe tener 4 dígitos');
       return;
@@ -75,12 +86,18 @@ export default function AccessPinsConfig() {
       return;
     }
 
-    const result = await saveAccessPin(selectedRole, pinValue);
+    if (selectedRole === 'owner' && accessPins.some(p => p.role === 'owner' && p.is_active)) {
+      toast.error('Ya existe un PIN de Dueño/a activo. Puede editarlo o eliminarlo primero.');
+      return;
+    }
+
+    const result = await saveAccessPin(selectedRole, pinValue, pinName);
     if (result.success) {
-      toast.success(`PIN de ${ROLE_LABELS[selectedRole]} guardado`);
+      toast.success(`PIN de ${ROLE_LABELS[selectedRole]} - ${pinName} guardado`);
       setShowModal(false);
       setPinValue('');
       setConfirmPin('');
+      setPinName('');
     } else {
       toast.error(result.error || 'Error al guardar PIN');
     }
@@ -177,7 +194,7 @@ export default function AccessPinsConfig() {
             >
               <div className="flex items-center justify-between w-full mb-2">
                 <div className="flex items-center gap-2">
-                  <span className="font-medium text-text text-base">{ROLE_LABELS[pin.role]}</span>
+                  <span className="font-medium text-text text-base">{ROLE_LABELS[pin.role]}{pin.pin_name ? `: ${pin.pin_name}` : ''}</span>
                   {pin.is_active ? (
                     <span className="flex items-center gap-1 text-sm text-success">
                       <CheckCircle className="h-4 w-4" /> Activo
@@ -243,20 +260,34 @@ export default function AccessPinsConfig() {
                   {!hasOwnerPin ? (
                     <option value="owner">{ROLE_LABELS['owner']}</option>
                   ) : (
-                    availableRoles.map(role => {
-                      const existingPin = accessPins.find(p => p.role === role);
-                      if (existingPin && editingPin !== role) return null;
-                      return (
-                        <option key={role} value={role}>
-                          {ROLE_LABELS[role]}
-                        </option>
-                      );
-                    })
+                    <>
+                      {availableRoles.map(role => {
+                        if (role === 'owner' && accessPins.some(p => p.role === 'owner' && p.is_active)) {
+                          return null;
+                        }
+                        return (
+                          <option key={role} value={role}>
+                            {ROLE_LABELS[role]}
+                          </option>
+                        );
+                      })}
+                    </>
                   )}
                 </select>
                 {!hasOwnerPin && (
                   <p className="text-xs text-warning mt-1">Debe configurar primero el PIN de Dueño/a</p>
                 )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-text mb-2 block">Nombre del usuario *</label>
+                <Input
+                  value={pinName}
+                  onChange={e => setPinName(e.target.value)}
+                  placeholder="Ej: Juan, María, Carlos..."
+                  className="text-text"
+                />
+                <p className="text-xs text-text-secondary">Este nombre aparecerá en el registro de acciones</p>
               </div>
 
               <div className="relative">

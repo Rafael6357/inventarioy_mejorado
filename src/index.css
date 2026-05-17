@@ -147,10 +147,15 @@
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;
-    width: 100% !important;
-    margin: 0 !important;
-    padding: 20mm !important; /* Margen de seguridad para la impresora */
+    width: 58mm !important;
+    margin-left: 5px !important;
+    padding: 2mm !important;
     overflow: visible !important;
+    color: #000 !important;
+    font-weight: 700 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    line-height: 1.0 !important;
   }
 
   /* Ocultar elementos innecesarios del ticket al imprimir */

@@ -128,6 +128,7 @@ export interface AccessPin {
   user_id: string;
   pin_hash: string;
   role: 'owner' | 'economist' | 'admin' | 'supervisor' | 'clerk';
+  pin_name: string;
   is_active: boolean;
   failed_attempts: number;
   blocked_until: string | null;
@@ -401,6 +402,7 @@ interface DatabaseState {
 addItemsToPendingAccount: (accountId: string, items: { product_id: string; product_name: string; quantity: number; unit_price: number; subtotal: number }[], isAccountHouse?: boolean, saleType?: 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA')
     => Promise<{ success: boolean; error?: string }>;
   updatePendingAccount: (accountId: string, updates: Partial<PendingAccount>) => Promise<{ success: boolean; error?: string }>;
+  updatePendingAccountItems: (accountId: string, items: PendingItem[]) => Promise<{ success: boolean; error?: string }>;
   togglePendingAccountType: (accountId: string) => Promise<{ success: boolean; error?: string }>;
   deletePendingAccount: (accountId: string) => Promise<{ success: boolean; error?: string }>;
   getPendingAccounts: () => Promise<void>;
@@ -413,6 +415,7 @@ addItemsToPendingAccount: (accountId: string, items: { product_id: string; produ
   verifyPinSimple: (pin: string) => Promise<{ success: boolean; error?: string; blocked?: boolean; remainingTime?: number; role?: string }>;
   accessPins: AccessPin[];
   verifiedRole: string | null;
+  verifiedRoleName: string | null;
   clearVerifiedRole: () => void;
   fetchEmployeeDocuments: (employeeId: string) => Promise<void>;
   deleteEmployeeDocument: (id: string, fileUrl: string) => Promise<void>;
@@ -473,12 +476,14 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
   payrollMonthFilter: 0,
   payrollYearFilter: 0,
   verifiedRole: typeof window !== 'undefined' ? localStorage.getItem('verifiedRole') : null,
+  verifiedRoleName: typeof window !== 'undefined' ? localStorage.getItem('verifiedRoleName') : null,
   actionLogs: [],
   isLoading: true,
 
   clearVerifiedRole: () => {
     localStorage.removeItem('verifiedRole');
-    set({ verifiedRole: null });
+    localStorage.removeItem('verifiedRoleName');
+    set({ verifiedRole: null, verifiedRoleName: null });
   },
 
   fetchAll: async (limit = 50) => {
@@ -1261,6 +1266,7 @@ addProduct: async (product) => {
           items: [],
           total_amount: 0,
           status: 'pending',
+          created_at_local: new Date().toISOString(),
         })
         .select()
         .single();
@@ -1356,6 +1362,30 @@ addProduct: async (product) => {
     const { error } = await supabase
       .from('pending_accounts')
       .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', accountId);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    await get().getPendingAccounts();
+    return { success: true };
+  },
+
+  updatePendingAccountItems: async (accountId: string, items: PendingItem[]) => {
+    const account = get().pendingAccounts.find(a => a.id === accountId);
+    if (!account) return { success: false, error: 'Cuenta no encontrada' };
+
+    const isAccountHouse = (account as any).is_account_house || false;
+    const newTotal = isAccountHouse ? 0 : items.reduce((sum, item) => sum + item.subtotal, 0);
+
+    const { error } = await supabase
+      .from('pending_accounts')
+      .update({
+        items: items,
+        total_amount: newTotal,
+        updated_at: new Date().toISOString()
+      })
       .eq('id', accountId);
 
     if (error) {
@@ -1527,24 +1557,34 @@ const { error } = await supabase
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
   },
 
-  saveAccessPin: async (role: string, pin: string) => {
+  saveAccessPin: async (role: string, pin: string, name: string) => {
     const user = useAuthStore.getState().user;
     if (!user) return { success: false, error: 'No hay usuario autenticado' };
+    if (!name || name.trim() === '') return { success: false, error: 'El nombre es obligatorio' };
 
-    const existingPin = get().accessPins.find(p => p.role === role);
     const pinHash = await get().hashPin(pin);
 
-    if (existingPin) {
-      const { error } = await supabase
-        .from('access_pins')
-        .update({ pin_hash: pinHash, is_active: true, failed_attempts: 0, blocked_until: null })
-        .eq('id', existingPin.id);
+    if (role === 'owner') {
+      const existingPin = get().accessPins.find(p => p.role === 'owner');
+      
+      if (existingPin) {
+        const { error } = await supabase
+          .from('access_pins')
+          .update({ pin_hash: pinHash, pin_name: name.trim(), is_active: true, failed_attempts: 0, blocked_until: null })
+          .eq('id', existingPin.id);
 
-      if (error) return { success: false, error: error.message };
+        if (error) return { success: false, error: error.message };
+      } else {
+        const { error } = await supabase
+          .from('access_pins')
+          .insert({ user_id: user.id, role, pin_hash: pinHash, pin_name: name.trim() });
+
+        if (error) return { success: false, error: error.message };
+      }
     } else {
       const { error } = await supabase
         .from('access_pins')
-        .insert({ user_id: user.id, role, pin_hash: pinHash });
+        .insert({ user_id: user.id, role, pin_hash: pinHash, pin_name: name.trim() });
 
       if (error) return { success: false, error: error.message };
     }
@@ -1593,8 +1633,24 @@ const { error } = await supabase
     const requiredRoles = MODULE_ROLES[modulePath] || [];
     if (requiredRoles.length === 0) return { success: true };
 
-    const userPin = get().accessPins.find(p => p.is_active && requiredRoles.includes(p.role));
-    if (!userPin) return { success: false, error: 'Tu PIN no tiene acceso a este módulo' };
+    const pinHash = await get().hashPin(pin);
+    const matchingPins = get().accessPins.filter(p => p.is_active && requiredRoles.includes(p.role));
+    const userPin = matchingPins.find(p => p.pin_hash === pinHash);
+    
+    if (!userPin) {
+      const existingPin = matchingPins[0];
+      if (!existingPin) return { success: false, error: 'Tu PIN no tiene acceso a este módulo' };
+      
+      const newAttempts = existingPin.failed_attempts + 1;
+      if (newAttempts >= 3) {
+        const blockedUntil = new Date(Date.now() + 5 * 60 * 1000);
+        await supabase.from('access_pins').update({ failed_attempts: newAttempts, blocked_until: blockedUntil.toISOString() }).eq('id', existingPin.id);
+        return { success: false, error: 'PIN bloqueado por 3 intentos fallidos', blocked: true, remainingTime: 300 };
+      } else {
+        await supabase.from('access_pins').update({ failed_attempts: newAttempts }).eq('id', existingPin.id);
+      }
+      return { success: false, error: `PIN incorrecto. Intentos: ${newAttempts}/3` };
+    }
 
     if (userPin.blocked_until) {
       const blockedUntil = new Date(userPin.blocked_until);
@@ -1607,25 +1663,13 @@ const { error } = await supabase
       }
     }
 
-    const pinHash = await get().hashPin(pin);
-    if (pinHash !== userPin.pin_hash) {
-      const newAttempts = userPin.failed_attempts + 1;
-      if (newAttempts >= 3) {
-        const blockedUntil = new Date(Date.now() + 5 * 60 * 1000);
-        await supabase.from('access_pins').update({ failed_attempts: newAttempts, blocked_until: blockedUntil.toISOString() }).eq('id', userPin.id);
-        return { success: false, error: 'PIN bloqueado por 3 intentos fallidos', blocked: true, remainingTime: 300 };
-      } else {
-        await supabase.from('access_pins').update({ failed_attempts: newAttempts }).eq('id', userPin.id);
-      }
-      return { success: false, error: `PIN incorrecto. Intentos: ${newAttempts}/3` };
-    }
-
     if (userPin.failed_attempts > 0) {
       await supabase.from('access_pins').update({ failed_attempts: 0, blocked_until: null }).eq('id', userPin.id);
     }
 
-    set({ verifiedRole: userPin.role });
+    set({ verifiedRole: userPin.role, verifiedRoleName: userPin.pin_name });
     localStorage.setItem('verifiedRole', userPin.role);
+    localStorage.setItem('verifiedRoleName', userPin.pin_name || '');
     return { success: true, verifiedRole: userPin.role };
   },
 
@@ -1666,8 +1710,9 @@ const { error } = await supabase
       await supabase.from('access_pins').update({ failed_attempts: 0, blocked_until: null }).eq('id', userPin.id);
     }
 
-    set({ verifiedRole: userPin.role });
+    set({ verifiedRole: userPin.role, verifiedRoleName: userPin.pin_name });
     localStorage.setItem('verifiedRole', userPin.role);
+    localStorage.setItem('verifiedRoleName', userPin.pin_name || '');
     return { success: true, role: userPin.role };
   },
 
@@ -1676,9 +1721,10 @@ const { error } = await supabase
     if (!user) return;
 
     const verifiedRole = get().verifiedRole;
+    const verifiedRoleName = get().verifiedRoleName;
     const activePin = get().accessPins.find(p => p.is_active);
     const role = verifiedRole || activePin?.role || user.role || 'owner';
-    const roleLabel = verifiedRole ? ROLE_LABELS[verifiedRole] : (activePin ? ROLE_LABELS[activePin.role] : (user.name || 'Dueño/a'));
+    const roleLabel = verifiedRole ? `${ROLE_LABELS[verifiedRole]}${verifiedRoleName ? `: ${verifiedRoleName}` : ''}` : (activePin ? `${ROLE_LABELS[activePin.role]}${activePin.pin_name ? `: ${activePin.pin_name}` : ''}` : (user.name || 'Dueño/a'));
     
     await supabase.from('action_logs').insert({
       user_id: user.id,

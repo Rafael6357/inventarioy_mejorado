@@ -215,7 +215,7 @@ export default function DailyClosingsView() {
     return grouped;
   };
 
-  const canPrint = verifiedRole && ['owner', 'economist', 'supervisor'].includes(verifiedRole);
+  const canPrint = verifiedRole && ['owner', 'economist', 'supervisor', 'clerk'].includes(verifiedRole);
 
   return (
     <div className="space-y-6">
@@ -431,7 +431,7 @@ export default function DailyClosingsView() {
                                     : sale.sale_type === 'BAR' ? 'Bar'
                                     : sale.sale_type === 'VENTA_RAPIDA' ? 'Venta Rápida' : 'Otro'}
                                 </span>
-                                <span className="text-text-secondary ml-2">• {sale.items?.length || 0} items</span>
+                                <span className="text-text-secondary ml-2">• {sale.items?.length || 0} productos</span>
                               </div>
                               <span className="font-mono text-primary">${Number(sale.total_amount || 0).toFixed(2)}</span>
                             </div>
@@ -656,7 +656,7 @@ export default function DailyClosingsView() {
               </button>
             </div>
 
-            <div id="ticket-container" className="bg-white text-black p-4 rounded-lg font-mono text-xs overflow-x-auto">
+            <div id="ticket-container" className="bg-white text-black p-3 rounded-lg font-mono text-xs" style={{ maxWidth: '58mm', margin: '0 0 0 5px', fontSize: '13px' }}>
               <div className="text-center border-b-2 border-dashed border-gray-400 pb-2 mb-3">
                 <p className="font-bold text-sm">RESUMEN DE VENTAS</p>
                 <p className="text-xs mt-1">
@@ -680,8 +680,8 @@ export default function DailyClosingsView() {
                   return `${qtyStr}x ${name.slice(0, 15).padEnd(15)} ${subStr}`;
                 };
                 const formatTotal = (label: string, total: number) => {
-                  const labelStr = label.padEnd(18, ' ');
-                  const totalStr = total.toFixed(2).padStart(9, ' ');
+                  const labelStr = label.padEnd(14, ' ');
+                  const totalStr = total.toFixed(2).padStart(7, ' ');
                   return `${labelStr}${totalStr}`;
                 };
 
@@ -764,7 +764,7 @@ export default function DailyClosingsView() {
                       <p className="text-center text-gray-500">Sin ventas en este cierre</p>
                     )}
 
-                    <div className="border-t-2 border-dashed border-gray-400 mt-3 pt-2 text-center">
+                    <div className="border-t-2 border-dashed border-gray-400 mt-1 pt-1 text-center">
                       <p className="font-bold text-sm">
                         {formatTotal('TOTAL DEL DIA:', totalDia)}
                       </p>

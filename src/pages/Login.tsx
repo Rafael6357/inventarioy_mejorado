@@ -54,7 +54,9 @@ export default function Login() {
       <div className="w-full max-w-md space-y-8 rounded-2xl border border-border/50 bg-surface/80 backdrop-blur-xl p-8 shadow-[0_0_40px_-10px_rgba(255,193,7,0.15)]">
         <div className="flex flex-col items-center text-center">
           <div className="mb-6">
-            <InventarioYLogo size="xl" />
+            <Link to="/">
+              <InventarioYLogo size="xl" className="cursor-pointer hover:opacity-80 transition-opacity" />
+            </Link>
           </div>
           <h2 className="text-2xl font-bold text-text">Bienvenido de nuevo</h2>
           <p className="mt-2 text-sm text-text-secondary">
@@ -138,6 +140,12 @@ export default function Login() {
             </Button>
           </div>
         </form>
+
+        <p className="text-center text-sm text-text-secondary mt-4">
+          <Link to="/" className="text-primary hover:underline flex items-center justify-center gap-1">
+            ← Volver al inicio
+          </Link>
+        </p>
 
         <p className="text-center text-sm text-text-secondary">
           ¿No tienes una cuenta?{' '}

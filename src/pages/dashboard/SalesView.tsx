@@ -9,7 +9,7 @@ import TicketView from './TicketView';
 
 export default function SalesView() {
   const { user } = useAuthStore();
-  const { products, recipes, employees, sales, dailyClosings, pendingAccounts, addSale, createDailyClosing, getDailyClosings, createPendingAccount, addItemsToPendingAccount, chargePendingAccount, getPendingAccounts, togglePendingAccountType, logAction, forceRefreshData } = useDatabaseStore();
+  const { products, recipes, employees, sales, dailyClosings, pendingAccounts, addSale, createDailyClosing, getDailyClosings, createPendingAccount, addItemsToPendingAccount, chargePendingAccount, getPendingAccounts, togglePendingAccountType, updatePendingAccountItems, logAction, forceRefreshData } = useDatabaseStore();
   
   const activeProducts = products.filter(p => p.is_active !== false);
 
@@ -60,6 +60,10 @@ export default function SalesView() {
   const [paymentWarning, setPaymentWarning] = useState<string | null>(null);
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
   const [pendingSectionCollapsed, setPendingSectionCollapsed] = useState(false);
+  const [editingItemAccountId, setEditingItemAccountId] = useState<string | null>(null);
+  const [editingItem, setEditingItem] = useState<any>(null);
+  const [showEditItemModal, setShowEditItemModal] = useState(false);
+  const [editItemQuantity, setEditItemQuantity] = useState<number>(1);
 
   const toggleAccountExpansion = (accountId: string) => {
     setExpandedAccounts(prev => {
@@ -79,6 +83,59 @@ export default function SalesView() {
 
   const collapseAllAccounts = () => {
     setExpandedAccounts(new Set());
+  };
+
+  const handleEditItem = (accountId: string, item: any) => {
+    setEditingItemAccountId(accountId);
+    setEditingItem(item);
+    setEditItemQuantity(item.quantity);
+    setShowEditItemModal(true);
+  };
+
+  const handleSaveEditItem = async () => {
+    if (!editingItemAccountId || !editingItem) return;
+
+    const account = pendingAccounts.find(a => a.id === editingItemAccountId);
+    if (!account) return;
+
+    const currentItems = (account.items as any[]) || [];
+    const newItems = currentItems.map(i => {
+      if (i.product_id === editingItem.product_id && i.added_at === editingItem.added_at) {
+        return {
+          ...i,
+          quantity: editItemQuantity,
+          subtotal: editItemQuantity * (i.price || i.unit_price)
+        };
+      }
+      return i;
+    });
+
+    const result = await updatePendingAccountItems(editingItemAccountId, newItems);
+    if (result.success) {
+      toast.success('Cantidad actualizada');
+    } else {
+      toast.error(result.error || 'Error al actualizar');
+    }
+    setShowEditItemModal(false);
+    setEditingItem(null);
+    setEditingItemAccountId(null);
+  };
+
+  const handleDeleteItem = async (accountId: string, itemToDelete: any) => {
+    const account = pendingAccounts.find(a => a.id === accountId);
+    if (!account) return;
+
+    const currentItems = (account.items as any[]) || [];
+    const newItems = currentItems.filter(i => 
+      !(i.product_id === itemToDelete.product_id && i.added_at === itemToDelete.added_at)
+    );
+
+    const result = await updatePendingAccountItems(accountId, newItems);
+    if (result.success) {
+      toast.success('Producto eliminado');
+    } else {
+      toast.error(result.error || 'Error al eliminar');
+    }
   };
 
   useEffect(() => {
@@ -507,6 +564,14 @@ export default function SalesView() {
         return;
       }
 
+      // Capturar items del cart antes de limpiar
+      const cartItems = cart.map(item => ({
+        name: item.name,
+        quantity: item.quantity,
+        unitPrice: item.price,
+        subtotal: item.price * item.quantity
+      }));
+
       // Limpiar estados de venta exitosa
       setCart([]);
       setDiscount(0);
@@ -524,7 +589,7 @@ export default function SalesView() {
         const selectedEmployee = employees.find(e => e.id === employeeId);
         await useDatabaseStore.getState().logAction('sales', 'VENTA', {
           total: total,
-          items_count: cart.length,
+          items_count: cartItems.length,
           sale_type: saleType,
           sale_name: saleType === 'VENTA_RAPIDA' ? `Venta rápida ${nextQuickSaleNumber}` : null,
           employee: selectedEmployee?.name || user?.name || 'Dueño',
@@ -541,28 +606,19 @@ export default function SalesView() {
         const saleLabel = saleType === 'VENTA_RAPIDA' ? `Venta rápida ${nextQuickSaleNumber}` : (saleType === 'SALON' ? 'Salón' : saleType === 'DOMICILIO' ? 'Domicilio' : saleType === 'BAR' ? 'Bar' : 'Venta');
         
         setPreticketData({
-          items: cart.map(item => ({
-            name: item.name,
-            quantity: item.quantity,
-            unitPrice: item.price,
-            subtotal: item.price * item.quantity
-          })),
+          items: cartItems,
           total: isAccountHouse ? 0 : total,
           employeeName: empName,
           businessName: user.businessName || 'Mi Negocio',
           saleLabel: saleLabel,
           isPreticket: true,
+          employeeRole: selectedEmployee ? selectedEmployee.role : (user.name ? 'Dueño' : ''),
           date: new Date(closingDate + 'T' + new Date().toTimeString().slice(0,8))
         });
         setShowPreticket(true);
 
         setTicketData({
-          items: cart.map(item => ({
-            name: item.name,
-            quantity: item.quantity,
-            unitPrice: item.price,
-            subtotal: item.price * item.quantity
-          })),
+          items: cartItems,
           total: isAccountHouse ? 0 : total,
           employeeName: empName,
           businessName: user.businessName || 'Mi Negocio',
@@ -727,7 +783,7 @@ setShowTicket(true);
                           )}
                         </div>
                         <p className="text-xs text-text-secondary">
-                          {accountItems.length} productos - ${(account.total_amount || 0).toFixed(2)}
+                          {account.created_at_local ? new Date(account.created_at_local).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }) : new Date(new Date(account.created_at).getTime() + 3600000).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })} - {accountItems.length} productos - ${(account.total_amount || 0).toFixed(2)}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -772,15 +828,31 @@ setShowTicket(true);
                         </div>
                     </div>
                     {isExpanded && accountItems.length > 0 && (
-                      <div className="mt-2 pt-2 border-t border-border/30 max-h-32 overflow-y-auto">
+                      <div className="mt-2 pt-2 border-t border-border/30 max-h-40 overflow-y-auto">
                         <p className="text-xs font-medium text-text-secondary mb-1">Productos:</p>
                         <div className="space-y-1">
                           {accountItems.map((item, index) => (
-                            <div key={`${item.product_id}-${index}`} className="flex items-center justify-between text-xs pl-2">
+                            <div key={`${item.product_id}-${index}`} className="flex items-center justify-between text-xs pl-2 group">
                               <span className="text-text">{item.name || item.product_name}</span>
-                              <span className="text-text-secondary">
-                                x{item.quantity} ${((item.price || item.unit_price) * item.quantity).toFixed(2)}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleEditItem(account.id, item)}
+                                  className="text-primary hover:text-primary/70 font-medium"
+                                  title="Editar cantidad"
+                                >
+                                  x{item.quantity}
+                                </button>
+                                <span className="text-text-secondary">
+                                  ${((item.price || item.unit_price) * item.quantity).toFixed(2)}
+                                </span>
+                                <button
+                                  onClick={() => handleDeleteItem(account.id, item)}
+                                  className="text-danger hover:text-danger/70 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  title="Eliminar producto"
+                                >
+                                  ✕
+                                </button>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -1293,12 +1365,37 @@ setShowTicket(true);
                     }));
                     const result = await addItemsToPendingAccount(selectedPendingAccount, items, isAccountHouse, saleType);
                     if (result.success) {
+                      const cartItems = cart.map(item => ({
+                        name: item.name,
+                        quantity: item.quantity,
+                        unitPrice: item.price,
+                        subtotal: item.price * item.quantity
+                      }));
+                      const totalItems = cartItems.reduce((sum, item) => sum + item.subtotal, 0);
+                      
                       setCart([]);
                       setShowPreview(false);
                       setPaymentError(null);
                       setPaymentWarning(null);
                       setSalePaymentMethod({ efectivo: 0, transferencia: 0, usd: 0, eur: 0 });
                       toast.success('Productos agregados a la cuenta');
+
+                      if (user?.generateTicket && cartItems.length > 0) {
+                        const selectedEmployee = employees.find(e => e.id === employeeId);
+                        const empName = selectedEmployee ? selectedEmployee.name : (user.name || 'Vendedor');
+                        setPreticketData({
+                          items: cartItems,
+                          total: totalItems,
+                          employeeName: empName,
+                          businessName: user.businessName || 'Mi Negocio',
+                          saleLabel: 'Cuenta Pendiente',
+                          isPreticket: true,
+                          isPendingAccount: true,
+                          employeeRole: selectedEmployee ? selectedEmployee.role : (user.name ? 'Dueño' : ''),
+                          date: new Date(closingDate + 'T' + new Date().toTimeString().slice(0,8))
+                        });
+                        setShowPreticket(true);
+                      }
                     } else {
                       toast.error(result.error || 'Error al agregar productos');
                     }
@@ -1712,6 +1809,7 @@ setShowTicket(true);
                           saleType: selectedAccountForCharge.sale_type || 'SALON',
                           isAccountHouse: isAccHouse,
                           paymentBreakdown: chargeBreakdown,
+                          employeeRole: selectedEmp ? selectedEmp.role : (user?.name ? 'Dueño' : ''),
                           date: new Date(closingDate + 'T' + new Date().toTimeString().slice(0,8))
                         });
                         setShowTicket(true);
@@ -1871,6 +1969,63 @@ setShowTicket(true);
                 }}
               >
                 Continuar Así
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    {showEditItemModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-sm mx-4 bg-surface rounded-xl shadow-2xl border border-border/50 p-6">
+            <h3 className="text-lg font-semibold text-text mb-4">Editar Producto</h3>
+            <p className="text-sm text-text-secondary mb-4">
+              {editingItem?.name || editingItem?.product_name}
+            </p>
+            <div className="space-y-4">
+              <div className="flex items-center justify-center gap-4">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setEditItemQuantity(Math.max(1, editItemQuantity - 1))}
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
+                <Input
+                  type="number"
+                  min="1"
+                  value={editItemQuantity}
+                  onChange={(e) => setEditItemQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-20 text-center text-lg"
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setEditItemQuantity(editItemQuantity + 1)}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-center text-sm text-text-secondary">
+                Total: ${((editingItem?.price || editingItem?.unit_price || 0) * editItemQuantity).toFixed(2)}
+              </p>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setShowEditItemModal(false);
+                  setEditingItem(null);
+                  setEditingItemAccountId(null);
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                className="flex-1 gap-2"
+                onClick={handleSaveEditItem}
+              >
+                Guardar
               </Button>
             </div>
           </div>

@@ -1,4 +1,4 @@
-import { Package, ShoppingCart, ChefHat, Sparkles, ChevronDown, CheckCircle2, Loader2 } from 'lucide-react';
+import { Package, ShoppingCart, ChefHat, Sparkles, ChevronDown, CheckCircle2, Loader2, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -52,6 +52,15 @@ export default function Landing() {
             </Link>
             <Link to="/register">
               <Button>Registrarse</Button>
+            </Link>
+            <Link to="/acceso">
+              <Button 
+                variant="outline" 
+                className="text-sm border-primary/50 text-primary bg-primary/5 hover:bg-primary/10 hover:border-primary shadow-[0_0_10px_rgba(255,193,7,0.2)] hover:shadow-[0_0_20px_rgba(255,193,7,0.4)] transition-all duration-300"
+              >
+                <Users className="h-4 w-4 mr-1" />
+                Acceso de Empleados
+              </Button>
             </Link>
           </div>
         </div>

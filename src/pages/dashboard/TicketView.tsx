@@ -18,6 +18,7 @@ interface TicketData {
   date: Date;
   saleLabel?: string;
   isPreticket?: boolean;
+  isPendingAccount?: boolean;
   saleType?: 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA';
   isAccountHouse?: boolean;
   deliveryFee?: number;
@@ -34,7 +35,7 @@ export default function TicketView({ ticketData, onClose, isPreticket = false }:
   const printRef = useRef<HTMLDivElement>(null);
 
   const handlePrint = () => {
-    window.print();
+    printTicket(ticketData);
   };
 
   const formatDate = (date: Date) => {
@@ -56,7 +57,12 @@ export default function TicketView({ ticketData, onClose, isPreticket = false }:
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" id="ticket-container">
       <div className="bg-bg rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="p-4 border-b border-border flex items-center justify-between print-hide">
-          <h2 className="text-lg font-semibold text-text">{isPreticket || ticketData.isPreticket ? 'Preticket' : 'Ticket'}</h2>
+          <div>
+            <h2 className="text-lg font-semibold text-text">{isPreticket || ticketData.isPreticket ? 'Preticket' : 'Ticket'}</h2>
+            {ticketData.isPendingAccount && (
+              <p className="text-xs text-text-secondary">Agregado a cuenta pendiente</p>
+            )}
+          </div>
           <Button variant="ghost" size="icon" onClick={onClose} className="print-hide">
             <X className="h-5 w-5" />
           </Button>
@@ -123,10 +129,16 @@ export default function TicketView({ ticketData, onClose, isPreticket = false }:
               <span>{formatCurrency(ticketData.total)}</span>
             </div>
 
+            {ticketData.isPendingAccount && (
+              <div className="text-center text-xs mt-3 text-gray-600 italic">
+                El ticket final se generará al cobrar la cuenta
+              </div>
+            )}
+
             <div className="border-t border-black my-2 py-1" />
 
             <div className="text-center text-xs mt-4">
-              {ticketData.ticketMessage || '¡Gracias por su visita!'}
+              {ticketData.isPendingAccount ? 'Items agregados a cuenta pendiente' : (ticketData.ticketMessage || '¡Gracias por su visita!')}
             </div>
 
             <div className="text-center mt-2 text-xs">
@@ -174,34 +186,48 @@ export function printTicket(ticketData: TicketData) {
       <style>
         body {
           font-family: 'Courier New', monospace;
-          font-size: 12px;
-          width: 80mm;
+          font-size: 13px;
+          font-weight: 700;
+          color: #000 !important;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+          text-rendering: optimizeLegibility;
+          line-height: 1.0;
+          width: 58mm;
           margin: 0;
-          padding: 10px;
+          margin-left: 5px;
+          padding: 2px;
         }
         .header {
           text-align: center;
           margin-bottom: 10px;
+          color: #000 !important;
         }
-        .header h1 {
-          font-size: 16px;
+.header h1 {
+          font-size: 18px;
           margin: 0;
         }
         .divider {
           border-top: 1px dashed #000;
           margin: 10px 0;
+          color: #000 !important;
         }
         .item {
           display: flex;
           justify-content: space-between;
+          color: #000 !important;
         }
-        .total {
+.total {
           font-weight: bold;
-          font-size: 14px;
+          font-size: 16px;
         }
         .footer {
           text-align: center;
           margin-top: 10px;
+          color: #000 !important;
+        }
+        .footer p {
+          color: #000 !important;
         }
         @media print {
           body { margin: 0; }
