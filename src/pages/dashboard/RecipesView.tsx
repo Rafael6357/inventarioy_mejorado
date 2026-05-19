@@ -1,12 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
 import { useAuthStore } from '../../store/authStore';
-import { ChefHat, Plus, Minus, Trash2, Search, UtensilsCrossed, AlertCircle, Pencil, X, Check } from 'lucide-react';
+import { ChefHat, Plus, Minus, Trash2, Search, UtensilsCrossed, AlertCircle, Pencil, X, Check, Printer } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
-import { validateNumber, getNumberFromString } from '../../lib/utils';
+import { validateNumber, getNumberFromString, exportToExcel } from '../../lib/utils';
 import {
   convertUnit,
   getCompatibleUnits,
@@ -168,11 +168,43 @@ export default function RecipesView() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-text">Recetas y Escandallos</h1>
-        <p className="text-sm text-text-secondary">
-          Crea platillos compuestos para descontar de tránsito automáticamente
-        </p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-2xl font-bold text-text">Recetas y Escandallos</h1>
+          <p className="text-sm text-text-secondary">
+            Crea platillos compuestos para descontar de tránsito automáticamente
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            const columns = [
+              { header: 'Nombre', key: 'name' },
+              { header: 'Costo Total', key: 'total_cost', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
+              { header: 'Precio Venta', key: 'selling_price', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
+              { header: 'Margen %', key: 'margin', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
+              { header: 'Ingredientes', key: 'ingredients' },
+            ];
+            const data = recipes.map(r => {
+              const totalCost = r.ingredients?.reduce((sum: number, ing: any) => {
+                return sum + (Number(ing.quantity) * Number(ing.unit_cost) || 0);
+              }, 0) || 0;
+              const margin = r.selling_price > 0 ? ((r.selling_price - totalCost) / r.selling_price) * 100 : 0;
+              return {
+                ...r,
+                total_cost: totalCost,
+                margin: margin,
+                ingredients: r.ingredients?.length || 0,
+              };
+            });
+            exportToExcel(columns, data, `recetas_${new Date().toISOString().split('T')[0]}`);
+          }}
+          className="gap-2"
+        >
+          <Printer className="h-4 w-4" />
+          Exportar
+        </Button>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

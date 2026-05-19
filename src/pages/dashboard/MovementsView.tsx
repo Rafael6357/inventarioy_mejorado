@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
-import { Search, Filter, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, Calendar, ChevronLeft, ChevronRight, TrendingDown, Settings2 } from 'lucide-react';
+import { Search, Filter, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, Calendar, ChevronLeft, ChevronRight, TrendingDown, Settings2, Printer } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
+import { exportToExcel } from '../../lib/utils';
 
 export default function MovementsView() {
   const { movements, products, fetchMore } = useDatabaseStore();
@@ -93,6 +94,33 @@ export default function MovementsView() {
             Visualización cronológica completa de entradas, salidas y mermas
           </p>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            const columns = [
+              { header: 'Fecha', key: 'date' },
+              { header: 'Tipo', key: 'type' },
+              { header: 'Producto', key: 'product_name' },
+              { header: 'Cantidad', key: 'quantity', format: (v: number) => v?.toFixed(3).replace('.', ',') || '0' },
+              { header: 'Unidad', key: 'unit' },
+              { header: 'Costo', key: 'cost', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
+              { header: 'Razón', key: 'reason' },
+            ];
+            const data = filteredMovements.map(m => ({
+              ...m,
+              date: new Date(m.date).toLocaleString('es-ES'),
+              product_name: getProductName(m.product_id),
+              quantity: Number(m.quantity),
+              cost: Number(m.cost) || 0,
+            }));
+            exportToExcel(columns, data, `movimientos_${new Date().toISOString().split('T')[0]}`);
+          }}
+          className="gap-2"
+        >
+          <Printer className="h-4 w-4" />
+          Exportar
+        </Button>
       </div>
 
       <div className="rounded-xl border border-border bg-surface p-4 shadow-sm">

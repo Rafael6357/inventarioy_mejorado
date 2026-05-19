@@ -1,12 +1,31 @@
 import { Package, ShoppingCart, ChefHat, Sparkles, ChevronDown, CheckCircle2, Loader2, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
 import InventarioYLogo from '../components/InventarioYLogo';
 
 export default function Landing() {
   const [contactLoading, setContactLoading] = useState(false);
+
+  // Animaciones de scroll con Intersection Observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+          }
+        });
+      },
+      { threshold: 0.1, rootMargin: '0px 0px -50px 0px' }
+    );
+
+    const fadeElements = document.querySelectorAll('.fade-up');
+    fadeElements.forEach((el) => observer.observe(el));
+
+    return () => observer.disconnect();
+  }, []);
 
   const handleContactSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -101,7 +120,7 @@ export default function Landing() {
 
         <section id="features" className="py-24 bg-surface/30">
           <div className="container mx-auto px-4">
-            <div className="text-center mb-16">
+            <div className="text-center mb-16 fade-up">
               <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">Todo lo que necesitas para crecer</h2>
               <p className="text-text-secondary max-w-2xl mx-auto">Herramientas profesionales diseñadas específicamente para PYMES, restaurantes y comercios.</p>
             </div>
@@ -128,8 +147,8 @@ export default function Landing() {
                   description: "Análisis inteligente de tus datos para predecir demanda y optimizar compras.",
                   icon: Sparkles,
                 },
-              ].map((feature) => (
-                <div key={feature.title} className="relative overflow-hidden rounded-2xl border border-border bg-surface p-8 transition-all hover:border-primary/50 hover:shadow-[0_0_30px_-10px_rgba(255,193,7,0.3)]">
+              ].map((feature, index) => (
+                <div key={feature.title} className="relative overflow-hidden rounded-2xl border border-border bg-surface p-8 transition-all hover:border-primary/50 hover:shadow-[0_0_30px_-10px_rgba(255,193,7,0.3)] fade-up" style={{ transitionDelay: `${index * 100}ms` }}>
                   <div className="mb-6 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
                     <feature.icon className="h-6 w-6" />
                   </div>
@@ -143,13 +162,13 @@ export default function Landing() {
 
         <section id="pricing" className="py-24">
           <div className="container mx-auto px-4">
-            <div className="text-center mb-16">
+            <div className="text-center mb-16 fade-up">
               <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">Precio simple y transparente</h2>
               <p className="text-text-secondary max-w-2xl mx-auto">Sin sorpresas ni costos ocultos. Un solo plan con todo incluido.</p>
             </div>
 
             <div className="mx-auto max-w-md">
-              <div className="relative rounded-3xl border border-primary bg-surface p-8 shadow-2xl">
+              <div className="relative rounded-3xl border border-primary bg-surface p-8 shadow-2xl fade-up">
                 <div className="absolute -top-5 left-0 right-0 mx-auto w-fit rounded-full bg-primary px-4 py-1 text-sm font-bold text-black">
                   Plan Profesional
                 </div>
@@ -192,11 +211,11 @@ export default function Landing() {
 
         <section id="faq" className="py-24 bg-surface/30">
           <div className="container mx-auto px-4 max-w-3xl">
-            <div className="text-center mb-16">
+            <div className="text-center mb-16 fade-up">
               <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">Preguntas Frecuentes</h2>
             </div>
             
-            <div className="space-y-4">
+            <div className="space-y-4 fade-up" style={{ transitionDelay: '100ms' }}>
               {[
                 {
                   q: "¿Cómo funciona la prueba gratis?",

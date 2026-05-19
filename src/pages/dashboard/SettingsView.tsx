@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { useDatabaseStore } from '../../store/dbStore';
-import { Settings, Save, Building2, User, Shield, Printer, MessageSquare, DollarSign, QrCode, Copy, ExternalLink, Download, RefreshCw, Sparkles, RotateCcw, Lock } from 'lucide-react';
+import { Settings, Save, Building2, User, Shield, Printer, MessageSquare, DollarSign, QrCode, Copy, ExternalLink, Download, RefreshCw, Sparkles, RotateCcw, Lock, ShoppingCart } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
@@ -207,231 +207,282 @@ export default function SettingsView() {
   return (
     <>
       <div className="space-y-6 max-w-7xl">
+        {/* Header */}
         <div>
           <h1 className="text-2xl font-bold text-text">Configuración</h1>
           <p className="text-sm text-text-secondary">
-            Administra tu perfil, preferencias y suscripción
+            Administra tu cuenta, preferencias y sistema
           </p>
         </div>
 
+        {/* ============================================
+            SECCIÓN 1: CUENTA Y PERFIL
+            Grid de 2 columnas
+            ============================================ */}
         <div className="grid gap-6 md:grid-cols-2">
-        {/* Estado de la Cuenta - Fila 1 columna 1 */}
-        <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(255,193,7,0.15)]">
-          <h3 className="font-semibold text-text mb-4 flex items-center gap-2">
-            <Shield className="h-4 w-4 text-primary drop-shadow-[0_0_5px_rgba(205,164,52,0.8)]" />
-            Estado de la Cuenta
-          </h3>
-          <div className="space-y-3 text-sm">
-            <div>
-              <p className="text-text-secondary">Rol</p>
-              <p className="font-medium text-text capitalize">{user?.role}</p>
-            </div>
-            <div>
-              <p className="text-text-secondary">Plan Actual</p>
-              <div className="mt-1 inline-flex items-center rounded-full border border-primary/50 bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary shadow-[0_0_10px_rgba(205,164,52,0.2)]">
-                {user?.subscription?.status === 'trialing' ? 'Prueba Gratuita' : 'Plan Profesional'}
+          
+          {/* 1.1 Estado de la Cuenta */}
+          <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(255,193,7,0.15)]">
+            <h2 className="text-lg font-semibold text-text mb-4 flex items-center gap-2">
+              <Shield className="h-5 w-5 text-primary" />
+              Estado de la Cuenta
+            </h2>
+            <div className="space-y-4 text-sm">
+              <div className="flex justify-between items-center py-2 border-b border-border/50">
+                <span className="text-text-secondary">Rol</span>
+                <span className="font-medium text-text capitalize">{user?.role}</span>
               </div>
-            </div>
-            {user?.subscription?.status === 'trialing' && (
-              <div>
-                <p className="text-text-secondary">Fin de prueba</p>
-                <p className="font-medium text-text">
-                  {new Date(user?.subscription?.trialEndsAt || Date.now()).toLocaleDateString('es-ES')}
-                </p>
+              <div className="flex justify-between items-center py-2 border-b border-border/50">
+                <span className="text-text-secondary">Plan</span>
+                <div className="inline-flex items-center rounded-full border border-primary/50 bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                  {user?.subscription?.status === 'trialing' ? 'Prueba Gratuita' : 'Plan Profesional'}
+                </div>
               </div>
-            )}
+              {user?.subscription?.status === 'trialing' && (
+                <div className="flex justify-between items-center py-2 border-b border-border/50">
+                  <span className="text-text-secondary">Fin de prueba</span>
+                  <span className="font-medium text-text">
+                    {new Date(user?.subscription?.trialEndsAt || Date.now()).toLocaleDateString('es-ES')}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* Perfil del Usuario - Fila 1 columna 2 */}
-        <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-8 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(255,193,7,0.15)]">
-          <h2 className="text-xl font-semibold text-text mb-6 flex items-center gap-2">
-            <User className="h-5 w-5 text-primary drop-shadow-[0_0_5px_rgba(205,164,52,0.8)]" />
-            Perfil del Usuario
-          </h2>
-            
-            <form onSubmit={handleSave} className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Nombre Completo</Label>
+          {/* 1.2 Perfil del Usuario */}
+          <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(255,193,7,0.15)]">
+            <h2 className="text-lg font-semibold text-text mb-4 flex items-center gap-2">
+              <User className="h-5 w-5 text-primary" />
+              Perfil del Usuario
+            </h2>
+            <form onSubmit={handleSave} className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label htmlFor="name" className="text-xs">Nombre</Label>
                   <Input 
                     id="name" 
                     value={formData.name}
                     onChange={e => setFormData(prev => ({...prev, name: e.target.value}))}
                     maxLength={100}
-                    required
+                    className="h-9"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Correo Electrónico</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="email" className="text-xs">Email</Label>
                   <Input 
                     id="email" 
                     type="email"
                     value={user?.email || ''}
                     disabled
-                    className="bg-bg/50 text-text-secondary cursor-not-allowed"
+                    className="h-9 bg-bg/50 text-text-secondary"
                   />
-                  <p className="text-xs text-text-secondary">El correo no se puede cambiar</p>
                 </div>
               </div>
 
-              <div className="space-y-2 pt-2">
-                <Label htmlFor="businessName" className="flex items-center gap-2">
-                  <Building2 className="h-4 w-4" />
-                  Nombre del Negocio
-                </Label>
+              <div className="space-y-1">
+                <Label htmlFor="businessName" className="text-xs">Negocio</Label>
                 <Input 
                   id="businessName" 
                   value={formData.businessName}
                   onChange={e => setFormData(prev => ({...prev, businessName: e.target.value}))}
                   maxLength={100}
-                  required
+                  className="h-9"
                 />
               </div>
 
-              <div className="space-y-2 pt-4">
-                <Label htmlFor="phone" className="flex items-center gap-2">
-                  <Building2 className="h-4 w-4" />
-                  Teléfono del Negocio
-                </Label>
-                <Input 
-                  id="phone" 
-                  value={formData.phone}
-                  onChange={e => setFormData(prev => ({...prev, phone: e.target.value}))}
-                  placeholder="+53 12345678"
-                  maxLength={20}
-                />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label htmlFor="phone" className="text-xs">Teléfono</Label>
+                  <Input 
+                    id="phone" 
+                    value={formData.phone}
+                    onChange={e => setFormData(prev => ({...prev, phone: e.target.value}))}
+                    placeholder="+53..."
+                    maxLength={20}
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="businessHours" className="text-xs">Horario</Label>
+                  <Input 
+                    id="businessHours" 
+                    value={formData.businessHours}
+                    onChange={e => setFormData(prev => ({...prev, businessHours: e.target.value}))}
+                    placeholder="Lun-Vie: 9am-6pm"
+                    maxLength={100}
+                    className="h-9"
+                  />
+                </div>
               </div>
 
-              <div className="space-y-2 pt-4">
-                <Label htmlFor="address" className="flex items-center gap-2">
-                  <Building2 className="h-4 w-4" />
-                  Dirección del Negocio
-                </Label>
+              <div className="space-y-1">
+                <Label htmlFor="address" className="text-xs">Dirección</Label>
                 <Input 
                   id="address" 
                   value={formData.address}
                   onChange={e => setFormData(prev => ({...prev, address: e.target.value}))}
                   placeholder="Calle 123, Ciudad"
                   maxLength={200}
+                  className="h-9"
                 />
               </div>
 
-              <div className="space-y-2 pt-4">
-                <Label htmlFor="businessHours" className="flex items-center gap-2">
-                  <Building2 className="h-4 w-4" />
-                  Horario de Atención
-                </Label>
-                <Input 
-                  id="businessHours" 
-                  value={formData.businessHours}
-                  onChange={e => setFormData(prev => ({...prev, businessHours: e.target.value}))}
-                  placeholder="Lun-Vie: 9am-6pm"
-                  maxLength={100}
-                />
-              </div>
-
-              <div className="space-y-2 pt-4">
-                <Label htmlFor="businessCode" className="flex items-center gap-2">
-                  <Lock className="h-4 w-4" />
-                  Código de Acceso para Empleados
-                </Label>
+              <div className="space-y-1">
+                <Label htmlFor="businessCode" className="text-xs">Código de Acceso</Label>
                 <Input 
                   id="businessCode" 
                   value={formData.businessCode}
                   onChange={e => setFormData(prev => ({...prev, businessCode: e.target.value.toLowerCase().trim()}))}
-                  placeholder="Ej: micafe, mitienda123"
+                  placeholder="micafe"
                   maxLength={30}
+                  className="h-9"
                 />
-                <p className="text-xs text-text-secondary">
-                  Este código permitirá a tus empleados acceder al sistema con su PIN sin necesidad de login
-                </p>
+                <p className="text-xs text-text-secondary">Para empleados con PIN</p>
               </div>
 
-              <div className="pt-6 border-t border-border mt-4">
-                <h3 className="text-lg font-semibold text-text mb-4 flex items-center gap-2">
-                  <Printer className="h-5 w-5" />
-                  Configuración de Ticket
-                </h3>
-                
-                <div className="flex items-center justify-between py-3 border-b border-border">
-                  <div className="space-y-0.5">
-                    <Label className="text-base">Generar ticket al vender</Label>
-                    <p className="text-sm text-text-secondary">
-                      Mostrará un ticket después de cada venta
-                    </p>
-                  </div>
-                  <Switch
-                    checked={formData.generateTicket}
-                    onCheckedChange={(checked) => setFormData(prev => ({...prev, generateTicket: checked}))}
+              <div className="pt-2">
+                <Button type="submit" size="sm" className="gap-2" disabled={isSaving || isSubmitting}>
+                  <Save className="h-3 w-3" />
+                  {isSaving ? 'Guardando...' : 'Guardar'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        {/* ============================================
+            SECCIÓN 2: VENTAS Y PUNTO DE VENTA
+            Card completo con sub-secciones
+            ============================================ */}
+        <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(255,193,7,0.15)]">
+          <h2 className="text-lg font-semibold text-text mb-6 flex items-center gap-2">
+            <ShoppingCart className="h-5 w-5 text-primary" />
+            Ventas y Punto de Venta
+          </h2>
+          
+          <div className="grid gap-6 lg:grid-cols-3">
+            {/* 2.1 Ticket */}
+            <div className="space-y-4">
+              <h3 className="font-medium text-text flex items-center gap-2">
+                <Printer className="h-4 w-4 text-text-secondary" />
+                Ticket
+              </h3>
+              <div className="flex items-center justify-between p-3 bg-bg/50 rounded-lg">
+                <div className="space-y-0.5">
+                  <Label className="text-sm">Generar ticket</Label>
+                  <p className="text-xs text-text-secondary">Después de cada venta</p>
+                </div>
+                <Switch
+                  checked={formData.generateTicket}
+                  onCheckedChange={(checked) => setFormData(prev => ({...prev, generateTicket: checked}))}
+                />
+              </div>
+              {formData.generateTicket && (
+                <div className="space-y-1">
+                  <Label className="text-xs">Mensaje del ticket</Label>
+                  <Input 
+                    value={formData.ticketMessage}
+                    onChange={e => setFormData(prev => ({...prev, ticketMessage: e.target.value}))}
+                    maxLength={100}
+                    className="h-8"
                   />
                 </div>
+              )}
+            </div>
 
-                {formData.generateTicket && (
-                  <div className="space-y-2 pt-4">
-                    <Label htmlFor="ticketMessage" className="flex items-center gap-2">
-                      <MessageSquare className="h-4 w-4" />
-                      Mensaje del ticket
-                    </Label>
-                    <Input 
-                      id="ticketMessage" 
-                      value={formData.ticketMessage}
-                      onChange={e => setFormData(prev => ({...prev, ticketMessage: e.target.value}))}
-                      maxLength={100}
-                      placeholder="¡Gracias por su visita!"
-                    />
-                  </div>
+            {/* 2.2 Monedas */}
+            <div className="space-y-4">
+              <h3 className="font-medium text-text flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-text-secondary" />
+                Monedas
+              </h3>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between p-2 bg-bg/50 rounded-lg">
+                  <Label className="text-sm">USD</Label>
+                  <Switch
+                    checked={currencySettings.usdEnabled}
+                    onCheckedChange={(checked) => setCurrencySettings(prev => ({...prev, usdEnabled: checked}))}
+                  />
+                </div>
+                {currencySettings.usdEnabled && (
+                  <Input 
+                    type="number"
+                    min="1"
+                    value={currencySettings.usdRate}
+                    onChange={e => setCurrencySettings(prev => ({...prev, usdRate: Number(e.target.value)}))}
+                    className="h-8 text-sm"
+                    placeholder="Tasa USD→CUP"
+                  />
                 )}
+                <div className="flex items-center justify-between p-2 bg-bg/50 rounded-lg">
+                  <Label className="text-sm">EUR</Label>
+                  <Switch
+                    checked={currencySettings.eurEnabled}
+                    onCheckedChange={(checked) => setCurrencySettings(prev => ({...prev, eurEnabled: checked}))}
+                  />
+                </div>
+                {currencySettings.eurEnabled && (
+                  <Input 
+                    type="number"
+                    min="1"
+                    value={currencySettings.eurRate}
+                    onChange={e => setCurrencySettings(prev => ({...prev, eurRate: Number(e.target.value)}))}
+                    className="h-8 text-sm"
+                    placeholder="Tasa EUR→CUP"
+                  />
+                )}
+                <div className="flex items-center justify-between p-2 bg-bg/50 rounded-lg">
+                  <Label className="text-sm">CUP Transferencia</Label>
+                  <Switch
+                    checked={currencySettings.cupTransferEnabled}
+                    onCheckedChange={(checked) => setCurrencySettings(prev => ({...prev, cupTransferEnabled: checked}))}
+                  />
+                </div>
+              </div>
+            </div>
 
-                <div className="pt-6 border-t border-border mt-4">
-                  <h3 className="text-lg font-semibold text-text mb-4 flex items-center gap-2">
-                    <QrCode className="h-5 w-5" />
-                    Menú Público Digital
-                  </h3>
-                  
-                  <div className="bg-bg/50 rounded-lg p-4 space-y-4">
-                    <p className="text-sm text-text-secondary">
-                      Imprime este código QR y ponlo en tu negocio. Los clientes lo escanean y ven tu menú digital:
-                    </p>
-                    
-                    {user?.id && (
-                      <div className="flex flex-col items-center">
-                        <div id="qr-code" className="bg-white p-4 rounded-lg">
-                          <QRCode
-                            value={`${window.location.origin}/menu?b=${user.id}`}
-                            size={180}
-                            level="H"
-                          />
-                        </div>
-                        <p className="text-xs text-text-secondary mt-2 text-center">
-                          Escanea para ver el menú
-                        </p>
+            {/* 2.3 Menú Digital */}
+            <div className="space-y-4">
+              <h3 className="font-medium text-text flex items-center gap-2">
+                <QrCode className="h-4 w-4 text-text-secondary" />
+                Menú Digital
+              </h3>
+              <div className="bg-bg/50 rounded-lg p-3 space-y-3">
+                {user?.id && (
+                  <>
+                    <div className="flex justify-center">
+                      <div id="qr-code" className="bg-white p-2 rounded-lg">
+                        <QRCode
+                          value={`${window.location.origin}/menu?b=${user.id}`}
+                          size={120}
+                          level="H"
+                        />
                       </div>
-                    )}
-                    
-                    <div className="flex items-center gap-2">
+                    </div>
+                    <div className="flex gap-2">
                       <Input
                         readOnly
-                        value={user?.id ? `${window.location.origin}/menu?b=${user.id}` : ''}
-                        className="font-mono text-sm bg-bg text-text border-border"
+                        value={`${window.location.origin}/menu?b=${user.id}`}
+                        className="h-7 text-xs font-mono"
                       />
                       <Button
                         variant="outline"
                         size="sm"
+                        className="h-7 px-2"
                         onClick={() => {
                           if (user?.id) {
                             navigator.clipboard.writeText(`${window.location.origin}/menu?b=${user.id}`);
-                            toast.success('Enlace copiado al portapapeles');
+                            toast.success('Copiado');
                           }
                         }}
                       >
-                        <Copy className="h-4 w-4" />
+                        <Copy className="h-3 w-3" />
                       </Button>
                     </div>
-                    
                     <Button
                       variant="outline"
-                      className="w-full"
+                      size="sm"
+                      className="w-full h-7"
                       onClick={() => {
                         const svg = document.querySelector('#qr-code svg') as SVGElement;
                         if (svg) {
@@ -441,155 +492,68 @@ export default function SettingsView() {
                           const img = new Image();
                           const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
                           const url = URL.createObjectURL(svgBlob);
-                          
                           img.onload = () => {
-                            canvas.width = 300;
-                            canvas.height = 300;
-                            ctx?.drawImage(img, 0, 0, 300, 300);
-                            const pngUrl = canvas.toDataURL('image/png');
-                            const downloadLink = document.createElement('a');
-                            downloadLink.href = pngUrl;
-                            downloadLink.download = `menu-qr-${user?.name || 'negocio'}.png`;
-                            downloadLink.click();
-                            URL.revokeObjectURL(url);
-                            toast.success('Código QR descargado');
+                            canvas.width = 200;
+                            canvas.height = 200;
+                            ctx?.drawImage(img, 0, 0, 200, 200);
+                            const link = document.createElement('a');
+                            link.href = canvas.toDataURL('image/png');
+                            link.download = 'menu-qr.png';
+                            link.click();
+                            toast.success('QR descargado');
                           };
                           img.src = url;
                         }
                       }}
                     >
-                      <Download className="h-4 w-4 mr-2" />
-                      Descargar QR
+                      <Download className="h-3 w-3 mr-1" />
+                      Descargar
                     </Button>
-                    
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => window.open(`/menu?b=${user?.id}`, '_blank')}
-                      >
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        Ver Menú
-                      </Button>
-                    </div>
-                    
-                    <p className="text-xs text-text-secondary">
-                      Los clientes podrán ver tus productos, precios y estado de disponibilidad sin necesidad de iniciar sesión.
-                    </p>
-                  </div>
-                </div>
+                  </>
+                )}
               </div>
-
-              <div className="pt-6 border-t border-border mt-4">
-                <h3 className="text-lg font-semibold text-text mb-4 flex items-center gap-2">
-                  <DollarSign className="h-5 w-5" />
-                  Monedas Aceptadas
-                </h3>
-                
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between py-3 border-b border-border">
-                    <div className="space-y-0.5">
-                      <Label className="text-base">Aceptar USD</Label>
-                      <p className="text-sm text-text-secondary">
-                        Permitir pagos en dólares estadounidenses
-                      </p>
-                    </div>
-                    <Switch
-                      checked={currencySettings.usdEnabled}
-                      onCheckedChange={(checked) => setCurrencySettings(prev => ({...prev, usdEnabled: checked}))}
-                    />
-                  </div>
-                  
-                  {currencySettings.usdEnabled && (
-                    <div className="pl-4 py-2">
-                      <Label className="text-sm">Tasa de cambio USD a CUP</Label>
-                      <Input 
-                        type="number"
-                        min="1"
-                        value={currencySettings.usdRate}
-                        onChange={e => setCurrencySettings(prev => ({...prev, usdRate: Number(e.target.value)}))}
-                        className="w-32 mt-1"
-                      />
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between py-3 border-b border-border">
-                    <div className="space-y-0.5">
-                      <Label className="text-base">Aceptar EUR</Label>
-                      <p className="text-sm text-text-secondary">
-                        Permitir pagos en euros
-                      </p>
-                    </div>
-                    <Switch
-                      checked={currencySettings.eurEnabled}
-                      onCheckedChange={(checked) => setCurrencySettings(prev => ({...prev, eurEnabled: checked}))}
-                    />
-                  </div>
-                  
-                  {currencySettings.eurEnabled && (
-                    <div className="pl-4 py-2">
-                      <Label className="text-sm">Tasa de cambio EUR a CUP</Label>
-                      <Input 
-                        type="number"
-                        min="1"
-                        value={currencySettings.eurRate}
-                        onChange={e => setCurrencySettings(prev => ({...prev, eurRate: Number(e.target.value)}))}
-                        className="w-32 mt-1"
-                      />
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between py-3 border-b border-border">
-                    <div className="space-y-0.5">
-                      <Label className="text-base">Aceptar CUP Transferencia</Label>
-                      <p className="text-sm text-text-secondary">
-                        Permitir pagos por transferencia
-                      </p>
-                    </div>
-                    <Switch
-                      checked={currencySettings.cupTransferEnabled}
-                      onCheckedChange={(checked) => setCurrencySettings(prev => ({...prev, cupTransferEnabled: checked}))}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-4 flex justify-end">
-                <Button type="submit" className="gap-2" disabled={isSaving || isSubmitting}>
-                  <Save className="h-4 w-4" />
-                  {isSaving ? 'Guardando...' : 'Guardar Cambios'}
-                </Button>
-              </div>
-
-              <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-8 shadow-sm mt-6">
-                <h2 className="text-xl font-semibold text-text mb-6 flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-primary drop-shadow-[0_0_5px_rgba(205,164,52,0.8)]" />
-                  Onboarding
-                </h2>
-                <p className="text-sm text-text-secondary mb-4">
-                  ¿Quieres ver nuevamente el tour de bienvenida?
-                </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    localStorage.removeItem('onboarding_completed');
-                    toast.success('Onboarding reiniciado. Recarga la página para verlo.');
-                  }}
-                  className="gap-2"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                  Reiniciar Onboarding
-                </Button>
-              </div>
-            </form>
+            </div>
           </div>
         </div>
 
-        {/* Control de Acceso - Ancho completo */}
-        <div className="md:col-span-2 rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-8 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(255,193,7,0.15)]">
+        {/* ============================================
+            SECCIÓN 3: CONTROL DE ACCESO
+            Card completo
+            ============================================ */}
+        <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(255,193,7,0.15)]">
+          <h2 className="text-lg font-semibold text-text mb-4 flex items-center gap-2">
+            <Lock className="h-5 w-5 text-primary" />
+            Control de Acceso
+          </h2>
           <AccessPinsConfig />
+        </div>
+
+        {/* ============================================
+            SECCIÓN 4: SISTEMA
+            Card completo
+            ============================================ */}
+        <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(255,193,7,0.15)]">
+          <h2 className="text-lg font-semibold text-text mb-4 flex items-center gap-2">
+            <Settings className="h-5 w-5 text-primary" />
+            Sistema
+          </h2>
+          <div className="flex items-center justify-between p-4 bg-bg/50 rounded-lg">
+            <div className="space-y-1">
+              <Label className="text-sm font-medium">Tour de Bienvenida</Label>
+              <p className="text-xs text-text-secondary">Reinicia el onboarding para ver el tour nuevamente</p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                localStorage.removeItem('onboarding_completed');
+                toast.success('Onboarding reiniciado. Recarga la página.');
+              }}
+            >
+              <RotateCcw className="h-3 w-3 mr-1" />
+              Reiniciar
+            </Button>
+          </div>
         </div>
       </div>
     </>

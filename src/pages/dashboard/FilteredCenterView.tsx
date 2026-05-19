@@ -1,8 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
-import { Filter, Search, ArrowUpDown, AlertTriangle, CheckCircle2, Settings2 } from 'lucide-react';
+import { Filter, Search, ArrowUpDown, AlertTriangle, CheckCircle2, Settings2, Printer } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
+import { Button } from '../../components/ui/button';
+import { calculateMargin, exportToExcel } from '../../lib/utils';
 
 export default function FilteredCenterView() {
   const { products } = useDatabaseStore();
@@ -110,11 +112,45 @@ export default function FilteredCenterView() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-text">Centro Filtrado</h1>
-        <p className="text-sm text-text-secondary">
-          Búsqueda avanzada y filtros combinados para tu inventario
-        </p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-2xl font-bold text-text">Centro Filtrado</h1>
+          <p className="text-sm text-text-secondary">
+            Búsqueda avanzada y filtros combinados para tu inventario
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            const columns = [
+              { header: 'Producto', key: 'name' },
+              { header: 'Categoría', key: 'category' },
+{ header: 'Stock', key: 'stock', format: (v: number) => v?.toFixed(3).replace('.', ',') || '0' },
+              { header: 'Precio', key: 'price', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
+              { header: 'Margen %', key: 'margin', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
+              { header: 'Valor Total', key: 'totalValue', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
+            ];
+            const data = filteredAndSortedProducts.map(p => {
+              const physicalStock = Number(p.quantity) - (Number(p.in_transit) || 0);
+              const margin = p.price && p.price > 0 ? ((p.price - p.cost) / p.price) * 100 : 0;
+              const state = (Number(p.rop) || 0) === 0 ? 'Sin configurar' : (physicalStock <= p.rop ? 'Bajo' : (physicalStock > p.rop * 2 ? 'Exceso' : 'Normal'));
+              return {
+                ...p,
+                stock: physicalStock,
+                state: state,
+                price: Number(p.price) || 0,
+                margin: margin,
+                totalValue: physicalStock * Number(p.cost),
+              };
+            });
+            exportToExcel(columns, data, `inventario_filtrado_${new Date().toISOString().split('T')[0]}`);
+          }}
+          className="gap-2"
+        >
+          <Printer className="h-4 w-4" />
+          Exportar
+        </Button>
       </div>
 
       {/* Filters Bar */}
@@ -169,7 +205,7 @@ export default function FilteredCenterView() {
               onChange={e => setTypeFilter(e.target.value)}
             >
               <option value="ALL">Todos los tipos</option>
-              <option value="INDIVIDUAL">Individual</option>
+              <option value="INDIVIDUAL">Venta Rápida</option>
               <option value="CONSUMO_DIRECTO">Consumo Directo</option>
               <option value="GASTO_VARIABLE">Gasto Variable</option>
               <option value="INGREDIENTE">Ingrediente</option>
@@ -202,6 +238,7 @@ export default function FilteredCenterView() {
                 <th className="px-4 py-3 font-medium cursor-pointer hover:bg-surface-hover transition-colors" onClick={() => toggleSort('price')}>
                   <div className="flex items-center">Precio <SortIcon field="price" /></div>
                 </th>
+                <th className="px-4 py-3 font-medium">Margen %</th>
                 <th className="px-4 py-3 font-medium cursor-pointer hover:bg-surface-hover transition-colors" onClick={() => toggleSort('value')}>
                   <div className="flex items-center">Valor Total <SortIcon field="value" /></div>
                 </th>
@@ -210,7 +247,7 @@ export default function FilteredCenterView() {
             <tbody className="divide-y divide-border">
               {filteredAndSortedProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-text-secondary">
+                  <td colSpan={7} className="px-4 py-12 text-center text-text-secondary">
                     <div className="flex flex-col items-center justify-center">
                       <Filter className="h-8 w-8 mb-2 opacity-20" />
                       <p>No se encontraron productos con estos filtros.</p>
@@ -276,6 +313,15 @@ export default function FilteredCenterView() {
                       </td>
                       <td className="px-4 py-3 font-mono text-text-secondary">
                         ${product.price.toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 font-mono">
+                        {product.price && product.price > 0 ? (
+                          <span className={calculateMargin(Number(product.cost), Number(product.price)) < 30 ? 'text-warning' : 'text-green-600'}>
+                            {calculateMargin(Number(product.cost), Number(product.price)).toFixed(2)}%
+                          </span>
+                        ) : (
+                          <span className="text-text-secondary">-</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 font-mono font-medium text-text">
                         ${totalValue.toFixed(2)}

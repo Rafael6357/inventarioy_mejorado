@@ -399,26 +399,28 @@ export default function Dashboard() {
         </header>
 
         <main className="flex-1 overflow-y-auto bg-transparent p-4 md:p-6 lg:p-8">
-          <Routes>
-            <Route path="/" element={<StockView />} />
-            <Route path="/inventory" element={<InventoryView />} />
-            <Route path="/movements" element={<MovementsView />} />
-            <Route path="/transit" element={<TransitView />} />
-            <Route path="/sales" element={<SalesView />} />
-            <Route path="/closings" element={<DailyClosingsView />} />
-            <Route path="/hr" element={<HRView />} />
-            <Route path="/recipes" element={<RecipesView />} />
-            <Route path="/consumption" element={<ConsumptionView />} />
-            <Route path="/analysis" element={<AnalysisView />} />
-            <Route path="/charts" element={<ChartsView />} />
-            <Route path="/filtered" element={<FilteredCenterView />} />
-            <Route path="/ai" element={<AIView />} />
-            <Route path="/settings" element={<SettingsView />} />
-            <Route path="/action-logs" element={<ActionLogsView />} />
-            {user.role === 'admin' && (
-              <Route path="/payments" element={<PaymentsView />} />
-            )}
-          </Routes>
+          <div key={location.pathname} className="page-transition">
+            <Routes>
+              <Route path="/" element={<StockView />} />
+              <Route path="/inventory" element={<InventoryView />} />
+              <Route path="/movements" element={<MovementsView />} />
+              <Route path="/transit" element={<TransitView />} />
+              <Route path="/sales" element={<SalesView />} />
+              <Route path="/closings" element={<DailyClosingsView />} />
+              <Route path="/hr" element={<HRView />} />
+              <Route path="/recipes" element={<RecipesView />} />
+              <Route path="/consumption" element={<ConsumptionView />} />
+              <Route path="/analysis" element={<AnalysisView />} />
+              <Route path="/charts" element={<ChartsView />} />
+              <Route path="/filtered" element={<FilteredCenterView />} />
+              <Route path="/ai" element={<AIView />} />
+              <Route path="/settings" element={<SettingsView />} />
+              <Route path="/action-logs" element={<ActionLogsView />} />
+              {user.role === 'admin' && (
+                <Route path="/payments" element={<PaymentsView />} />
+              )}
+            </Routes>
+          </div>
         </main>
 
         <PinModal

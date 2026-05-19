@@ -7,7 +7,7 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
-import { validateNumber, getNumberFromString } from '../../lib/utils';
+import { validateNumber, getNumberFromString, exportToExcel } from '../../lib/utils';
 
 const DOC_TYPE_LABELS: Record<string, string> = {
   MANUAL: 'Manual',
@@ -932,32 +932,31 @@ export default function HRView() {
                 </Button>
                 {payrollEntries.length > 0 && (
                   <Button variant="outline" onClick={() => {
-                    const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-                    const csvContent = [
-                      ['EMPLEADO', 'CARGO/OCUPACIÓN', 'NIT/CARNET', 'SALARIO BASE', 'SALARIO DEVENGADO', 'VACACIONES (DÍAS)', 'BASE EXENTA', 'BASE IMPONIBLE', 'RETENCIONES', 'NETO A COBRAR'].join(','),
-                      ...payrollEntries.map(entry => {
-                        const employee = employees.find(e => e.id === entry.employee_id);
-                        return [
-                          entry.employee_name,
-                          employee?.role || '',
-                          employee?.nit_id || '',
-                          entry.base_salary.toFixed(2),
-                          entry.earned_salary.toFixed(2),
-                          (entry.vacation_days || 0).toString(),
-                          entry.exemption_base.toFixed(2),
-                          entry.taxable_base.toFixed(2),
-                          (entry.tax_amount + entry.special_contribution).toFixed(2),
-                          entry.net_salary.toFixed(2)
-                        ].join(',');
-                      }),
-                      ['', '', '', '', '', '', '', '', 'TOTAL GENERAL:', '', payrollEntries.reduce((sum, e) => sum + e.net_salary, 0).toFixed(2)].join(',')
-                    ].join('\n');
+                    const columns = [
+                      { header: 'Empleado', key: 'employee_name' },
+                      { header: 'Cargo/Ocupación', key: 'role' },
+                      { header: 'NIT/Carnet', key: 'nit_id' },
+                      { header: 'Salario Base', key: 'base_salary', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
+                      { header: 'Salario Devengado', key: 'earned_salary', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
+                      { header: 'Vacaciones (Días)', key: 'vacation_days', format: (v: number) => v?.toString() || '0' },
+                      { header: 'Base Exenta', key: 'exemption_base', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
+                      { header: 'Base Imponible', key: 'taxable_base', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
+                      { header: 'Retenciones', key: 'tax_amount', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
+                      { header: 'Neto a Cobrar', key: 'net_salary', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
+                    ];
                     
-                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                    const link = document.createElement('a');
-                    link.href = URL.createObjectURL(blob);
-                    link.download = `Nomina_${monthNames[payrollMonth.month - 1]}_${payrollMonth.year}.csv`;
-                    link.click();
+                    const data = payrollEntries.map(entry => {
+                      const employee = employees.find(e => e.id === entry.employee_id);
+                      return {
+                        ...entry,
+                        role: employee?.role || '',
+                        nit_id: employee?.nit_id || '',
+                        tax_amount: (entry.tax_amount || 0) + (entry.special_contribution || 0),
+                      };
+                    });
+                    
+                    const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+                    exportToExcel(columns, data, `Nomina_${monthNames[payrollMonth.month - 1]}_${payrollMonth.year}`);
                     toast.success('Nómina exportada correctamente');
                   }} className="gap-2">
                     <FileSpreadsheet className="h-4 w-4" />

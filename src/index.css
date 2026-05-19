@@ -4,9 +4,9 @@
 @theme {
   --color-primary: #FFC107;
   --color-primary-hover: #FFD54F;
-  --color-bg: #000000;
-  --color-surface: #050505;
-  --color-surface-hover: #111111;
+  --color-bg: #0a0a0a;
+  --color-surface: #111111;
+  --color-surface-hover: #161616;
   --color-text: #FFFFFF;
   --color-text-secondary: #A1A1AA;
   --color-border: #1A1A1A;
@@ -32,7 +32,7 @@
     height: 8px;
   }
   ::-webkit-scrollbar-track {
-    background: #000000;
+    background: #0a0a0a;
   }
   ::-webkit-scrollbar-thumb {
     background: #333333;
@@ -191,5 +191,76 @@
   
   .text-text, .text-text-secondary, .text-black {
     color: black !important;
+  }
+}
+
+/* ============================================
+   TRANSICIONES DE PÁGINA - SUAVIZADO
+   ============================================ */
+
+/* Transición fade-in para cambio de módulos */
+.page-transition {
+  animation: fadeIn 0.25s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Transición fade-up para scroll (Landing) */
+.fade-up {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+}
+
+.fade-up.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Transición para elementos individuales */
+.fade-in {
+  opacity: 0;
+  transition: opacity 0.3s ease-out;
+}
+
+.fade-in.visible {
+  opacity: 1;
+}
+
+/* Micro-interacción en botones */
+.btn-transition {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btn-transition:hover {
+  transform: translateY(-1px);
+}
+
+.btn-transition:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Transición para modales */
+.modal-transition {
+  animation: modalFadeIn 0.2s ease-out;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }

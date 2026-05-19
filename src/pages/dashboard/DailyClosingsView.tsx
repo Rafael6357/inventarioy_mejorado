@@ -4,6 +4,7 @@ import { useDatabaseStore } from '../../store/dbStore';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
+import { exportToExcel } from '../../lib/utils';
 
 export default function DailyClosingsView() {
   const { dailyClosings, sales, employees, logAction, products } = useDatabaseStore();
@@ -255,6 +256,40 @@ export default function DailyClosingsView() {
             <p className="text-xs text-text-secondary">Venta Rápida</p>
             <p className="font-mono font-bold text-text">${totalVentaRapidaHistorico.toFixed(2)}</p>
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const columns = [
+                { header: 'Fecha', key: 'closing_date' },
+                { header: 'Cierre', key: 'closing_amount', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
+                { header: 'Ventas', key: 'total_sales', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
+                { header: 'Descuentos', key: 'total_discounts', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
+                { header: 'Salón', key: 'salon', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
+                { header: 'Domicilio', key: 'domicilio', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
+                { header: 'Bar', key: 'bar', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
+                { header: 'Venta Rápida', key: 'venta_rapida', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
+                { header: 'Empleado', key: 'created_by_name' },
+                { header: 'Notas', key: 'notes' },
+              ];
+              const data = filteredClosings.map(c => ({
+                ...c,
+                closing_date: new Date(c.closing_date).toLocaleDateString('es-ES'),
+                closing_amount: Number(c.closing_amount) || 0,
+                total_sales: Number(c.total_sales) || 0,
+                total_discounts: Number(c.total_discounts) || 0,
+                salon: Number(c.salon) || 0,
+                domicilio: Number(c.domicilio) || 0,
+                bar: Number(c.bar) || 0,
+                venta_rapida: Number(c.venta_rapida) || 0,
+              }));
+              exportToExcel(columns, data, `cierres_caja_${new Date().toISOString().split('T')[0]}`);
+            }}
+            className="gap-2"
+          >
+            <Printer className="h-4 w-4" />
+            Exportar
+          </Button>
         </div>
       </div>
 

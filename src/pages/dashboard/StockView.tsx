@@ -1,12 +1,12 @@
-import { useState, useMemo } from 'react';
-import { Search, AlertTriangle, ArrowDownToLine, ArrowUpFromLine, Trash2, Filter, Pencil, X, Settings2, Scale } from 'lucide-react';
+import { useState, useMemo, useRef } from 'react';
+import { Search, AlertTriangle, ArrowDownToLine, ArrowUpFromLine, Trash2, Filter, Pencil, X, Settings2, Scale, ArrowUpDown, Printer, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useDatabaseStore } from '../../store/dbStore';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { validateNumber, getNumberFromString } from '../../lib/utils';
+import { validateNumber, getNumberFromString, calculateMargin, exportToExcel } from '../../lib/utils';
 import { normalizeUnit, getCompatibleUnits, convertUnit } from '../../lib/unitConversion';
 
 export default function StockView() {
@@ -14,6 +14,8 @@ export default function StockView() {
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
+  const [sortBy, setSortBy] = useState<string>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [productToDelete, setProductToDelete] = useState<{id: string, name: string} | null>(null);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [editParams, setEditParams] = useState({
@@ -29,6 +31,7 @@ export default function StockView() {
     date: string;
   } | null>(null);
   const [isAdjusting, setIsAdjusting] = useState(false);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
   
   const products = useDatabaseStore((state) => state.products);
   const movements = useDatabaseStore((state) => state.movements);
@@ -79,7 +82,7 @@ export default function StockView() {
   };
 
   const filteredProducts = useMemo(() => {
-    return activeProducts.filter((product) => {
+    const filtered = activeProducts.filter((product) => {
       const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                             product.category.toLowerCase().includes(searchTerm.toLowerCase());
       
@@ -105,7 +108,76 @@ export default function StockView() {
 
       return matchesSearch && matchesCategory && matchesStatus && matchesType;
     });
-  }, [activeProducts, movements, searchTerm, categoryFilter, statusFilter, typeFilter]);
+
+    // Sorting logic
+    return filtered.sort((a, b) => {
+      let valA: any;
+      let valB: any;
+
+      const physA = Number(a.quantity) - (Number(a.in_transit) || 0);
+      const physB = Number(b.quantity) - (Number(b.in_transit) || 0);
+
+      switch (sortBy) {
+        case 'name':
+          valA = a.name.toLowerCase();
+          valB = b.name.toLowerCase();
+          break;
+        case 'available':
+          valA = physA;
+          valB = physB;
+          break;
+        case 'in_transit':
+          valA = Number(a.in_transit) || 0;
+          valB = Number(b.in_transit) || 0;
+          break;
+        case 'cost':
+          valA = Number(a.cost) || 0;
+          valB = Number(b.cost) || 0;
+          break;
+        case 'total':
+          valA = physA * Number(a.cost);
+          valB = physB * Number(b.cost);
+          break;
+        case 'margin':
+          valA = a.price && a.price > 0 ? ((a.price - a.cost) / a.price) * 100 : 0;
+          valB = b.price && b.price > 0 ? ((b.price - b.cost) / b.price) * 100 : 0;
+          break;
+        case 'date':
+          valA = lastMovementDates[a.id] ? new Date(lastMovementDates[a.id]).getTime() : 0;
+          valB = lastMovementDates[b.id] ? new Date(lastMovementDates[b.id]).getTime() : 0;
+          break;
+        default:
+          valA = a.name.toLowerCase();
+          valB = b.name.toLowerCase();
+      }
+
+      if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+      if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [activeProducts, movements, searchTerm, categoryFilter, statusFilter, typeFilter, sortBy, sortOrder, lastMovementDates]);
+
+  const toggleSort = (field: string) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(field);
+      setSortOrder('asc');
+    }
+  };
+
+  const SortIcon = ({ field }: { field: string }) => {
+    if (sortBy !== field) return <ArrowUpDown className="ml-1 h-3 w-3 opacity-30" />;
+    return <ArrowUpDown className={`ml-1 h-3 w-3 ${sortOrder === 'desc' ? 'rotate-180' : ''} text-primary`} />;
+  };
+
+  const scrollTable = (direction: 'left' | 'right') => {
+    const container = tableContainerRef.current || document.getElementById('stock-table-container');
+    if (container) {
+      const scrollAmount = container.clientWidth * 0.5;
+      container.scrollBy({ left: direction === 'left' ? -scrollAmount : scrollAmount, behavior: 'smooth' });
+    }
+  };
 
   const confirmDelete = async () => {
     if (productToDelete) {
@@ -241,13 +313,49 @@ export default function StockView() {
                 Salida
               </Button>
             </Link>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const columns = [
+                  { header: 'Producto', key: 'name' },
+                  { header: 'Categoría', key: 'category' },
+                  { header: 'Tipo', key: 'type' },
+                  { header: 'Disponible', key: 'available', format: (v: number) => v?.toFixed(3).replace('.', ',') || '0' },
+                  { header: 'En Tránsito', key: 'in_transit', format: (v: number) => v?.toFixed(3).replace('.', ',') || '0' },
+                  { header: 'Costo Unit.', key: 'cost', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
+                  { header: 'Margen %', key: 'margin', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
+                  { header: 'Total', key: 'total', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
+                  { header: 'Unidad', key: 'unit' },
+                  { header: 'ROP', key: 'rop', format: (v: number) => v?.toString() || '0' },
+                ];
+                const data = filteredProducts.map(p => {
+                  const physicalStock = Number(p.quantity) - (Number(p.in_transit) || 0);
+                  const margin = p.price && p.price > 0 ? ((p.price - p.cost) / p.price) * 100 : 0;
+                  return {
+                    ...p,
+                    type: p.is_consumo_directo ? 'Consumo Directo' : p.is_gasto_variable ? 'Gasto Variable' : p.is_individual ? 'Venta Rápida' : 'Ingrediente',
+                    available: physicalStock,
+                    in_transit: Number(p.in_transit) || 0,
+                    cost: Number(p.cost) || 0,
+                    margin: margin,
+                    total: physicalStock * Number(p.cost),
+                  };
+                });
+                exportToExcel(columns, data, `inventario_${new Date().toISOString().split('T')[0]}`);
+              }}
+              className="gap-2"
+            >
+              <Printer className="h-4 w-4" />
+              Exportar
+            </Button>
           </div>
         </div>
       </div>
 
       <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-4 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(255,193,7,0.15)]">
         <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center">
-          <div className="relative flex-1 max-w-md">
+          <div className="relative w-52">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary" />
             <Input
               placeholder="Buscar por nombre o categoría..."
@@ -291,14 +399,14 @@ export default function StockView() {
               <option value="ALL">Todos los tipos</option>
               <option value="CONSUMO_DIRECTO">Consumo Directo</option>
               <option value="GASTO_VARIABLE">Gasto Variable</option>
-              <option value="INDIVIDUAL">Individual</option>
+              <option value="INDIVIDUAL">Venta Rápida</option>
               <option value="INGREDIENTE">Ingrediente</option>
             </select>
           </div>
         </div>
 
         <div className="relative">
-          <div className="absolute top-0 left-0 right-0 h-1.5 overflow-x-auto cursor-grab active:cursor-grabbing scrollbar-thin" 
+          <div className="absolute top-0 left-0 right-0 h-2 bg-border/30 rounded-t overflow-x-auto cursor-grab active:cursor-grabbing scrollbar-thin" 
                id="top-scrollbar"
                onScroll={(e) => {
                  const container = document.getElementById('stock-table-container');
@@ -308,31 +416,56 @@ export default function StockView() {
           </div>
         </div>
 
-        <div className="overflow-x-auto" id="stock-table-container"
-             onScroll={(e) => {
-               const topScroll = document.getElementById('top-scrollbar');
-               if (topScroll) topScroll.scrollLeft = e.currentTarget.scrollLeft;
-             }}>
-          <table className="w-full text-left text-sm text-text [&_tr]:divide-x [&_tr]:divide-border/50">
+        <div className="flex items-center gap-1">
+          <button 
+            onClick={() => scrollTable('left')}
+            className="flex-shrink-0 p-1 hover:bg-surface-hover rounded text-text-secondary hover:text-text transition-colors"
+            title="Desplazar a la izquierda"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          
+          <div className="flex-1 overflow-x-auto" id="stock-table-container"
+               ref={tableContainerRef}
+               onScroll={(e) => {
+                 const topScroll = document.getElementById('top-scrollbar');
+                 if (topScroll) topScroll.scrollLeft = e.currentTarget.scrollLeft;
+               }}>
+            <table className="w-full text-left text-sm text-text [&_tr]:divide-x [&_tr]:divide-border/50">
             <thead className="border-b border-border/50 bg-bg/50 text-xs uppercase text-text-secondary sticky top-0 z-10">
               <tr>
-                <th className="px-3 py-3 font-medium min-w-[120px]">Producto</th>
+                <th className="px-3 py-3 font-medium min-w-[120px] cursor-pointer hover:text-text" onClick={() => toggleSort('name')}>
+                  <div className="flex items-center">Producto <SortIcon field="name" /></div>
+                </th>
                 <th className="px-3 py-3 font-medium min-w-[100px]">Categoría</th>
                 <th className="px-3 py-3 font-medium min-w-[90px]">Tipo</th>
-                <th className="px-3 py-3 font-medium text-right min-w-[80px]">Disponible</th>
-                <th className="px-3 py-3 font-medium text-right min-w-[80px]">En Transito</th>
-                <th className="px-3 py-3 font-medium text-right min-w-[90px]">Costo Unit.</th>
-                <th className="px-3 py-3 font-medium text-right min-w-[80px]">Total</th>
+                <th className="px-3 py-3 font-medium text-right min-w-[80px] cursor-pointer hover:text-text" onClick={() => toggleSort('available')}>
+                  <div className="flex items-center justify-end">Disponible <SortIcon field="available" /></div>
+                </th>
+                <th className="px-3 py-3 font-medium text-right min-w-[80px] cursor-pointer hover:text-text" onClick={() => toggleSort('in_transit')}>
+                  <div className="flex items-center justify-end">En Tránsito <SortIcon field="in_transit" /></div>
+                </th>
+                <th className="px-3 py-3 font-medium text-right min-w-[90px] cursor-pointer hover:text-text" onClick={() => toggleSort('cost')}>
+                  <div className="flex items-center justify-end">Costo Unit. <SortIcon field="cost" /></div>
+                </th>
+                <th className="px-3 py-3 font-medium text-right min-w-[70px] cursor-pointer hover:text-text" onClick={() => toggleSort('margin')}>
+                  <div className="flex items-center justify-end">Margen % <SortIcon field="margin" /></div>
+                </th>
+                <th className="px-3 py-3 font-medium text-right min-w-[80px] cursor-pointer hover:text-text" onClick={() => toggleSort('total')}>
+                  <div className="flex items-center justify-end">Total <SortIcon field="total" /></div>
+                </th>
                 <th className="px-3 py-3 font-medium min-w-[80px]">Unidad</th>
                 <th className="px-3 py-3 font-medium min-w-[80px]">Parámetros</th>
-                <th className="px-4 py-3 font-medium">Fecha Última Actualización</th>
+                <th className="px-4 py-3 font-medium cursor-pointer hover:text-text" onClick={() => toggleSort('date')}>
+                  <div className="flex items-center">Fecha Última Actualización <SortIcon field="date" /></div>
+                </th>
                 <th className="px-4 py-3 font-medium text-center">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="px-4 py-8 text-center text-text-secondary">
+                  <td colSpan={13} className="px-4 py-8 text-center text-text-secondary">
                     No se encontraron productos.
                   </td>
                 </tr>
@@ -375,7 +508,7 @@ export default function StockView() {
                           </span>
                         ) : product.is_individual ? (
                           <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
-                            Individual
+                            Venta Rápida
                           </span>
                         ) : (
                           <span className="inline-flex items-center rounded-full bg-surface-hover px-2 py-1 text-xs font-medium text-text-secondary">
@@ -395,6 +528,15 @@ export default function StockView() {
                       </td>
                       <td className="px-4 py-3 text-right font-mono">
                         ${Number(product.cost).toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-right font-mono">
+                        {product.price && product.price > 0 ? (
+                          <span className={calculateMargin(Number(product.cost), Number(product.price)) < 30 ? 'text-warning' : 'text-green-600'}>
+                            {calculateMargin(Number(product.cost), Number(product.price)).toFixed(2)}%
+                          </span>
+                        ) : (
+                          <span className="text-text-secondary">-</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-right font-mono font-medium text-primary">
                         ${(physicalStock * Number(product.cost)).toFixed(2)}
@@ -467,6 +609,15 @@ export default function StockView() {
               )}
             </tbody>
           </table>
+          </div>
+          
+          <button 
+            onClick={() => scrollTable('right')}
+            className="flex-shrink-0 p-1 hover:bg-surface-hover rounded text-text-secondary hover:text-text transition-colors"
+            title="Desplazar a la derecha"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
         </div>
       </div>
 

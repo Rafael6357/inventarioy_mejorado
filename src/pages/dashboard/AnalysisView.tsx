@@ -4,6 +4,7 @@ import { TrendingUp, DollarSign, Package, AlertTriangle, ArrowUpRight, ArrowDown
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { exportToExcel } from '../../lib/utils';
 
 function parseSaleItems(items: any): any[] {
   if (Array.isArray(items)) return items;
@@ -128,28 +129,23 @@ export default function AnalysisView() {
     };
   }, [auditProduct, auditDateFrom, auditDateTo, movements, products]);
 
-  const exportToExcel = () => {
+  const handleExportAudit = () => {
     if (!auditData) return;
-    const headers = ['Fecha', 'Tipo', 'Cantidad', 'Razón'];
-    const rows = auditData.movements.map(m => [
-      new Date(m.date).toLocaleDateString('es-CO'),
-      m.type,
-      m.type === 'ENTRADA' ? `+${Number(m.quantity).toFixed(4)}` : `-${Number(m.quantity).toFixed(4)}`,
-      (m.reason || '-').replace(/,/g, ' ')
-    ]);
+    const columns = [
+      { header: 'Fecha', key: 'date' },
+      { header: 'Tipo', key: 'type' },
+      { header: 'Cantidad', key: 'quantity' },
+      { header: 'Razón', key: 'reason' },
+    ];
     
-    // Añadir BOM UTF-8 para que Excel reconozca caracteres especiales
-    const csvContent = '\uFEFF' + [headers, ...rows]
-      .map(row => row.map(cell => `"${cell}"`).join(','))
-      .join('\n');
+    const data = auditData.movements.map(m => ({
+      ...m,
+      date: new Date(m.date).toLocaleDateString('es-CO'),
+      quantity: m.type === 'ENTRADA' ? `+${Number(m.quantity).toFixed(3).replace('.', ',')}` : `-${Number(m.quantity).toFixed(3).replace('.', ',')}`,
+      reason: m.reason || '-',
+    }));
     
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `auditoria_${auditData.product.name}_${auditDateFrom}_${auditDateTo}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    exportToExcel(columns, data, `auditoria_${auditData.product.name}_${auditDateFrom}_${auditDateTo}`);
   };
 
   const totalInventoryValue = useMemo(() => {
@@ -470,7 +466,7 @@ export default function AnalysisView() {
             </div>
 
             <div className="mt-4 flex justify-end">
-              <Button size="sm" variant="outline" className="gap-2" onClick={exportToExcel}>
+              <Button size="sm" variant="outline" className="gap-2" onClick={handleExportAudit}>
                 <Download className="h-4 w-4" />
                 Exportar CSV
               </Button>

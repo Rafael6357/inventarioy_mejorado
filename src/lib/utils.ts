@@ -56,3 +56,56 @@ export function validateNumber(
   
   return { isValid: true };
 }
+
+export interface ExportColumn {
+  header: string;
+  key: string;
+  format?: (value: any, row?: any) => string;
+}
+
+export function exportToExcel(columns: ExportColumn[], data: any[], filename: string): void {
+  if (!data || data.length === 0) return;
+  
+  const headers = columns.map(col => col.header);
+  const rows = data.map(row => 
+    columns.map(col => {
+      const value = row[col.key];
+      let formattedValue = '';
+      
+      if (col.format) {
+        formattedValue = col.format(value, row);
+      } else if (value === null || value === undefined) {
+        formattedValue = '';
+      } else {
+        formattedValue = String(value);
+      }
+      
+      // Escapar comillas dobles y puntos y coma para CSV con separador ;
+      // Si el valor contiene ; o " o saltos de línea, lo envolvemos en comillas
+      const needsQuoting = formattedValue.includes(';') || formattedValue.includes('"') || formattedValue.includes('\n');
+      let result = formattedValue.replace(/"/g, '""');
+      if (needsQuoting) {
+        result = `"${result}"`;
+      }
+      return result;
+    })
+  );
+  
+  // Usar punto y coma (;) como separador para mejor compatibilidad con Excel en español/Cuba
+  const csvContent = '\uFEFF' + [headers, ...rows]
+    .map(row => row.join(';'))
+    .join('\n');
+  
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${filename}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export function calculateMargin(cost: number, price: number): number {
+  if (!price || price <= 0) return 0;
+  return ((price - cost) / price) * 100;
+}

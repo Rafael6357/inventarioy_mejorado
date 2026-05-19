@@ -307,7 +307,7 @@ export default function ConsumptionView() {
                         </span>
                       ) : item.product.is_individual ? (
                         <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
-                          Individual
+                          Venta Rápida
                         </span>
                       ) : (
                         <span className="inline-flex items-center rounded-full bg-surface-hover px-2.5 py-1 text-xs font-medium text-text-secondary">

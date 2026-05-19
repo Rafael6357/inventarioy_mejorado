@@ -5,7 +5,7 @@ import { Plus, Minus, Trash2, ShoppingCart, CreditCard, Search, X, DollarSign, U
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
-import { validateNumber, getNumberFromString } from '../../lib/utils';
+import { validateNumber, getNumberFromString, exportToExcel } from '../../lib/utils';
 import TicketView from './TicketView';
 
 export default function SalesView() {
@@ -220,6 +220,28 @@ export default function SalesView() {
     const d = new Date(c.closing_date).toISOString().split('T')[0];
     return d === closingDate;
   });
+
+  const handleExportSales = () => {
+    const columns = [
+      { header: 'Fecha', key: 'date' },
+      { header: 'Tipo', key: 'sale_type' },
+{ header: 'Subtotal', key: 'subtotal', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
+            { header: 'Descuento', key: 'discount', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
+            { header: 'Total', key: 'total_amount', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
+      { header: 'Método', key: 'payment_method' },
+      { header: 'Empleado', key: 'employee_name' },
+    ];
+    
+    const data = sales.map(s => ({
+      ...s,
+      date: new Date(s.date).toLocaleString('es-ES'),
+      subtotal: Number(s.subtotal) || 0,
+      total_amount: Number(s.total_amount) || 0,
+      discount: Number(s.discount) || 0,
+    }));
+    
+    exportToExcel(columns, data, `ventas_${new Date().toISOString().split('T')[0]}`);
+  };
 
   const openClosingModal = () => {
     const items = todaySales.map(s => ({
@@ -704,6 +726,16 @@ setShowTicket(true);
               <p className="text-xs text-text-secondary">Ventas del día</p>
               <p className="font-mono font-bold text-primary">${todayTotal.toFixed(2)}</p>
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportSales}
+              className="gap-2"
+              title="Exportar ventas a Excel"
+            >
+              <Printer className="h-4 w-4" />
+              Exportar
+            </Button>
             <Button
               variant="outline"
               size="sm"
