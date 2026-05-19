@@ -1,28 +1,34 @@
 import { useState, useMemo } from 'react';
-import { Search, AlertTriangle, ArrowDownToLine, ArrowUpFromLine, Trash2, Filter, Pencil, X, Settings2 } from 'lucide-react';
+import { Search, AlertTriangle, ArrowDownToLine, ArrowUpFromLine, Trash2, Filter, Pencil, X, Settings2, Scale } from 'lucide-react';
 import { useDatabaseStore } from '../../store/dbStore';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
+import { validateNumber, getNumberFromString } from '../../lib/utils';
+import { normalizeUnit, getCompatibleUnits, convertUnit } from '../../lib/unitConversion';
 
 export default function StockView() {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [productToDelete, setProductToDelete] = useState<{id: string, name: string} | null>(null);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [editParams, setEditParams] = useState({
     rop: 0,
-    eoq: 0,
-    lead_time: 0,
-    order_cost: 0,
-    holding_cost: 0,
     price: 0,
-    monthly_demand: 0,
   });
-  const [demandDetail, setDemandDetail] = useState<{transactions: number; range: string} | null>(null);
+  const [ropAutoDetail, setRopAutoDetail] = useState<{dailyAvg: number; suggested: number} | null>(null);
+  
+  const [adjustmentModal, setAdjustmentModal] = useState<{
+    product: any;
+    physicalStock: number;
+    unit: string;
+    date: string;
+  } | null>(null);
+  const [isAdjusting, setIsAdjusting] = useState(false);
   
   const products = useDatabaseStore((state) => state.products);
   const movements = useDatabaseStore((state) => state.movements);
@@ -60,6 +66,18 @@ export default function StockView() {
     return Array.from(cats).sort();
   }, [activeProducts]);
 
+  const autoCalculatedRop = (productId: string, currentStock: number): number => {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const recentUsage = movements
+      .filter(m => m.product_id === productId && (m.type === 'SALIDA' || m.type === 'CONSUMO') && new Date(m.date) >= thirtyDaysAgo)
+      .reduce((sum, m) => sum + Number(m.quantity), 0);
+    
+    const dailyAvg = recentUsage / 30;
+    return dailyAvg > 0 ? Math.round(dailyAvg * 7) : 0;
+  };
+
   const filteredProducts = useMemo(() => {
     return activeProducts.filter((product) => {
       const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -67,19 +85,27 @@ export default function StockView() {
       
       const matchesCategory = categoryFilter === 'ALL' || product.category === categoryFilter;
       
-              let matchesStatus = true;
+      let matchesStatus = true;
       const physicalStock = Number(product.quantity) - (Number(product.in_transit) || 0);
+      const effectiveRop = product.rop > 0 ? product.rop : autoCalculatedRop(product.id, physicalStock);
+      
       if (statusFilter === 'LOW_STOCK') {
-        matchesStatus = physicalStock <= product.rop && physicalStock > 0;
+        matchesStatus = physicalStock <= effectiveRop && physicalStock > 0;
       } else if (statusFilter === 'OUT_OF_STOCK') {
         matchesStatus = physicalStock <= 0;
       } else if (statusFilter === 'OPTIMAL') {
-        matchesStatus = physicalStock > product.rop;
+        matchesStatus = physicalStock > effectiveRop;
       }
 
-      return matchesSearch && matchesCategory && matchesStatus;
+      const matchesType = typeFilter === 'ALL' ||
+        (typeFilter === 'CONSUMO_DIRECTO' && product.is_consumo_directo) ||
+        (typeFilter === 'GASTO_VARIABLE' && product.is_gasto_variable) ||
+        (typeFilter === 'INDIVIDUAL' && product.is_individual) ||
+        (typeFilter === 'INGREDIENTE' && !product.is_consumo_directo && !product.is_gasto_variable && !product.is_individual);
+
+      return matchesSearch && matchesCategory && matchesStatus && matchesType;
     });
-  }, [activeProducts, searchTerm, categoryFilter, statusFilter]);
+  }, [activeProducts, movements, searchTerm, categoryFilter, statusFilter, typeFilter]);
 
   const confirmDelete = async () => {
     if (productToDelete) {
@@ -101,55 +127,57 @@ export default function StockView() {
     setEditingProduct(product);
     setEditParams({
       rop: Number(product.rop) || 0,
-      eoq: Number(product.eoq) || 0,
-      lead_time: Number(product.lead_time) || 0,
-      order_cost: Number(product.order_cost) || 0,
-      holding_cost: Number(product.holding_cost) || 0,
       price: Number(product.price) || 0,
-      monthly_demand: 0,
     });
-    setDemandDetail(null);
+    setRopAutoDetail(null);
   };
 
   const closeEditModal = () => {
     setEditingProduct(null);
-    setEditParams({ rop: 0, eoq: 0, lead_time: 0, order_cost: 0, holding_cost: 0, price: 0, monthly_demand: 0 });
-    setDemandDetail(null);
+    setEditParams({ rop: 0, price: 0 });
+    setRopAutoDetail(null);
   };
 
-  const calculateMonthlyDemand = (productId: string) => {
-    const threeMonthsAgo = new Date();
-    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+  const calculateRopAuto = (productId: string) => {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     
     const recentMovements = movements.filter(m => {
       return m.product_id === productId && 
              (m.type === 'SALIDA' || m.type === 'CONSUMO') &&
-             new Date(m.date) >= threeMonthsAgo;
+             new Date(m.date) >= thirtyDaysAgo;
     });
     
     const totalConsumed = recentMovements.reduce((sum, m) => sum + (Number(m.quantity) || 0), 0);
-    const monthlyAverage = Math.round(totalConsumed / 3);
-    
-    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-    const startDate = `${months[threeMonthsAgo.getMonth()]} ${threeMonthsAgo.getFullYear()}`;
-    const endDate = `${months[new Date().getMonth()]} ${new Date().getFullYear()}`;
+    const dailyAverage = totalConsumed / 30;
+    const suggestedRop = Math.round(dailyAverage * 7);
     
     return {
-      monthlyAverage,
-      totalTransactions: recentMovements.length,
-      dateRange: `${startDate} - ${endDate}`
+      dailyAvg: Math.round(dailyAverage * 100) / 100,
+      suggested: suggestedRop,
+      totalTransactions: recentMovements.length
     };
   };
 
   const handleSaveParams = async () => {
     if (!editingProduct) return;
     
+    const ropValidation = validateNumber(String(editParams.rop), { min: 0, fieldName: 'ROP' });
+    if (!ropValidation.isValid) {
+      toast.error(ropValidation.error);
+      return;
+    }
+
+    if (editingProduct.is_individual) {
+      const priceValidation = validateNumber(String(editParams.price), { required: true, min: 0.01, fieldName: 'Precio' });
+      if (!priceValidation.isValid) {
+        toast.error(priceValidation.error);
+        return;
+      }
+    }
+
     const updates: any = {
       rop: Math.max(0, editParams.rop),
-      eoq: Math.max(0, editParams.eoq),
-      lead_time: Math.max(0, editParams.lead_time),
-      order_cost: Math.max(0, editParams.order_cost),
-      holding_cost: Math.max(0, editParams.holding_cost),
     };
 
     if (editingProduct.is_individual) {
@@ -163,10 +191,6 @@ export default function StockView() {
         product_name: editingProduct.name,
         changes: {
           rop: editParams.rop,
-          eoq: editParams.eoq,
-          lead_time: editParams.lead_time,
-          order_cost: editParams.order_cost,
-          holding_cost: editParams.holding_cost,
           price: editingProduct.is_individual ? editParams.price : null,
         },
       });
@@ -178,13 +202,7 @@ export default function StockView() {
   };
 
   const hasConfiguredParams = (product: any) => {
-    return (
-      Number(product.rop) > 0 ||
-      Number(product.eoq) > 0 ||
-      Number(product.lead_time) > 0 ||
-      Number(product.order_cost) > 0 ||
-      Number(product.holding_cost) > 0
-    );
+    return Number(product.rop) > 0;
   };
 
   const totalInventoryValue = useMemo(() => {
@@ -239,7 +257,7 @@ export default function StockView() {
             />
           </div>
           
-          <div className="flex flex-1 gap-2 sm:max-w-md">
+          <div className="flex flex-1 gap-2 sm:max-w-2xl">
             <div className="relative flex-1">
               <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary" />
               <select
@@ -264,22 +282,49 @@ export default function StockView() {
               <option value="LOW_STOCK">Stock Bajo</option>
               <option value="OUT_OF_STOCK">Sin Stock</option>
             </select>
+
+            <select
+              className="h-10 flex-1 rounded-md border border-border bg-bg px-3 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+            >
+              <option value="ALL">Todos los tipos</option>
+              <option value="CONSUMO_DIRECTO">Consumo Directo</option>
+              <option value="GASTO_VARIABLE">Gasto Variable</option>
+              <option value="INDIVIDUAL">Individual</option>
+              <option value="INGREDIENTE">Ingrediente</option>
+            </select>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="relative">
+          <div className="absolute top-0 left-0 right-0 h-1.5 overflow-x-auto cursor-grab active:cursor-grabbing scrollbar-thin" 
+               id="top-scrollbar"
+               onScroll={(e) => {
+                 const container = document.getElementById('stock-table-container');
+                 if (container) container.scrollLeft = e.currentTarget.scrollLeft;
+               }}>
+            <div className="w-[150%] h-full" />
+          </div>
+        </div>
+
+        <div className="overflow-x-auto" id="stock-table-container"
+             onScroll={(e) => {
+               const topScroll = document.getElementById('top-scrollbar');
+               if (topScroll) topScroll.scrollLeft = e.currentTarget.scrollLeft;
+             }}>
           <table className="w-full text-left text-sm text-text [&_tr]:divide-x [&_tr]:divide-border/50">
-            <thead className="border-b border-border/50 bg-bg/50 text-xs uppercase text-text-secondary">
+            <thead className="border-b border-border/50 bg-bg/50 text-xs uppercase text-text-secondary sticky top-0 z-10">
               <tr>
-                <th className="px-4 py-3 font-medium">Producto</th>
-                <th className="px-4 py-3 font-medium">Categoría</th>
-                <th className="px-4 py-3 font-medium">Tipo</th>
-                <th className="px-4 py-3 font-medium text-right">Disponible</th>
-                <th className="px-4 py-3 font-medium text-right">En Transito</th>
-                <th className="px-4 py-3 font-medium text-right">Costo Unitario</th>
-                <th className="px-4 py-3 font-medium text-right">Total</th>
-                <th className="px-4 py-3 font-medium">Unidad de Medida</th>
-                <th className="px-4 py-3 font-medium">Parámetros</th>
+                <th className="px-3 py-3 font-medium min-w-[120px]">Producto</th>
+                <th className="px-3 py-3 font-medium min-w-[100px]">Categoría</th>
+                <th className="px-3 py-3 font-medium min-w-[90px]">Tipo</th>
+                <th className="px-3 py-3 font-medium text-right min-w-[80px]">Disponible</th>
+                <th className="px-3 py-3 font-medium text-right min-w-[80px]">En Transito</th>
+                <th className="px-3 py-3 font-medium text-right min-w-[90px]">Costo Unit.</th>
+                <th className="px-3 py-3 font-medium text-right min-w-[80px]">Total</th>
+                <th className="px-3 py-3 font-medium min-w-[80px]">Unidad</th>
+                <th className="px-3 py-3 font-medium min-w-[80px]">Parámetros</th>
                 <th className="px-4 py-3 font-medium">Fecha Última Actualización</th>
                 <th className="px-4 py-3 font-medium text-center">Acciones</th>
               </tr>
@@ -296,7 +341,8 @@ export default function StockView() {
                   const inTransit = Number(product.in_transit) || 0;
                   const physicalStock = Number(product.quantity) - inTransit;
                   const isOutOfStock = physicalStock <= 0;
-                  const isLowStock = physicalStock <= Number(product.rop) && !isOutOfStock;
+                  const effectiveRop = product.rop > 0 ? product.rop : autoCalculatedRop(product.id, physicalStock);
+                  const isLowStock = physicalStock <= effectiveRop && !isOutOfStock;
                   const lastUpdate = lastMovementDates[product.id];
                   const isConfigured = hasConfiguredParams(product);
                   
@@ -319,7 +365,15 @@ export default function StockView() {
                       </td>
                       <td className="px-4 py-3 text-text-secondary">{product.category}</td>
                       <td className="px-4 py-3">
-                        {product.is_individual ? (
+                        {product.is_consumo_directo ? (
+                          <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-600">
+                            Consumo Directo
+                          </span>
+                        ) : product.is_gasto_variable ? (
+                          <span className="inline-flex items-center rounded-full bg-purple-500/10 px-2 py-1 text-xs font-medium text-purple-600">
+                            Gasto Variable
+                          </span>
+                        ) : product.is_individual ? (
                           <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
                             Individual
                           </span>
@@ -354,9 +408,6 @@ export default function StockView() {
                             <span className="inline-flex items-center rounded bg-primary/10 px-1.5 py-0.5 text-primary" title="ROP">
                               ROP: {product.rop}
                             </span>
-                            <span className="inline-flex items-center rounded bg-primary/10 px-1.5 py-0.5 text-primary" title="EOQ">
-                              EOQ: {product.eoq}
-                            </span>
                           </div>
                         ) : (
                           <span className="text-xs text-text-secondary">Sin configurar</span>
@@ -378,11 +429,27 @@ export default function StockView() {
                             <button
                               onClick={() => openEditModal(product)}
                               className="rounded-lg p-2 text-text-secondary hover:bg-primary/10 hover:text-primary transition-colors"
-                              title="Editar parámetros (ROP, EOQ)"
+                              title="Editar parámetros (ROP)"
                             >
                               <Pencil className="h-4 w-4" />
                             </button>
                           )}
+                          <button
+                            onClick={() => {
+                              const baseUnit = normalizeUnit(product.unit);
+                              const compatibleUnits = getCompatibleUnits(baseUnit);
+                              setAdjustmentModal({
+                                product,
+                                physicalStock: 0,
+                                unit: compatibleUnits.includes(product.unit) ? product.unit : baseUnit,
+                                date: new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16),
+                              });
+                            }}
+                            className="rounded-lg p-2 text-text-secondary hover:bg-success/10 hover:text-success transition-colors"
+                            title="Ajuste de inventario"
+                          >
+                            <Scale className="h-4 w-4" />
+                          </button>
                           {canEdit() && (
                             <button
                               onClick={() => setProductToDelete({ id: product.id, name: product.name })}
@@ -460,71 +527,18 @@ export default function StockView() {
             <div className="space-y-4 overflow-y-auto max-h-[50vh] pr-2">
               <div className="space-y-2">
                 <Label htmlFor="edit_rop">ROP (Punto de Reorden)</Label>
-                <Input
-                  id="edit_rop"
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={editParams.rop}
-                  onChange={(e) => setEditParams({...editParams, rop: Number(e.target.value)})}
-                />
-                <p className="text-xs text-text-secondary">Umbral para alertar cuando debas reordenar</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="edit_eoq">EOQ (Cantidad Económica)</Label>
                 <div className="flex gap-2">
                   <Input
-                    id="edit_eoq"
+                    id="edit_rop"
                     type="number"
                     min="0"
                     step="1"
                     className="flex-1"
-                    value={editParams.eoq}
-                    onChange={(e) => setEditParams({...editParams, eoq: Number(e.target.value)})}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const monthlyDemand = editParams.monthly_demand || 0;
-                      const orderCost = editParams.order_cost || 0;
-                      const holdingCost = editParams.holding_cost || 0;
-                      
-                      if (monthlyDemand > 0 && orderCost > 0 && holdingCost > 0) {
-                        const annualDemand = monthlyDemand * 12;
-                        const eoq = Math.sqrt((2 * annualDemand * orderCost) / holdingCost);
-                        const calculatedEoq = Math.round(Math.max(1, eoq));
-                        setEditParams({...editParams, eoq: calculatedEoq});
-                        toast.success(`EOQ calculado: ${calculatedEoq} unidades`);
-                      } else {
-                        toast.error('Ingrese: Demanda mensual, Costo de pedido y Costo de almacenamiento');
-                      }
-                    }}
-                    title="Calcular EOQ automáticamente"
-                  >
-                    Calcular
-                  </Button>
-                </div>
-                <p className="text-xs text-text-secondary">Cantidad óptima por pedido (usando fórmula de Wilson)</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="edit_monthly_demand">Demanda Mensual Estimada</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="edit_monthly_demand"
-                    type="number"
-                    min="0"
-                    step="1"
-                    className="flex-1"
-                    value={editParams.monthly_demand || ''}
+                    value={editParams.rop}
                     onChange={(e) => {
-                      setEditParams({...editParams, monthly_demand: Number(e.target.value)});
-                      setDemandDetail(null);
+                      setEditParams({...editParams, rop: Number(e.target.value)});
+                      setRopAutoDetail(null);
                     }}
-                    placeholder="Ej: 50"
                   />
                   <Button
                     type="button"
@@ -532,70 +546,46 @@ export default function StockView() {
                     size="sm"
                     onClick={() => {
                       if (!editingProduct) return;
-                      const result = calculateMonthlyDemand(editingProduct.id);
+                      const result = calculateRopAuto(editingProduct.id);
                       if (result.totalTransactions > 0) {
-                        setEditParams({...editParams, monthly_demand: result.monthlyAverage});
-                        setDemandDetail({
-                          transactions: result.totalTransactions,
-                          range: result.dateRange
+                        setEditParams({...editParams, rop: result.suggested});
+                        setRopAutoDetail({
+                          dailyAvg: result.dailyAvg,
+                          suggested: result.suggested
                         });
-                        toast.success(`Demanda calculada: ${result.monthlyAverage}/mes basado en ${result.totalTransactions} transacciones`);
+                        toast.success(`ROP sugerido: ${result.suggested} (basado en ${result.dailyAvg} uds/día)`);
                       } else {
-                        toast.error('No hay datos de consumo en los últimos 3 meses');
+                        toast.error('No hay datos de consumo en los últimos 30 días');
                       }
                     }}
-                    title="Calcular demanda automáticamente desde movimientos"
+                    title="Calcular ROP automáticamente desde ventas"
                   >
                     Auto
                   </Button>
                 </div>
-                {demandDetail ? (
+                {ropAutoDetail ? (
                   <p className="text-xs text-success">
-                    ✓ Calculado: {demandDetail.transactions} transacciones ({demandDetail.range})
+                    ✓ Basado en {ropAutoDetail.dailyAvg} uds/día → sugerencia: {ropAutoDetail.suggested}
                   </p>
                 ) : (
-                  <p className="text-xs text-text-secondary">Consumo promedio mensual del producto</p>
+                  <p className="text-xs text-text-secondary">Stock mínimo que activa la alerta de reposición</p>
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="edit_lead_time">Tiempo de Entrega (días)</Label>
-                <Input
-                  id="edit_lead_time"
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={editParams.lead_time}
-                  onChange={(e) => setEditParams({...editParams, lead_time: Number(e.target.value)})}
-                />
-                <p className="text-xs text-text-secondary">Días que tarda el proveedor en entregar</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="edit_order_cost">Costo de Pedido</Label>
-                <Input
-                  id="edit_order_cost"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={editParams.order_cost}
-                  onChange={(e) => setEditParams({...editParams, order_cost: Number(e.target.value)})}
-                />
-                <p className="text-xs text-text-secondary">Costo fijo por cada pedido al proveedor</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="edit_holding_cost">Costo de Almacenamiento</Label>
-                <Input
-                  id="edit_holding_cost"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={editParams.holding_cost}
-                  onChange={(e) => setEditParams({...editParams, holding_cost: Number(e.target.value)})}
-                />
-                <p className="text-xs text-text-secondary">Costo de guardar 1 unidad por año</p>
-              </div>
+              {editingProduct.is_individual && (
+                <div className="space-y-2">
+                  <Label htmlFor="edit_price">Precio de Venta ($)</Label>
+                  <Input
+                    id="edit_price"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={editParams.price}
+                    onChange={(e) => setEditParams({...editParams, price: Number(e.target.value)})}
+                  />
+                  <p className="text-xs text-text-secondary">Precio de venta por unidad</p>
+                </div>
+              )}
             </div>
 
               {editingProduct.is_individual && (
@@ -631,6 +621,159 @@ export default function StockView() {
           </div>
         </div>
       )}
+
+      {adjustmentModal && (() => {
+        const baseUnit = normalizeUnit(adjustmentModal.product.unit);
+        const compatibleUnits = getCompatibleUnits(baseUnit);
+        const difference = adjustmentModal.physicalStock - Number(adjustmentModal.product.quantity);
+        
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl">
+              <div className="mb-6 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
+                    <Scale className="h-5 w-5 text-success" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-text">Ajuste de Inventario</h2>
+                    <p className="text-xs text-text-secondary">{adjustmentModal.product.name}</p>
+                  </div>
+                </div>
+                <button onClick={() => setAdjustmentModal(null)} className="rounded-full p-2 text-text-secondary hover:bg-surface-hover hover:text-text transition-colors">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="rounded-xl bg-bg/50 border border-border p-4 space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-text-secondary">Stock Sistema:</span>
+                    <span className="font-mono font-medium text-text">{Number(adjustmentModal.product.quantity).toFixed(4)} {adjustmentModal.product.unit}</span>
+                  </div>
+                  
+                  <div className="flex justify-between text-sm">
+                    <span className="text-text-secondary">Stock Físico:</span>
+                    <span className={`font-mono font-bold ${difference >= 0 ? 'text-success' : 'text-danger'}`}>
+                      {adjustmentModal.physicalStock.toFixed(4)} {adjustmentModal.unit}
+                    </span>
+                  </div>
+                  
+                  <div className="flex justify-between text-sm border-t border-border pt-2">
+                    <span className="text-text-secondary">Diferencia:</span>
+                    <span className={`font-mono font-bold ${difference >= 0 ? 'text-success' : 'text-danger'}`}>
+                      {difference >= 0 ? '+' : ''}{difference.toFixed(4)} {adjustmentModal.unit}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="physical_stock">Stock Físico *</Label>
+                    <Input
+                      id="physical_stock"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={adjustmentModal.physicalStock}
+                      onChange={(e) => setAdjustmentModal({...adjustmentModal, physicalStock: Number(e.target.value)})}
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="adjust_unit">Unidad</Label>
+                    <select
+                      id="adjust_unit"
+                      className="h-10 w-full rounded-lg border border-border bg-bg px-3 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                      value={adjustmentModal.unit}
+                      onChange={(e) => setAdjustmentModal({...adjustmentModal, unit: e.target.value})}
+                    >
+                      {compatibleUnits.map((u) => (
+                        <option key={u} value={u}>{u}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="adjust_date">Fecha</Label>
+                  <Input
+                    id="adjust_date"
+                    type="datetime-local"
+                    value={adjustmentModal.date}
+                    onChange={(e) => setAdjustmentModal({...adjustmentModal, date: e.target.value})}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Razón y Motivo</Label>
+                  <div className="h-10 rounded-lg border border-border bg-bg/50 px-3 py-2 text-sm text-text-secondary">
+                    Ajuste de inventario
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 flex gap-3">
+                <Button 
+                  variant="outline" 
+                  className="flex-1"
+                  onClick={() => setAdjustmentModal(null)}
+                  disabled={isAdjusting}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  className="flex-1 gap-2"
+                  onClick={async () => {
+                    if (adjustmentModal.physicalStock < 0) {
+                      toast.error('El stock físico no puede ser negativo');
+                      return;
+                    }
+                    
+                    setIsAdjusting(true);
+                    try {
+                      const product = adjustmentModal.product;
+                      const physicalStockInBase = convertUnit(adjustmentModal.physicalStock, adjustmentModal.unit as any, normalizeUnit(product.unit));
+                      
+                      const { updateProduct, addMovement, logAction } = useDatabaseStore.getState();
+                      
+                      await updateProduct(product.id, { quantity: physicalStockInBase });
+                      
+                      await addMovement({
+                          product_id: product.id,
+                          type: 'AJUSTE' as any,
+                          quantity: physicalStockInBase - Number(product.quantity),
+                          unit: normalizeUnit(product.unit),
+                          cost: product.cost,
+                          reason: 'Ajuste de inventario',
+                          status: 'NORMAL',
+                          date: new Date(adjustmentModal.date).toISOString(),
+                        });
+                        
+                        await logAction('stock', 'AJUSTE', {
+                          product_id: product.id,
+                          product_name: product.name,
+                          old_quantity: product.quantity,
+                          new_quantity: physicalStockInBase,
+                        });
+                      
+                      toast.success('Stock actualizado correctamente');
+                      setAdjustmentModal(null);
+                    } catch (err: any) {
+                      toast.error(err.message || 'Error al realizar el ajuste');
+                    } finally {
+                      setIsAdjusting(false);
+                    }
+                  }}
+                  disabled={isAdjusting || adjustmentModal.physicalStock < 0}
+                >
+                  {isAdjusting ? 'Guardando...' : 'Guardar Ajuste'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

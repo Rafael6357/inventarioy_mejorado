@@ -29,6 +29,7 @@ const MODULE_TRANSLATIONS: Record<string, string> = {
   ai: 'IA',
   settings: 'Configuración',
   payroll: 'Nómina',
+  stock: 'Stock',
 };
 
 const MODULE_ICONS: Record<string, string> = {
@@ -45,6 +46,7 @@ const MODULE_ICONS: Record<string, string> = {
   hr: '👥',
   ai: '🤖',
   settings: '⚙️',
+  stock: '📉',
 };
 
 const ACTION_COLORS: Record<string, string> = {

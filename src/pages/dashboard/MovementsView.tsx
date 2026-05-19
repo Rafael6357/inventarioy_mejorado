@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
-import { Search, Filter, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Filter, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, Calendar, ChevronLeft, ChevronRight, TrendingDown, Settings2 } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
@@ -46,9 +46,19 @@ export default function MovementsView() {
     // Paso 2: Aplicar filtros
     return movementsWithBal
       .filter(m => {
-        const isInventoryMovement = m.type === 'ENTRADA' || m.type === 'SALIDA' || m.type === 'MERMA';
+        const isInventoryMovement = m.type === 'ENTRADA' || m.type === 'SALIDA' || m.type === 'MERMA' || m.type === 'AJUSTE';
         const matchesSearch = getProductName(m.product_id).toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesType = typeFilter === 'ALL' || m.type === typeFilter;
+        
+        let matchesType = true;
+        if (typeFilter === 'ALL') {
+          matchesType = true;
+        } else if (typeFilter === 'CONSUMO_DIRECTO') {
+          matchesType = m.is_consumo_directo === true;
+        } else if (typeFilter === 'GASTO_VARIABLE') {
+          matchesType = m.is_gasto_variable === true;
+        } else {
+          matchesType = m.type === typeFilter;
+        }
         
         let matchesDate = true;
         if (startDate) {
@@ -126,6 +136,9 @@ export default function MovementsView() {
                 <option value="ENTRADA">Entradas</option>
                 <option value="SALIDA">Salidas</option>
                 <option value="MERMA">Mermas</option>
+                <option value="AJUSTE">Ajustes de Inventario</option>
+                <option value="CONSUMO_DIRECTO">Consumo Directo</option>
+                <option value="GASTO_VARIABLE">Gasto Variable</option>
               </select>
             </div>
           </div>
@@ -156,6 +169,9 @@ export default function MovementsView() {
                 paginatedMovements.map((movement) => {
                   const isEntrada = movement.type === 'ENTRADA';
                   const isSalida = movement.type === 'SALIDA';
+                  const isAjuste = movement.type === 'AJUSTE';
+                  const isConsumoDirecto = movement.is_consumo_directo === true;
+                  const isGastoVariable = movement.is_gasto_variable === true;
                   
                   return (
                     <tr key={movement.id} className="transition-colors hover:bg-surface-hover">
@@ -173,31 +189,40 @@ export default function MovementsView() {
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${
                           isEntrada ? 'bg-success/10 text-success' :
+                          isConsumoDirecto ? 'bg-amber-500/10 text-amber-600' :
+                          isGastoVariable ? 'bg-purple-500/10 text-purple-600' :
+                          isAjuste ? 'bg-blue-500/10 text-blue-600' :
                           isSalida ? 'bg-primary/10 text-primary' :
                           'bg-danger/10 text-danger'
                         }`}>
                           {isEntrada ? <ArrowDownToLine className="h-3 w-3" /> : 
+                           isConsumoDirecto ? <ArrowUpFromLine className="h-3 w-3" /> :
+                           isGastoVariable ? <TrendingDown className="h-3 w-3" /> :
+                           isAjuste ? <Settings2 className="h-3 w-3" /> :
                            isSalida ? <ArrowUpFromLine className="h-3 w-3" /> : 
                            <AlertTriangle className="h-3 w-3" />}
-                          {movement.type}
+                          {isConsumoDirecto ? 'CONSUMO DIRECTO' : 
+                           isGastoVariable ? 'GASTO VARIABLE' : 
+                           isAjuste ? 'AJUSTE' :
+                           movement.type}
                         </span>
                       </td>
                       <td className={`px-4 py-3 text-right font-mono font-medium ${
-                        isEntrada ? 'text-success' : 'text-danger'
+                        isEntrada || (isAjuste && Number(movement.quantity) > 0) ? 'text-success' : 'text-danger'
                       }`}>
-                        {isEntrada ? '+' : '-'}{Number(movement.quantity).toFixed(4)} {movement.unit}
+                        {isEntrada || (isAjuste && Number(movement.quantity) > 0) ? '+' : '-'}{Math.abs(Number(movement.quantity)).toFixed(4)} {movement.unit}
                       </td>
                       <td className="px-4 py-3 text-right font-mono text-text-secondary">
                         ${movement.cost.toFixed(2)}
                       </td>
                       <td className="px-4 py-3 text-right font-mono font-medium text-text">
-                        ${(movement.quantity * movement.cost).toFixed(2)}
+                        ${(Math.abs(movement.quantity) * movement.cost).toFixed(2)}
                       </td>
                       <td className="px-4 py-3 text-right font-mono font-medium text-text">
                         {movement.balance} {movement.unit}
                       </td>
-                      <td className="px-4 py-3 text-text-secondary truncate max-w-[200px]" title={movement.reason || '-'}>
-                        {movement.reason || '-'}
+                      <td className="px-4 py-3 text-text-secondary truncate max-w-[200px]" title={isConsumoDirecto && movement.note ? movement.note : movement.reason || '-'}>
+                        {isConsumoDirecto && movement.note ? movement.note : movement.reason || '-'}
                       </td>
                     </tr>
                   );

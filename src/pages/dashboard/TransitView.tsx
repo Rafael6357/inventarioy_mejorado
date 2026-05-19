@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
 import { useAuthStore } from '../../store/authStore';
-import { Package, Search, Plus, Check, Loader2, AlertCircle, ArrowRight, ArrowLeft, Box, ChevronLeft, ChevronRight, TrendingDown, RefreshCw, Clock, AlertTriangle, RotateCcw, X } from 'lucide-react';
+import { Package, Search, Plus, Check, Loader2, AlertCircle, ArrowRight, ArrowLeft, Box, ChevronLeft, ChevronRight, TrendingDown, RefreshCw, Clock, AlertTriangle, RotateCcw, X, ChevronDown } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
@@ -14,9 +14,10 @@ import {
   UnitAbbrev,
   UNIT_LABELS,
 } from '../../lib/unitConversion';
+import { validateNumber, getNumberFromString } from '../../lib/utils';
 
 export default function TransitView() {
-  const { transitItems, products, cancelTransit, registerWasteFromTransit, logAction } = useDatabaseStore();
+  const { transitItems, products, cancelTransit, registerWasteFromTransit, registerManualConsumption, logAction } = useDatabaseStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [cancelModal, setCancelModal] = useState<{
     item: any;
@@ -32,12 +33,25 @@ export default function TransitView() {
   } | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
   const [isWasting, setIsWasting] = useState(false);
+  const [consumptionModal, setConsumptionModal] = useState<{
+    item: any;
+    quantity: number;
+    unit: UnitAbbrev;
+    note: string;
+  } | null>(null);
+  const [isConsuming, setIsConsuming] = useState(false);
 
   const getProduct = (id: string) => products.find(p => p.id === id);
 
   const handleCancel = async () => {
     if (!cancelModal || !cancelModal.reason.trim()) {
       toast.error('Ingresa un motivo para la devolución');
+      return;
+    }
+    
+    const quantityValidation = validateNumber(String(cancelModal.quantity), { required: true, min: 0.0001, fieldName: 'Cantidad' });
+    if (!quantityValidation.isValid) {
+      toast.error(quantityValidation.error);
       return;
     }
     
@@ -77,9 +91,15 @@ export default function TransitView() {
     }
   };
 
-  const handleWaste = async () => {
+const handleWaste = async () => {
     if (!wasteModal || !wasteModal.reason.trim()) {
-      toast.error('Ingresa una justificación para la merma');
+      toast.error('Ingresa un motivo para la merma');
+      return;
+    }
+    
+    const quantityValidation = validateNumber(String(wasteModal.quantity), { required: true, min: 0.0001, fieldName: 'Cantidad' });
+    if (!quantityValidation.isValid) {
+      toast.error(quantityValidation.error);
       return;
     }
     
@@ -116,6 +136,44 @@ export default function TransitView() {
       setWasteModal(null);
     } else {
       toast.error(result.error || 'Error al registrar la merma');
+    }
+  };
+
+  const handleConsumption = async () => {
+    if (!consumptionModal) {
+      return;
+    }
+    
+    const quantityValidation = validateNumber(String(consumptionModal.quantity), { required: true, min: 0.0001, fieldName: 'Cantidad' });
+    if (!quantityValidation.isValid) {
+      toast.error(quantityValidation.error);
+      return;
+    }
+    
+    const product = getProduct(consumptionModal.item.product_id);
+    if (product?.is_consumo_directo && !consumptionModal.note.trim()) {
+      toast.error('La nota es obligatoria para productos de Consumo Directo');
+      return;
+    }
+    
+    setIsConsuming(true);
+    const result = await registerManualConsumption(consumptionModal.item.id, consumptionModal.quantity, consumptionModal.note);
+    setIsConsuming(false);
+    if (result.success) {
+      toast.success('Consumo registrado exitosamente');
+      if (navigator.onLine) {
+        try {
+          await useDatabaseStore.getState().logAction('transit', 'CONSUMO_MANUAL', {
+            product_name: consumptionModal.item.product_name,
+            quantity: consumptionModal.quantity,
+          });
+        } catch (logErr) {
+          console.warn('[logAction] Error (offline?):', logErr);
+        }
+      }
+      setConsumptionModal(null);
+    } else {
+      toast.error(result.error || 'Error al registrar el consumo');
     }
   };
 
@@ -348,6 +406,42 @@ export default function TransitView() {
                                 </span>
                                 {item.remaining > 0 && (
                                   <div className="flex items-center gap-1">
+                                    {getProduct(item.product_id)?.is_consumo_directo && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          const product = getProduct(item.product_id);
+                                          const baseUnit = product ? normalizeUnit(product.unit) : 'u';
+                                          const compatibleUnits = getCompatibleUnits(baseUnit);
+                                          const savedUnit = getLastUsedUnit(item.product_id);
+                                          const defaultUnit = savedUnit && compatibleUnits.includes(savedUnit) ? savedUnit : baseUnit;
+                                          setConsumptionModal({ item, quantity: item.remaining, unit: defaultUnit, note: '' });
+                                        }}
+                                        className="flex items-center justify-center h-7 w-7 rounded-lg text-text-secondary hover:text-success hover:bg-success/10 transition-colors shrink-0"
+                                        title="Registrar consumo manual"
+                                      >
+                                        <TrendingDown className="h-3.5 w-3.5" />
+                                      </button>
+                                    )}
+                                    {getProduct(item.product_id)?.is_gasto_variable && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          const product = getProduct(item.product_id);
+                                          const baseUnit = product ? normalizeUnit(product.unit) : 'u';
+                                          const compatibleUnits = getCompatibleUnits(baseUnit);
+                                          const savedUnit = getLastUsedUnit(item.product_id);
+                                          const defaultUnit = savedUnit && compatibleUnits.includes(savedUnit) ? savedUnit : baseUnit;
+                                          setConsumptionModal({ item, quantity: item.remaining, unit: defaultUnit, note: '' });
+                                        }}
+                                        className="flex items-center justify-center h-7 w-7 rounded-lg text-text-secondary hover:text-purple-600 hover:bg-purple-500/10 transition-colors shrink-0"
+                                        title="Registrar gasto variable"
+                                      >
+                                        <TrendingDown className="h-3.5 w-3.5" />
+                                      </button>
+                                    )}
                                     <button
                                       onClick={(e) => {
                                         e.preventDefault();
@@ -652,6 +746,124 @@ export default function TransitView() {
                   disabled={isWasting || !wasteModal.reason.trim() || currentQuantityInBase > wasteModal.item.remaining || currentQuantityInBase <= 0}
                 >
                   {isWasting ? 'Registrando...' : <><AlertTriangle className="h-4 w-4" /> Registrar Merma</>}
+                </Button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {consumptionModal && getProduct(consumptionModal.item.product_id) && (() => {
+        const product = getProduct(consumptionModal.item.product_id);
+        const baseUnit = product ? normalizeUnit(product.unit) : 'u';
+        const compatibleUnits = getCompatibleUnits(baseUnit);
+        
+        const currentQuantityInBase = convertUnit(consumptionModal.quantity, consumptionModal.unit, baseUnit);
+        const maxInCurrentUnit = convertUnit(consumptionModal.item.remaining, baseUnit, consumptionModal.unit);
+        
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl">
+              <div className="mb-6 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
+                    <TrendingDown className="h-5 w-5 text-success" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-text">{product?.is_gasto_variable ? 'Registrar Gasto Variable' : 'Registrar Consumo Manual'}</h2>
+                    <p className="text-xs text-text-secondary">{product?.name}</p>
+                  </div>
+                </div>
+                <button onClick={() => setConsumptionModal(null)} className="rounded-full p-2 text-text-secondary hover:bg-surface-hover hover:text-text transition-colors">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="mb-4 space-y-4">
+                <div className="rounded-xl bg-bg/50 border border-border p-4">
+                  <div className="flex items-center gap-2 mb-3 text-sm text-text-secondary">
+                    <TrendingDown className="h-4 w-4 text-success" />
+                    Disponible: <span className="font-bold text-text">{consumptionModal.item.remaining} {baseUnit}</span>
+                  </div>
+
+                  <div className="flex gap-2 mb-3">
+                    <div className="flex-1">
+                      <label className="text-xs font-medium text-text-secondary">Cantidad consumida *</label>
+                      <Input
+                        type="number"
+                        min="0.0001"
+                        max={maxInCurrentUnit}
+                        step="0.01"
+                        value={consumptionModal.quantity}
+                        onChange={(e) => setConsumptionModal(prev => ({ ...prev, quantity: Number(e.target.value) }))}
+                        className="no-spin"
+                      />
+                    </div>
+                    <div className="w-32">
+                      <label className="text-xs font-medium text-text-secondary">Unidad</label>
+                      <select
+                        value={consumptionModal.unit}
+                        onChange={(e) => {
+                          const newUnit = e.target.value as UnitAbbrev;
+                          const convertedQty = convertUnit(consumptionModal.quantity, consumptionModal.unit, newUnit);
+                          setConsumptionModal(prev => ({ ...prev, quantity: convertedQty, unit: newUnit }));
+                          saveLastUsedUnit(consumptionModal.item.product_id, newUnit);
+                        }}
+                        disabled={compatibleUnits.length <= 1}
+                        className="w-full rounded-lg border border-border bg-bg px-2 py-2 text-sm text-text disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {compatibleUnits.map((u) => (
+                          <option key={u} value={u}>{UNIT_LABELS[u]}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {currentQuantityInBase > consumptionModal.item.remaining && (
+                    <p className="text-xs text-danger mt-2">
+                      La cantidad excede el disponible ({consumptionModal.item.remaining} {baseUnit})
+                    </p>
+                  )}
+
+                  <div className="flex gap-2 mt-2">
+                    {[0.25, 0.5, 1].map((pct, i) => {
+                      const qtyInUnit = convertUnit(consumptionModal.item.remaining * pct, baseUnit, consumptionModal.unit);
+                      return (
+                        <button
+                          key={`consumption-${pct}`}
+                          onClick={() => setConsumptionModal(prev => ({ ...prev, quantity: qtyInUnit }))}
+                          className="flex-1 rounded-lg border border-border bg-surface px-2 py-1 text-xs text-text-secondary hover:border-primary hover:text-primary transition-colors"
+                        >
+                          {i === 2 ? '100%' : `${i === 0 ? 25 : 50}%`}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {product?.is_consumo_directo && (
+                    <div className="mt-3 pt-3 border-t border-border">
+                      <label className="text-xs font-medium text-text-secondary">Nota *</label>
+                      <Input
+                        value={consumptionModal.note}
+                        onChange={(e) => setConsumptionModal(prev => ({ ...prev, note: e.target.value }))}
+                        placeholder="Ej: Sal - para mesa 5, Orégano - para cocina"
+                        className="mt-1"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <Button variant="outline" onClick={() => setConsumptionModal(null)} className="flex-1" disabled={isConsuming}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleConsumption}
+                  className="flex-1 gap-2"
+                  disabled={isConsuming || currentQuantityInBase > consumptionModal.item.remaining || currentQuantityInBase <= 0}
+                >
+                  {isConsuming ? 'Registrando...' : <><TrendingDown className="h-4 w-4" /> Registrar Consumo</>}
                 </Button>
               </div>
             </div>

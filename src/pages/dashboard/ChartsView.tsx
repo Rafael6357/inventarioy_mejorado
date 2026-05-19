@@ -8,7 +8,7 @@ import { BarChart3, TrendingUp, Activity } from 'lucide-react';
 const COLORS = ['#d4af37', '#b8962f', '#a68527', '#947220', '#83601a', '#724e15'];
 
 export default function ChartsView() {
-  const { sales, products, movements } = useDatabaseStore();
+  const { sales, products, recipes, movements } = useDatabaseStore();
 
   // 1. Sales Over Time (Line Chart)
   const salesOverTime = useMemo(() => {
@@ -23,11 +23,27 @@ export default function ChartsView() {
       .slice(-14); // Last 14 days with sales
   }, [sales]);
 
-  // 2. Top Selling Products (Bar Chart)
+  // 2. Top Selling Products (Bar Chart) - incluye productos individuales y recetas
   const topProducts = useMemo(() => {
     const productSales = sales.flatMap(s => s.items).reduce((acc, item) => {
-      const product = products.find(p => p.id === item.product_id);
-      const name = product ? product.name : 'Desconocido';
+      let name: string;
+      
+      // Si es receta, usar el nombre del snapshot o buscar en recipes
+      if (item.is_recipe) {
+        if (item.recipe_snapshot?.name) {
+          name = item.recipe_snapshot.name;
+        } else {
+          const recipe = recipes.find(r => r.id === item.product_id);
+          if (!recipe) return acc;
+          name = recipe.name;
+        }
+      } else {
+        // Producto individual
+        const product = products.find(p => p.id === item.product_id);
+        if (!product) return acc;
+        name = product.name;
+      }
+      
       acc[name] = (acc[name] || 0) + item.quantity;
       return acc;
     }, {} as Record<string, number>);
@@ -36,12 +52,12 @@ export default function ChartsView() {
       .map(([name, quantity]) => ({ name, quantity }))
       .sort((a, b) => b.quantity - a.quantity)
       .slice(0, 5); // Top 5
-  }, [sales, products]);
+  }, [sales, products, recipes]);
 
-  // 3. Movements Distribution (Pie Chart)
+  // 3. Movements Distribution - suma de cantidades movidas (no frecuencia)
   const movementsDistribution = useMemo(() => {
     const dist = movements.reduce((acc, mov) => {
-      acc[mov.type] = (acc[mov.type] || 0) + 1;
+      acc[mov.type] = (acc[mov.type] || 0) + mov.quantity;
       return acc;
     }, {} as Record<string, number>);
 
@@ -149,7 +165,7 @@ export default function ChartsView() {
                   <Tooltip 
                     contentStyle={{ backgroundColor: '#1a1a1a', borderColor: '#333', borderRadius: '8px' }}
                     cursor={{ fill: '#333', opacity: 0.4 }}
-                    formatter={(value: number) => [value, 'Registros']}
+                    formatter={(value: number) => [value, 'Unidades']}
                   />
                   <Bar dataKey="value" fill="#d4af37" radius={[4, 4, 0, 0]} barSize={40}>
                     {movementsDistribution.map((entry, index) => {
@@ -157,6 +173,7 @@ export default function ChartsView() {
                       if (entry.name === 'ENTRADA') color = '#10b981';
                       if (entry.name === 'SALIDA') color = '#6366f1';
                       if (entry.name === 'MERMA') color = '#ef4444';
+                      if (entry.name === 'AJUSTE') color = '#f59e0b';
                       return <Cell key={`cell-${entry.name}`} fill={color} />;
                     })}
                   </Bar>

@@ -5,6 +5,8 @@ const UNIT_CONVERSIONS = {
     lb: 453.592,
     oz: 28.3495,
     u: 1,
+    sac: 1,
+    lat: 1,
   },
   volume: {
     ml: 1,
@@ -12,11 +14,13 @@ const UNIT_CONVERSIONS = {
     gal: 3785.41,
     'fl oz': 29.5735,
     u: 1,
+    sac: 1,
+    lat: 1,
   },
 };
 
 export type UnitType = 'weight' | 'volume';
-export type UnitAbbrev = 'g' | 'kg' | 'lb' | 'oz' | 'u' | 'ml' | 'L' | 'gal' | 'fl oz';
+export type UnitAbbrev = 'g' | 'kg' | 'lb' | 'oz' | 'u' | 'ml' | 'L' | 'gal' | 'fl oz' | 'sac' | 'lat';
 
 export const UNIT_LABELS: Record<UnitAbbrev, string> = {
   g: 'Gramos (g)',
@@ -28,11 +32,13 @@ export const UNIT_LABELS: Record<UnitAbbrev, string> = {
   L: 'Litros (L)',
   gal: 'Galones (gal)',
   'fl oz': 'Onzas líquidas (fl oz)',
+  sac: 'Sacos',
+  lat: 'Latas',
 };
 
 export const UNITS_BY_TYPE: Record<UnitType, UnitAbbrev[]> = {
-  weight: ['g', 'kg', 'lb', 'oz', 'u'],
-  volume: ['ml', 'L', 'gal', 'fl oz', 'u'],
+  weight: ['g', 'kg', 'lb', 'oz', 'u', 'sac', 'lat'],
+  volume: ['ml', 'L', 'gal', 'fl oz', 'u', 'sac', 'lat'],
 };
 
 const UNIT_ALIASES: Record<string, UnitAbbrev> = {
@@ -45,6 +51,8 @@ const UNIT_ALIASES: Record<string, UnitAbbrev> = {
   'l': 'L', 'litros': 'L', 'litro': 'L', 'lts': 'L',
   'gal': 'gal', 'galones': 'gal', 'galon': 'gal',
   'fl oz': 'fl oz', 'onzas liquidas': 'fl oz', 'ozfl': 'fl oz',
+  'sac': 'sac', 'sacos': 'sac', 'saco': 'sac',
+  'lat': 'lat', 'latas': 'lat', 'lata': 'lat',
 };
 
 export function normalizeUnit(unit: string): UnitAbbrev {

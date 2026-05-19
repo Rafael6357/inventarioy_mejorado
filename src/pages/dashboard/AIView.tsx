@@ -37,7 +37,7 @@ export default function AIView() {
   const businessData = useMemo(() => {
     const totalInventoryValue = activeProducts.reduce((sum, p) => sum + (Number(p.quantity) * Number(p.cost)), 0);
     const totalSalesRevenue = sales.reduce((sum, s) => sum + Number(s.total_amount), 0);
-    const lowStockProducts = activeProducts.filter(p => Number(p.quantity) <= Number(p.rop));
+    const lowStockProducts = activeProducts.filter(p => Number(p.quantity) <= 0);
     
     const thirtyDaysFromNow = new Date();
     thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
@@ -54,7 +54,7 @@ export default function AIView() {
       return acc;
     }, {} as Record<string, { count: number; value: number }>);
 
-    const lowStock = activeProducts.filter(p => Number(p.quantity) <= Number(p.rop));
+    const lowStock = activeProducts.filter(p => Number(p.quantity) <= 0);
 
     const inputs = movements.filter(m => m.type === 'ENTRADA').length;
     const outputs = movements.filter(m => m.type === 'SALIDA').length;
@@ -190,7 +190,7 @@ export default function AIView() {
     const weeklyMargin = weeklyRevenue > 0 ? ((weeklyRevenue - weeklyCOGS) / weeklyRevenue) * 100 : 0;
     const monthlyMargin = monthlyRevenue > 0 ? ((monthlyRevenue - monthlyCOGS) / monthlyRevenue) * 100 : 0;
 
-    const lowStock = activeProducts.filter(p => Number(p.quantity) <= Number(p.rop));
+    const lowStock = activeProducts.filter(p => Number(p.quantity) <= 0);
 
     const thirtyDaysFromNow = new Date();
     thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
@@ -262,7 +262,7 @@ export default function AIView() {
         'TODOS LOS PRODUCTOS (' + activeProducts.length + '):\n' +
         (activeProducts.length > 0 ? activeProducts.map(p => '- ' + p.name + ' | Categoria: ' + (p.category || 'Sin categoria') + ' | Stock: ' + p.quantity + ' ' + p.unit + ' | Costo: $' + Number(p.cost).toFixed(2) + ' | Precio: $' + Number(p.price).toFixed(2) + ' | Vence: ' + (p.expiration_date ? new Date(p.expiration_date).toLocaleDateString('es-ES') : 'Sin fecha')).join('\n') : '- No hay productos registrados') + '\n\n' +
         'PRODUCTOS CON STOCK BAJO (' + lowStock.length + '):\n' +
-        (lowStock.length > 0 ? lowStock.map(p => '- ' + p.name + ': ' + p.quantity + ' ' + p.unit + ' (ROP: ' + p.rop + ')').join('\n') : '- Ninguno') + '\n\n' +
+        (lowStock.length > 0 ? lowStock.map(p => '- ' + p.name + ': ' + p.quantity + ' ' + p.unit).join('\n') : '- Ninguno') + '\n\n' +
         'PRODUCTOS PROXIMOS A VENCER (30 dias):\n' +
         (expiringProducts.length > 0 ? expiringProducts.map(p => '- ' + p.name + ': vence ' + new Date(p.expiration_date).toLocaleDateString('es-ES')).join('\n') : '- Ninguno') + '\n\n' +
         'TOP 20 PRODUCTOS POR VALOR:\n' +
@@ -292,7 +292,7 @@ export default function AIView() {
     const weeklyRevenue = weeklySalesData.reduce((sum, s) => sum + Number(s.total_amount), 0);
     const monthlyRevenue = monthlySalesData.reduce((sum, s) => sum + Number(s.total_amount), 0);
 
-    const lowStock = activeProducts.filter(p => Number(p.quantity) <= Number(p.rop));
+    const lowStock = activeProducts.filter(p => Number(p.quantity) <= 0);
 
     return {
       role: 'assistant',

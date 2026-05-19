@@ -5,6 +5,7 @@ import { Plus, Minus, Trash2, ShoppingCart, CreditCard, Search, X, DollarSign, U
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
+import { validateNumber, getNumberFromString } from '../../lib/utils';
 import TicketView from './TicketView';
 
 export default function SalesView() {
@@ -474,6 +475,23 @@ export default function SalesView() {
       toast.error('El carrito está vacío');
       return;
     }
+    
+    if (deliveryFee > 0) {
+      const deliveryValidation = validateNumber(String(deliveryFee), { min: 0, fieldName: 'Costo de delivery' });
+      if (!deliveryValidation.isValid) {
+        toast.error(deliveryValidation.error);
+        return;
+      }
+    }
+    
+    if (discount > 0) {
+      const discountValidation = validateNumber(String(discount), { min: 0, max: subtotal, fieldName: 'Descuento' });
+      if (!discountValidation.isValid) {
+        toast.error(discountValidation.error);
+        return;
+      }
+    }
+    
     setIsProcessingSale(false);
     setShowPreview(true);
   };

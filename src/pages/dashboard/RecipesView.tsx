@@ -6,6 +6,7 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
+import { validateNumber, getNumberFromString } from '../../lib/utils';
 import {
   convertUnit,
   getCompatibleUnits,
@@ -118,6 +119,12 @@ export default function RecipesView() {
     if (!user) return;
     if (ingredients.length === 0) {
       toast.error('La receta debe tener al menos un ingrediente.');
+      return;
+    }
+
+    const priceValidation = validateNumber(String(sellingPrice), { required: true, min: 0.01, fieldName: 'Precio de venta' });
+    if (!priceValidation.isValid) {
+      toast.error(priceValidation.error);
       return;
     }
 

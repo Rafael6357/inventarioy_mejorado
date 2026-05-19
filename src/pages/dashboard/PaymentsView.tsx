@@ -5,6 +5,7 @@ import { CreditCard, Search, ShieldCheck, CheckCircle2, XCircle, AlertCircle, Ca
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
+import { validateNumber, getNumberFromString } from '../../lib/utils';
 
 interface ProfilePayment {
   id: string;
@@ -703,8 +704,9 @@ export default function PaymentsView() {
                   const notes = (form.elements.namedItem('notes') as HTMLTextAreaElement).value;
                   const date = (form.elements.namedItem('date') as HTMLInputElement).value;
 
-                  if (!amount || Number(amount) <= 0) {
-                    toast.error('Ingresa un monto válido');
+                  const amountValidation = validateNumber(amount, { required: true, min: 1, fieldName: 'Monto' });
+                  if (!amountValidation.isValid) {
+                    toast.error(amountValidation.error);
                     return;
                   }
 

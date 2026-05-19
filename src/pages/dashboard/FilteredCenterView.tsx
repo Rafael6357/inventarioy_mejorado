@@ -12,6 +12,7 @@ export default function FilteredCenterView() {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [stockFilter, setStockFilter] = useState('ALL'); // ALL, LOW, NORMAL, OVER
+  const [typeFilter, setTypeFilter] = useState('ALL'); // ALL, INDIVIDUAL, CONSUMO_DIRECTO, GASTO_VARIABLE, INGREDIENTE
   const [sortBy, setSortBy] = useState('name'); // name, price, stock, value
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
@@ -40,7 +41,18 @@ export default function FilteredCenterView() {
       result = result.filter(p => p.category === categoryFilter);
     }
 
-    // 3. Stock Status Filter
+    // 3. Type Filter (Individual, Consumo Directo, Gasto Variable, Ingrediente)
+    if (typeFilter !== 'ALL') {
+      result = result.filter(p => {
+        if (typeFilter === 'INDIVIDUAL') return p.is_individual === true && !p.is_consumo_directo && !p.is_gasto_variable;
+        if (typeFilter === 'CONSUMO_DIRECTO') return p.is_consumo_directo === true;
+        if (typeFilter === 'GASTO_VARIABLE') return p.is_gasto_variable === true;
+        if (typeFilter === 'INGREDIENTE') return !p.is_individual && !p.is_consumo_directo && !p.is_gasto_variable;
+        return true;
+      });
+    }
+
+    // 4. Stock Status Filter
     if (stockFilter !== 'ALL') {
       result = result.filter(p => {
         const physicalStock = Number(p.quantity) - (Number(p.in_transit) || 0);
@@ -56,7 +68,7 @@ export default function FilteredCenterView() {
       });
     }
 
-    // 4. Sorting
+    // 5. Sorting
     result.sort((a, b) => {
       let valA: any = a.name;
       let valB: any = b.name;
@@ -80,7 +92,7 @@ export default function FilteredCenterView() {
     });
 
     return result;
-  }, [activeProducts, searchTerm, categoryFilter, stockFilter, sortBy, sortOrder]);
+  }, [activeProducts, searchTerm, categoryFilter, typeFilter, stockFilter, sortBy, sortOrder]);
 
   const toggleSort = (field: string) => {
     if (sortBy === field) {
@@ -107,7 +119,7 @@ export default function FilteredCenterView() {
 
       {/* Filters Bar */}
       <div className="rounded-xl border border-border bg-surface p-4 shadow-sm">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
           <div className="space-y-1.5">
             <Label className="text-xs text-text-secondary">Búsqueda General</Label>
             <div className="relative">
@@ -146,6 +158,21 @@ export default function FilteredCenterView() {
               <option value="LOW">Stock Bajo (Crítico)</option>
               <option value="NORMAL">Stock Normal</option>
               <option value="OVER">Sobre-stock</option>
+            </select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs text-text-secondary">Tipo de Producto</Label>
+            <select 
+              className="w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary h-10"
+              value={typeFilter}
+              onChange={e => setTypeFilter(e.target.value)}
+            >
+              <option value="ALL">Todos los tipos</option>
+              <option value="INDIVIDUAL">Individual</option>
+              <option value="CONSUMO_DIRECTO">Consumo Directo</option>
+              <option value="GASTO_VARIABLE">Gasto Variable</option>
+              <option value="INGREDIENTE">Ingrediente</option>
             </select>
           </div>
 
@@ -202,10 +229,11 @@ export default function FilteredCenterView() {
                 </tr>
               ) : (
                 filteredAndSortedProducts.map((product) => {
-                  const isLow = (Number(product.rop) || 0) > 0 && product.quantity <= product.rop;
-                  const isOver = (Number(product.rop) || 0) > 0 && product.quantity > product.rop * 2;
+                  const physicalStock = Number(product.quantity) - (Number(product.in_transit) || 0);
+                  const isLow = (Number(product.rop) || 0) > 0 && physicalStock <= product.rop;
+                  const isOver = (Number(product.rop) || 0) > 0 && physicalStock > product.rop * 2;
                   const noRopConfigured = (Number(product.rop) || 0) === 0;
-                  const totalValue = product.quantity * product.cost;
+                  const totalValue = physicalStock * product.cost;
 
                   return (
                     <tr key={product.id} className="transition-colors hover:bg-surface-hover">

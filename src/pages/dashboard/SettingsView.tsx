@@ -7,6 +7,7 @@ import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
 import { supabase } from '../../lib/supabase';
 import { toast } from 'sonner';
+import { validateNumber, getNumberFromString } from '../../lib/utils';
 import { Switch } from '../../components/ui/switch';
 import AccessPinsConfig from '../../components/AccessPinsConfig';
 import QRCode from 'react-qr-code';
@@ -95,6 +96,26 @@ export default function SettingsView() {
     if (!hasFormChanges && !hasCurrencyChanges) {
       toast.info('No hay cambios que guardar');
       return;
+    }
+
+    if (currencySettings.usdEnabled) {
+      const usdValidation = validateNumber(String(currencySettings.usdRate), { required: true, min: 1, fieldName: 'Tasa USD' });
+      if (!usdValidation.isValid) {
+        toast.error(usdValidation.error);
+        setIsSaving(false);
+        setIsSubmitting(false);
+        return;
+      }
+    }
+    
+    if (currencySettings.eurEnabled) {
+      const eurValidation = validateNumber(String(currencySettings.eurRate), { required: true, min: 1, fieldName: 'Tasa EUR' });
+      if (!eurValidation.isValid) {
+        toast.error(eurValidation.error);
+        setIsSaving(false);
+        setIsSubmitting(false);
+        return;
+      }
     }
     
     setIsSaving(true);

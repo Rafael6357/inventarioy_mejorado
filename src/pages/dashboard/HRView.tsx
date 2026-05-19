@@ -1,11 +1,13 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
 import { useAuthStore } from '../../store/authStore';
-import { Users, UserPlus, Trash2, Mail, Phone, Briefcase, DollarSign, FileText, Upload, Download, X, FolderOpen, BookOpen, ShieldCheck, Paperclip, Eye, ChevronDown, Building2, Calculator, Settings, RefreshCw, Save, Edit, FileSpreadsheet } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import { Users, UserPlus, Trash2, Mail, Phone, Briefcase, DollarSign, FileText, Upload, Download, X, FolderOpen, BookOpen, ShieldCheck, Paperclip, Eye, ChevronDown, Building2, Calculator, Settings, RefreshCw, Save, Edit, FileSpreadsheet, Camera } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
+import { validateNumber, getNumberFromString } from '../../lib/utils';
 
 const DOC_TYPE_LABELS: Record<string, string> = {
   MANUAL: 'Manual',
@@ -246,8 +248,9 @@ export default function HRView() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
   const [newEmployee, setNewEmployee] = useState({
-    name: '', role: '', salary: 0, phone: '', email: '', nit_id: '', category: '',
+    name: '', role: '', salary: 0, phone: '', email: '', nit_id: '', category: '', hire_date: '', photo_url: '',
   });
+  const [newEmployeePhoto, setNewEmployeePhoto] = useState<File | null>(null);
   const [newDepartment, setNewDepartment] = useState('');
   const [editingDepartment, setEditingDepartment] = useState<{id: string, name: string} | null>(null);
   const [payrollMonth, setPayrollMonth] = useState(() => {
@@ -270,6 +273,16 @@ export default function HRView() {
 
   const [configBaseExenta, setConfigBaseExenta] = useState(0);
   const [configImpuesto, setConfigImpuesto] = useState(0);
+  
+  const [orgDocModal, setOrgDocModal] = useState<'PNO' | 'REGLAMENTO' | null>(null);
+  const [orgDocFile, setOrgDocFile] = useState<File | null>(null);
+  const [isUploadingOrgDoc, setIsUploadingOrgDoc] = useState(false);
+  const [showDocDropdown, setShowDocDropdown] = useState(false);
+  
+  const orgDocsData = {
+    PNO: localStorage.getItem('org_doc_pno') || null,
+    REGLAMENTO: localStorage.getItem('org_doc_reglamento') || null,
+  };
   const [configContribucion, setConfigContribucion] = useState(0);
 
   useEffect(() => {
@@ -307,9 +320,47 @@ export default function HRView() {
     e.preventDefault();
     if (!user) return;
 
+    const salaryValidation = validateNumber(String(newEmployee.salary), { required: true, min: 1, fieldName: 'Salario' });
+    if (!salaryValidation.isValid) {
+      toast.error(salaryValidation.error);
+      return;
+    }
+
     try {
-      await addEmployee({ name: newEmployee.name, role: newEmployee.role, salary: newEmployee.salary, phone: newEmployee.phone, email: newEmployee.email, nit_id: newEmployee.nit_id, category: newEmployee.category });
-      setNewEmployee({ name: '', role: '', salary: 0, phone: '', email: '', nit_id: '', category: '' });
+      let photoUrl = null;
+      const { supabase } = useDatabaseStore.getState();
+      
+      if (newEmployeePhoto) {
+        const fileName = `employee-${Date.now()}-${newEmployeePhoto.name.replace(/[^a-zA-Z0-9.]/g, '')}`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('hr-documents')
+          .upload(fileName, newEmployeePhoto);
+        
+        if (uploadError) {
+          console.error('Error uploading photo:', uploadError);
+          toast.error('Error al subir la foto');
+          return;
+        }
+        
+        if (uploadData) {
+          const { data: urlData } = supabase.storage.from('hr-documents').getPublicUrl(fileName);
+          photoUrl = urlData.publicUrl;
+        }
+      }
+
+      await addEmployee({ 
+        name: newEmployee.name, 
+        role: newEmployee.role, 
+        salary: newEmployee.salary, 
+        phone: newEmployee.phone, 
+        email: newEmployee.email, 
+        nit_id: newEmployee.nit_id, 
+        category: newEmployee.category,
+        hire_date: newEmployee.hire_date || null,
+        photo_url: photoUrl,
+      });
+      setNewEmployee({ name: '', role: '', salary: 0, phone: '', email: '', nit_id: '', category: '', hire_date: '', photo_url: '' });
+      setNewEmployeePhoto(null);
       toast.success('Empleado agregado exitosamente');
     } catch (err) {
       toast.error((err as Error).message || 'Error al agregar el empleado');
@@ -405,16 +456,16 @@ export default function HRView() {
             Configuración
           </button>
           <button
-            onClick={() => setActiveTab('documentos')}
-            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all whitespace-nowrap ${
-              activeTab === 'documentos'
-                ? 'bg-primary text-white shadow-sm'
-                : 'text-text-secondary hover:text-text'
-            }`}
-          >
-            <FolderOpen className="h-4 w-4" />
-            Biblioteca de Documentos
-          </button>
+              onClick={() => setActiveTab('documentos')}
+              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all whitespace-nowrap ${
+                activeTab === 'documentos'
+                  ? 'bg-primary text-white shadow-sm'
+                  : 'text-text-secondary hover:text-text'
+              }`}
+            >
+              <FolderOpen className="h-4 w-4" />
+              Biblioteca de Documentos
+            </button>
         </div>
       </div>
 
@@ -516,6 +567,56 @@ export default function HRView() {
                     <option key={dept.id} value={dept.id}>{dept.name}</option>
                   ))}
                 </select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="hire_date">Fecha de Contratación</Label>
+                <Input
+                  id="hire_date"
+                  type="date"
+                  value={newEmployee.hire_date}
+                  onChange={e => setNewEmployee({ ...newEmployee, hire_date: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Foto del Empleado</Label>
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center justify-center w-20 h-20 rounded-lg border-2 border-dashed border-border hover:border-primary cursor-pointer transition-colors overflow-hidden bg-bg">
+                    {newEmployeePhoto ? (
+                      <img src={URL.createObjectURL(newEmployeePhoto)} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="flex flex-col items-center">
+                        <Camera className="h-6 w-6 text-text-secondary" />
+                        <span className="text-[10px] text-text-secondary">Subir</span>
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={e => {
+                        if (e.target.files && e.target.files[0]) {
+                          const file = e.target.files[0];
+                          if (file.size > 500 * 1024) {
+                            toast.warning('Archivo muy grande. Se recomienda max 500KB para mejor rendimiento.');
+                          }
+                          setNewEmployeePhoto(file);
+                        }
+                      }}
+                    />
+                  </label>
+                  {newEmployeePhoto && (
+                    <button
+                      type="button"
+                      onClick={() => setNewEmployeePhoto(null)}
+                      className="text-xs text-danger hover:underline"
+                    >
+                      Eliminar
+                    </button>
+                  )}
+                </div>
+                <p className="text-xs text-text-secondary">Formato: JPG, PNG o WebP. Tamaño máx: 500KB (optimizado: 100-200KB)</p>
               </div>
 
               <Button type="submit" className="mt-6 px-8 w-full gap-2">
@@ -1075,16 +1176,9 @@ export default function HRView() {
                   <p className="text-xs text-text-secondary">Monto que está libre de impuestos. En Cuba es aproximadamente $4,800 CUP/mes</p>
                 </div>
                 
-                <div className="p-4 rounded-lg bg-blue-50 border border-blue-200">
-                  <p className="text-sm font-medium text-blue-800 mb-2">¿Qué es la Base Imponible?</p>
-                  <p className="text-xs text-blue-700">
-                    Es la porción del salario sobre la cual se calcula el impuesto. Se calcula así:<br/>
-                    <strong>Base Imponible = Salario Bruto - Base Exenta</strong><br/>
-                    Ejemplo: Salario $10,000 - Base Exenta $4,800 = <strong>Base Imponible $5,200</strong>
-                  </p>
-                </div>
+
                 <div className="space-y-2">
-                  <Label>% Impuesto sobre Renta</Label>
+                  <Label>% de impuesto sobre la venta</Label>
                   <Input
                     type="number"
                     step="0.1"
@@ -1115,6 +1209,211 @@ export default function HRView() {
             ) : (
               <div className="flex justify-center py-8"><RefreshCw className="h-6 w-6 animate-spin text-primary" /></div>
             )}
+          </div>
+</div>
+        )}
+        
+        {activeTab === 'documentos' && (
+          <div className="grid gap-6 lg:grid-cols-2">
+            {/* PNO */}
+            <div className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+              <div className="mb-6 flex items-center gap-3 border-b border-border pb-4">
+                <div className="rounded-lg bg-amber-500/10 p-2 text-amber-600">
+                  <FileText className="h-5 w-5" />
+                </div>
+                <h2 className="text-lg font-semibold text-text">PNO</h2>
+                <span className="ml-auto text-xs text-text-secondary">Procedimientos Normalizados de Operación</span>
+              </div>
+              
+              {orgDocsData.PNO ? (
+                <div className="space-y-4">
+                  <div className="rounded-lg bg-bg p-4 border border-border">
+                    <p className="text-sm text-text-secondary mb-3">Documento actual:</p>
+                    <a 
+                      href={orgDocsData.PNO} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-primary hover:underline"
+                    >
+                      <Eye className="h-4 w-4" />
+                      Ver documento
+                    </a>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => setOrgDocModal('PNO')}
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    Reemplazar documento
+                  </Button>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <FileText className="h-12 w-12 mx-auto mb-3 text-text-secondary opacity-50" />
+                  <p className="text-sm text-text-secondary mb-4">No hay documento PNO cargado</p>
+                  <Button onClick={() => setOrgDocModal('PNO')}>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Subir documento PNO
+                  </Button>
+                </div>
+              )}
+            </div>
+            
+            {/* Reglamento del Negocio */}
+            <div className="rounded-xl border border-border bg-surface p-6 shadow-sm">
+              <div className="mb-6 flex items-center gap-3 border-b border-border pb-4">
+                <div className="rounded-lg bg-purple-500/10 p-2 text-purple-600">
+                  <BookOpen className="h-5 w-5" />
+                </div>
+                <h2 className="text-lg font-semibold text-text">Reglamento del Negocio</h2>
+                <span className="ml-auto text-xs text-text-secondary">Normativas internas</span>
+              </div>
+              
+              {orgDocsData.REGLAMENTO ? (
+                <div className="space-y-4">
+                  <div className="rounded-lg bg-bg p-4 border border-border">
+                    <p className="text-sm text-text-secondary mb-3">Documento actual:</p>
+                    <a 
+                      href={orgDocsData.REGLAMENTO} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-primary hover:underline"
+                    >
+                      <Eye className="h-4 w-4" />
+                      Ver documento
+                    </a>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => setOrgDocModal('REGLAMENTO')}
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    Reemplazar documento
+                  </Button>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <BookOpen className="h-12 w-12 mx-auto mb-3 text-text-secondary opacity-50" />
+                  <p className="text-sm text-text-secondary mb-4">No hay documento de reglamento cargado</p>
+                  <Button onClick={() => setOrgDocModal('REGLAMENTO')}>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Subir reglamento
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      
+      {/* Biblioteca de Documentos - Modal para PNO y Reglamento */}
+      {orgDocModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl">
+            <div className="mb-6 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="rounded-lg bg-primary/10 p-2 text-primary">
+                  <FolderOpen className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-text">
+                    {orgDocModal === 'PNO' ? 'Procedimientos Normalizados de Operación (PNO)' : 'Reglamento del Negocio'}
+                  </h2>
+                </div>
+              </div>
+              <button onClick={() => { setOrgDocModal(null); setOrgDocFile(null); }} className="rounded-full p-2 text-text-secondary hover:bg-surface-hover hover:text-text transition-colors">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            {orgDocsData[orgDocModal] ? (
+              <div className="space-y-4">
+                <div className="rounded-lg bg-bg p-4 border border-border">
+                  <p className="text-sm text-text-secondary mb-2">Documento actual:</p>
+                  <a 
+                    href={orgDocsData[orgDocModal]!} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline flex items-center gap-2"
+                  >
+                    <Eye className="h-4 w-4" />
+                    Ver documento
+                  </a>
+                </div>
+                <p className="text-sm text-text-secondary">Para reemplazar, sube un nuevo archivo:</p>
+              </div>
+            ) : (
+              <p className="text-sm text-text-secondary mb-4">No hay documento cargado. Sube uno nuevo:</p>
+            )}
+            
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Seleccionar archivo (PDF, imagen, etc.)</Label>
+                <input
+                  type="file"
+                  accept="*"
+                  className="block w-full text-sm text-text file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                  onChange={e => {
+                    if (e.target.files && e.target.files[0]) {
+                      setOrgDocFile(e.target.files[0]);
+                    }
+                  }}
+                />
+              </div>
+              
+              <div className="flex gap-3">
+                <Button 
+                  variant="outline" 
+                  className="flex-1"
+                  onClick={() => { setOrgDocModal(null); setOrgDocFile(null); }}
+                  disabled={isUploadingOrgDoc}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  className="flex-1 gap-2"
+                  onClick={async () => {
+                    if (!orgDocFile) {
+                      toast.error('Selecciona un archivo primero');
+                      return;
+                    }
+                    
+                    setIsUploadingOrgDoc(true);
+                    try {
+                      const { supabase } = useDatabaseStore.getState();
+                      const docType = orgDocModal === 'PNO' ? 'pno' : 'reglamento';
+                      const fileName = `${docType}-${Date.now()}-${orgDocFile.name.replace(/[^a-zA-Z0-9.]/g, '')}`;
+                      
+                      const { data: uploadData, error: uploadError } = await supabase.storage
+                        .from('hr-documents')
+                        .upload(fileName, orgDocFile);
+                      
+                      if (uploadError) {
+                        throw new Error(uploadError.message);
+                      }
+                      
+                      if (uploadData) {
+                        const { data: urlData } = supabase.storage.from('hr-documents').getPublicUrl(fileName);
+                        const docUrl = urlData.publicUrl;
+                        
+                        localStorage.setItem(`org_doc_${docType}`, docUrl);
+                        toast.success('Documento subido exitosamente');
+                        setOrgDocModal(null);
+                        setOrgDocFile(null);
+                      }
+                    } catch (err: any) {
+                      toast.error(err.message || 'Error al subir el documento');
+                    } finally {
+                      setIsUploadingOrgDoc(false);
+                    }
+                  }}
+                  disabled={isUploadingOrgDoc || !orgDocFile}
+                >
+                  {isUploadingOrgDoc ? 'Subiendo...' : 'Subir Documento'}
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       )}

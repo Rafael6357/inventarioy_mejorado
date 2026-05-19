@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
-import { TrendingUp, DollarSign, Package, AlertTriangle, ArrowUpRight, ArrowDownRight, Activity, Download, Search, Calendar } from 'lucide-react';
+import { TrendingUp, DollarSign, Package, AlertTriangle, ArrowUpRight, ArrowDownRight, Activity, Download, Search, Calendar, RotateCcw } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
@@ -33,7 +33,38 @@ export default function AnalysisView() {
   const [auditDateFrom, setAuditDateFrom] = useState<string>('');
   const [auditDateTo, setAuditDateTo] = useState<string>('');
 
+  const [turnoverDateFrom, setTurnoverDateFrom] = useState<string>('');
+  const [turnoverDateTo, setTurnoverDateTo] = useState<string>('');
+
   const today = new Date();
+  const setTurnoverHoy = () => {
+    const d = today.toISOString().split('T')[0];
+    setTurnoverDateFrom(d);
+    setTurnoverDateTo(d);
+  };
+  const setTurnoverAyer = () => {
+    const d = new Date(today);
+    d.setDate(d.getDate() - 1);
+    const y = d.toISOString().split('T')[0];
+    setTurnoverDateFrom(y);
+    setTurnoverDateTo(y);
+  };
+  const setTurnoverUltimos30 = () => {
+    const d = new Date(today);
+    d.setDate(d.getDate() - 30);
+    setTurnoverDateFrom(d.toISOString().split('T')[0]);
+    setTurnoverDateTo(today.toISOString().split('T')[0]);
+  };
+  const setTurnoverEsteMes = () => {
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    setTurnoverDateFrom(firstDay.toISOString().split('T')[0]);
+    setTurnoverDateTo(today.toISOString().split('T')[0]);
+  };
+  const setTurnoverEsteAno = () => {
+    const firstDay = new Date(today.getFullYear(), 0, 1);
+    setTurnoverDateFrom(firstDay.toISOString().split('T')[0]);
+    setTurnoverDateTo(today.toISOString().split('T')[0]);
+  };
   const setHoy = () => {
     const d = today.toISOString().split('T')[0];
     setAuditDateFrom(d);
@@ -139,34 +170,107 @@ export default function AnalysisView() {
   const grossProfit = totalSalesRevenue - totalCostOfGoodsSold;
   const grossMargin = totalSalesRevenue > 0 ? (grossProfit / totalSalesRevenue) * 100 : 0;
 
-  const abcAnalysis = useMemo(() => {
-    if (totalInventoryValue === 0) return [];
-    const productsWithValue = activeProducts.map(p => ({
-      ...p,
-      totalValue: p.quantity * p.cost
-    })).sort((a, b) => b.totalValue - a.totalValue);
-    let cumulativeValue = 0;
-    return productsWithValue.map(p => {
-      cumulativeValue += p.totalValue;
-      const cumulativePercentage = (cumulativeValue / totalInventoryValue) * 100;
-      let classification = 'C';
-      if (cumulativePercentage <= 80) classification = 'A';
-      else if (cumulativePercentage <= 95) classification = 'B';
-      return { ...p, classification, cumulativePercentage };
-    });
-  }, [activeProducts, totalInventoryValue]);
+  const turnoverData = useMemo(() => {
+    if (!turnoverDateFrom || !turnoverDateTo || activeProducts.length === 0) return [];
+    
+    const fromDate = new Date(turnoverDateFrom + 'T00:00:00');
+    const toDate = new Date(turnoverDateTo + 'T23:59:59');
+    const daysInPeriod = Math.max(1, Math.round((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)));
+    
+    return activeProducts.map(product => {
+      const salesInPeriod = safeSales.filter(s => {
+        const sDate = new Date(s.date || s.created_at);
+        return sDate >= fromDate && sDate <= toDate;
+      });
+      
+      // 1. Ventas directas (productos individuales)
+      const ventasDirectas = salesInPeriod.reduce((sum, s) => {
+        const items = parseSaleItems(s.items);
+        return sum + items
+          .filter((item: any) => item.product_id === product.id && !item.is_recipe)
+          .reduce((itemSum: number, item: any) => itemSum + (item.quantity || 0), 0);
+      }, 0);
+      
+      // 2. Ingredientes de recetas vendidas
+      const ventasEnRecetas = salesInPeriod.reduce((sum, s) => {
+        const items = parseSaleItems(s.items);
+        return sum + items.reduce((itemSum: number, item: any) => {
+          if (item.recipe_snapshot?.ingredients) {
+            const ingredientConsumed = item.recipe_snapshot.ingredients
+              .filter((ing: any) => ing.product_id === product.id)
+              .reduce((ingSum: number, ing: any) => ingSum + (ing.quantity || 0), 0);
+            return itemSum + ingredientConsumed;
+          }
+          return itemSum;
+        }, 0);
+      }, 0);
+      
+      // 3. Movimiento de consumo directo (CONSUMO_DIRECTO)
+      const consumoDirecto = safeMovements.filter(m => 
+        m.product_id === product.id && 
+        m.type === 'CONSUMO_DIRECTO' &&
+        new Date(m.date) >= fromDate && new Date(m.date) <= toDate
+      ).reduce((sum, m) => sum + Number(m.quantity), 0);
+      
+      // 4. SALIDA movements (tránsito a cocina - gasto variable)
+      const salidasTransito = safeMovements.filter(m => 
+        m.product_id === product.id && 
+        m.type === 'SALIDA' &&
+        new Date(m.date) >= fromDate && new Date(m.date) <= toDate
+      ).reduce((sum, m) => sum + Number(m.quantity), 0);
+      
+      // Total consumo/salida real
+      const totalOutput = ventasDirectas + ventasEnRecetas + consumoDirecto + salidasTransito;
+      const currentStock = Number(product.quantity);
+      const dailySalesRate = totalOutput > 0 ? totalOutput / daysInPeriod : 0;
+      const daysCoverage = dailySalesRate > 0 ? currentStock / dailySalesRate : Infinity;
+      const turnoverRate = currentStock > 0 ? totalOutput / currentStock : 0;
+      const annualTurnover = daysInPeriod > 0 ? turnoverRate * (365 / daysInPeriod) : 0;
+      const cogs = totalOutput * Number(product.cost);
+      const suggestedRop = Math.round(dailySalesRate * 7);
+      
+      let classification: string;
+      let classificationColor: string;
+      if (!isFinite(daysCoverage) || daysCoverage > 15) {
+        classification = 'Exceso';
+        classificationColor = 'success';
+      } else if (daysCoverage <= 3) {
+        classification = 'Crítico';
+        classificationColor = 'danger';
+      } else {
+        classification = 'Normal';
+        classificationColor = 'warning';
+      }
+      
+      return {
+        product,
+        ventasDirectas,
+        ventasEnRecetas,
+        consumoDirecto,
+        totalOutput,
+        cogs,
+        currentStock,
+        dailySalesRate,
+        daysCoverage: isFinite(daysCoverage) ? daysCoverage : 999,
+        turnoverRate,
+        annualTurnover,
+        suggestedRop,
+        classification,
+        classificationColor,
+      };
+    })
+    .filter(d => d.totalOutput > 0 || d.currentStock > 0)
+    .sort((a, b) => a.daysCoverage - b.daysCoverage);
+  }, [activeProducts, safeSales, safeMovements, turnoverDateFrom, turnoverDateTo]);
 
-  const lowStockProducts = activeProducts.filter(p => {
-    const physicalStock = Number(p.quantity) - (Number(p.in_transit) || 0);
-    return physicalStock <= p.rop;
-  });
+  const criticalProductsCount = turnoverData.filter(d => d.classification === 'Crítico').length;
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-text">Análisis y Rentabilidad</h1>
         <p className="text-sm text-text-secondary">
-          Métricas clave del negocio, clasificación ABC y auditoría de inventario
+          Métricas clave del negocio, rotación de inventario y auditoría
         </p>
       </div>
 
@@ -216,8 +320,8 @@ export default function AnalysisView() {
               <AlertTriangle className="h-4 w-4" />
             </div>
           </div>
-          <p className="mt-4 text-2xl font-bold text-text">{lowStockProducts.length}</p>
-          <p className="mt-1 text-xs text-text-secondary">Productos por reabastecer</p>
+          <p className="mt-4 text-2xl font-bold text-text">{criticalProductsCount}</p>
+          <p className="mt-1 text-xs text-text-secondary">Productos críticos (≤3 días)</p>
         </div>
       </div>
 
@@ -375,97 +479,155 @@ export default function AnalysisView() {
         )}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-6 shadow-sm lg:col-span-2 transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(205,164,52,0.15)]">
-          <div className="mb-6 flex items-center gap-3 border-b border-border/50 pb-4">
-            <div className="rounded-lg bg-primary/10 p-2 text-primary drop-shadow-[0_0_8px_rgba(205,164,52,0.5)]">
-              <Activity className="h-5 w-5" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-text">Clasificación ABC (Valor de Inventario)</h2>
-              <p className="text-xs text-text-secondary">A: 80% del valor | B: 15% del valor | C: 5% del valor</p>
-            </div>
+      <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(205,164,52,0.15)]">
+        <div className="mb-6 flex items-center gap-3 border-b border-border/50 pb-4">
+          <div className="rounded-lg bg-primary/10 p-2 text-primary drop-shadow-[0_0_8px_rgba(205,164,52,0.5)]">
+            <RotateCcw className="h-5 w-5" />
           </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-text [&_tr]:divide-x [&_tr]:divide-border/50">
-              <thead className="border-b border-border bg-bg/50 text-xs uppercase text-text-secondary">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Clase</th>
-                  <th className="px-4 py-3 font-medium">Producto</th>
-                  <th className="px-4 py-3 font-medium text-right">Stock</th>
-                  <th className="px-4 py-3 font-medium text-right">Valor Total</th>
-                  <th className="px-4 py-3 font-medium text-right">% Acumulado</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {abcAnalysis.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-text-secondary">
-                      No hay productos en el inventario.
-                    </td>
-                  </tr>
-                ) : (
-                  abcAnalysis.map((product) => (
-                    <tr key={product.id} className="transition-colors hover:bg-surface-hover">
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
-                          product.classification === 'A' ? 'bg-success/20 text-success' :
-                          product.classification === 'B' ? 'bg-primary/20 text-primary' :
-                          'bg-text-secondary/20 text-text-secondary'
-                        }`}>
-                          {product.classification}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-medium">{product.name}</td>
-                      <td className="px-4 py-3 text-right">{Number(product.quantity).toFixed(4)} {product.unit}</td>
-                      <td className="px-4 py-3 text-right font-mono">${product.totalValue.toFixed(2)}</td>
-                      <td className="px-4 py-3 text-right font-mono text-text-secondary">
-                        {product.cumulativePercentage.toFixed(1)}%
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+          <div>
+            <h2 className="text-lg font-semibold text-text">Rotación de Inventario</h2>
+            <p className="text-xs text-text-secondary">Análisis de velocidad de venta y cobertura de stock</p>
           </div>
         </div>
 
-        <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-6 shadow-sm lg:col-span-1 transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(205,164,52,0.15)]">
-          <h2 className="text-lg font-semibold text-text mb-4">Recomendaciones</h2>
-          <div className="space-y-4">
-            <div className="rounded-lg border border-success/30 bg-success/10 p-4 shadow-[inset_0_0_15px_rgba(34,197,94,0.05)]">
-              <h3 className="font-medium text-success text-sm mb-1">Productos Clase A</h3>
-              <p className="text-xs text-text-secondary">
-                Representan el 80% del valor de tu inventario. Requieren control estricto, conteos cíclicos frecuentes y negociaciones cuidadosas con proveedores.
-              </p>
+        <div className="mb-4 flex flex-wrap gap-2 items-end">
+          <div className="flex-1 min-w-[120px]">
+            <label className="text-xs font-medium text-text-secondary block mb-1">Desde</label>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary pointer-events-none" />
+              <Input
+                type="date"
+                value={turnoverDateFrom}
+                onChange={e => setTurnoverDateFrom(e.target.value)}
+                className="pl-9"
+              />
             </div>
-            <div className="rounded-lg border border-primary/30 bg-primary/10 p-4 shadow-[inset_0_0_15px_rgba(205,164,52,0.05)]">
-              <h3 className="font-medium text-primary text-sm mb-1">Productos Clase B</h3>
-              <p className="text-xs text-text-secondary">
-                Representan el 15% del valor. Mantén un control moderado y revisa sus niveles de stock periódicamente.
-              </p>
+          </div>
+          <div className="flex-1 min-w-[120px]">
+            <label className="text-xs font-medium text-text-secondary block mb-1">Hasta</label>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary pointer-events-none" />
+              <Input
+                type="date"
+                value={turnoverDateTo}
+                onChange={e => setTurnoverDateTo(e.target.value)}
+                className="pl-9"
+              />
             </div>
-            <div className="rounded-lg border border-border/50 bg-bg/50 p-4">
-              <h3 className="font-medium text-text text-sm mb-1">Productos Clase C</h3>
-              <p className="text-xs text-text-secondary">
-                Representan solo el 5% del valor pero suelen ser la mayoría de los items. Usa controles visuales simples y pedidos automáticos (ROP).
-              </p>
+          </div>
+          <div className="flex gap-1">
+            <Button size="sm" variant="outline" onClick={setTurnoverHoy}>Hoy</Button>
+            <Button size="sm" variant="outline" onClick={setTurnoverAyer}>Ayer</Button>
+            <Button size="sm" variant="outline" onClick={setTurnoverUltimos30}>30D</Button>
+            <Button size="sm" variant="outline" onClick={setTurnoverEsteMes}>Mes</Button>
+            <Button size="sm" variant="outline" onClick={setTurnoverEsteAno}>Año</Button>
+          </div>
+        </div>
+
+        {(!turnoverDateFrom || !turnoverDateTo) && (
+          <p className="text-sm text-text-secondary text-center py-8">
+            Selecciona un rango de fechas para ver el análisis de rotación.
+          </p>
+        )}
+
+        {turnoverDateFrom && turnoverDateTo && (
+          <>
+            <div className="mb-4 flex gap-4 text-xs">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-danger"></span> Crítico: ≤3 días</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-warning"></span> Normal: 4-15 días</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-success"></span> Exceso: &gt;15 días</span>
             </div>
-            
-            {lowStockProducts.length > 0 && (
-              <div className="rounded-lg border border-danger/30 bg-danger/10 p-4 mt-4 shadow-[inset_0_0_15px_rgba(239,68,68,0.05)]">
-                <h3 className="font-medium text-danger text-sm mb-1 flex items-center gap-1 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]">
+
+            <div className="overflow-y-auto max-h-[400px]">
+              <table className="w-full text-left text-sm text-text [&_tr]:divide-x [&_tr]:divide-border/50">
+                <thead className="sticky top-0 z-10 border-b border-border bg-bg/95 text-xs uppercase text-text-secondary shadow-sm">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">
+                      <div>Producto</div>
+                      <div className="text-[10px] normal-case font-normal text-text-secondary/70">Nombre y categoría</div>
+                    </th>
+                    <th className="px-4 py-3 font-medium text-right">
+                      <div>Consumido</div>
+                      <div className="text-[10px] normal-case font-normal text-text-secondary/70">Ventas + Recetas + Consumo</div>
+                    </th>
+                    <th className="px-4 py-3 font-medium text-right">
+                      <div>Stock</div>
+                      <div className="text-[10px] normal-case font-normal text-text-secondary/70">Cantidad actual</div>
+                    </th>
+                    <th className="px-4 py-3 font-medium text-right">
+                      <div>Cobertura</div>
+                      <div className="text-[10px] normal-case font-normal text-text-secondary/70">Días que durará el stock</div>
+                    </th>
+                    <th className="px-4 py-3 font-medium text-right">
+                      <div>Rot. Anual</div>
+                      <div className="text-[10px] normal-case font-normal text-text-secondary/70">Veces que renueva/año</div>
+                    </th>
+                    <th className="px-4 py-3 font-medium text-right">
+                      <div>ROP Sug.</div>
+                      <div className="text-[10px] normal-case font-normal text-text-secondary/70">Punto de reorden ×7 días</div>
+                    </th>
+                    <th className="px-4 py-3 font-medium">
+                      <div>Estado</div>
+                      <div className="text-[10px] normal-case font-normal text-text-secondary/70">Crítico/Normal/Exceso</div>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {turnoverData.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-8 text-center text-text-secondary">
+                        No hay datos de ventas en el período seleccionado.
+                      </td>
+                    </tr>
+                  ) : (
+                    turnoverData.map((item) => (
+                      <tr key={item.product.id} className={`transition-colors hover:bg-surface-hover ${
+                        item.classification === 'Crítico' ? 'bg-danger/5' : 
+                        item.classification === 'Exceso' ? 'bg-success/5' : ''
+                      }`}>
+                        <td className="px-4 py-3">
+                          <div className="font-medium">{item.product.name}</div>
+                          <div className="text-xs text-text-secondary">{item.product.category}</div>
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono">{item.totalOutput.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right font-mono">{item.currentStock.toFixed(2)} {item.product.unit}</td>
+                        <td className={`px-4 py-3 text-right font-mono font-medium ${
+                          item.classification === 'Crítico' ? 'text-danger' :
+                          item.classification === 'Exceso' ? 'text-success' : 'text-warning'
+                        }`}>
+                          {item.daysCoverage > 999 ? '∞' : item.daysCoverage.toFixed(1)} días
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono">{item.annualTurnover.toFixed(1)}x</td>
+                        <td className="px-4 py-3 text-right font-mono">{item.suggestedRop}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                            item.classificationColor === 'danger' ? 'bg-danger/20 text-danger' :
+                            item.classificationColor === 'success' ? 'bg-success/20 text-success' :
+                            'bg-warning/20 text-warning'
+                          }`}>
+                            {item.classification}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {criticalProductsCount > 0 && (
+              <div className="mt-4 rounded-lg border border-danger/30 bg-danger/10 p-4">
+                <div className="flex items-center gap-2 text-danger font-medium text-sm mb-1">
                   <AlertTriangle className="h-4 w-4" />
-                  Atención Requerida
-                </h3>
+                  Productos críticos requieren atención inmediata
+                </div>
                 <p className="text-xs text-text-secondary">
-                  Tienes {lowStockProducts.length} producto(s) por debajo del stock mínimo. Revisa el módulo de inventario para reabastecer.
+                  {criticalProductsCount} producto(s) con cobertura ≤3 días. Considera reabastecerlos pronto.
                 </p>
               </div>
             )}
-          </div>
-        </div>
+          </>
+        )}
       </div>
     </div>
   );

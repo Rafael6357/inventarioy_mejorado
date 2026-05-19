@@ -4,7 +4,7 @@ import { Calendar, TrendingUp, Package, UtensilsCrossed } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 
 export default function ConsumptionView() {
-  const { products, recipes, sales } = useDatabaseStore();
+  const { products, recipes, sales, movements } = useDatabaseStore();
   
   // Date range defaults to today
   const [startDate, setStartDate] = useState(() => {
@@ -131,9 +131,72 @@ export default function ConsumptionView() {
       });
     });
 
+    // Calculate consumption from movements (CONSUMO_DIRECTO)
+    const filteredMovements = movements.filter(m => {
+      const movementDate = new Date(m.date).toISOString().split('T')[0];
+      return m.is_consumo_directo === true && 
+             movementDate >= startDate && 
+             movementDate <= endDate;
+    });
+
+    // Add consumption from CONSUMO_DIRECTO movements to the map
+    filteredMovements.forEach(movement => {
+      const product = products.find(p => p.id === movement.product_id);
+      if (product) {
+        const existing = consumptionMap.get(product.id) || {
+          product,
+          directQty: 0,
+          recipeQty: 0,
+          totalQty: 0,
+          totalCost: 0,
+          recipes: []
+        };
+        
+        existing.directQty += Number(movement.quantity);
+        existing.totalQty += Number(movement.quantity);
+        existing.totalCost += (product.cost * Number(movement.quantity));
+        
+        if (existing.recipes.find(r => r.recipeName === 'Consumo Directo')) {
+          existing.recipes.find(r => r.recipeName === 'Consumo Directo')!.qty += Number(movement.quantity);
+        } else {
+          existing.recipes.push({ recipeName: 'Consumo Directo', qty: Number(movement.quantity) });
+        }
+        
+        consumptionMap.set(product.id, existing);
+      }
+    });
+
+    // Calculate consumption from movements (GASTO_VARIABLE)
+    const gastoVariableMovements = movements.filter(m => {
+      const movementDate = new Date(m.date).toISOString().split('T')[0];
+      return m.is_gasto_variable === true && 
+             movementDate >= startDate && 
+             movementDate <= endDate;
+    });
+
+    gastoVariableMovements.forEach(movement => {
+      const product = products.find(p => p.id === movement.product_id);
+      if (product) {
+        const existing = consumptionMap.get(product.id) || {
+          product,
+          directQty: 0,
+          recipeQty: 0,
+          totalQty: 0,
+          totalCost: 0,
+          recipes: []
+        };
+        
+        existing.directQty += Number(movement.quantity);
+        existing.totalQty += Number(movement.quantity);
+        existing.totalCost += (product.cost * Number(movement.quantity));
+        
+        consumptionMap.set(product.id, existing);
+      }
+    });
+
     // Convert map to array and sort by total cost descending
     return Array.from(consumptionMap.values()).sort((a, b) => b.totalCost - a.totalCost);
-  }, [sales, products, recipes, startDate, endDate]);
+  }, [sales, products, recipes, movements, startDate, endDate]);
 
   const totalDailyCost = consumptionData.reduce((sum, item) => sum + item.totalCost, 0);
 
@@ -212,6 +275,7 @@ export default function ConsumptionView() {
             <thead className="bg-bg/50 text-xs uppercase text-text-secondary">
               <tr>
                 <th className="px-6 py-4 font-medium">Ingrediente</th>
+                <th className="px-6 py-4 font-medium">Tipo</th>
                 <th className="px-6 py-4 font-medium">Consumo Directo</th>
                 <th className="px-6 py-4 font-medium">Consumo en Recetas</th>
                 <th className="px-6 py-4 font-medium">Total Consumido</th>
@@ -221,7 +285,7 @@ export default function ConsumptionView() {
             <tbody className="divide-y divide-border">
               {consumptionData.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-text-secondary">
+                  <td colSpan={6} className="px-6 py-12 text-center text-text-secondary">
                     No hay registros de consumo para el rango de fechas seleccionado.
                   </td>
                 </tr>
@@ -231,6 +295,25 @@ export default function ConsumptionView() {
                     <td className="px-6 py-4">
                       <p className="font-medium text-text">{item.product.name}</p>
                       <p className="text-xs text-text-secondary">{item.product.category}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      {item.product.is_consumo_directo ? (
+                        <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-600">
+                          Consumo Directo
+                        </span>
+                      ) : item.product.is_gasto_variable ? (
+                        <span className="inline-flex items-center rounded-full bg-purple-500/10 px-2.5 py-1 text-xs font-medium text-purple-600">
+                          Gasto Variable
+                        </span>
+                      ) : item.product.is_individual ? (
+                        <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                          Individual
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-surface-hover px-2.5 py-1 text-xs font-medium text-text-secondary">
+                          Ingrediente
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       {item.directQty > 0 ? (

@@ -11,7 +11,9 @@ import {
   Check
 } from 'lucide-react';
 import { useDatabaseStore } from '../store/dbStore';
+import { UNIT_LABELS } from '../lib/unitConversion';
 import { toast } from 'sonner';
+import { validateNumber, getNumberFromString } from '../lib/utils';
 
 interface OnboardingWizardProps {
   isOpen: boolean;
@@ -33,13 +35,8 @@ export default function OnboardingWizard({ isOpen, onClose }: OnboardingWizardPr
     quantity: 0,
     price: 0,
     cost: 0,
-    rop: 0,
-    eoq: 0,
     description: '',
     is_individual: false,
-    lead_time: 0,
-    order_cost: 0,
-    holding_cost: 0,
     expiration_date: ''
   });
 
@@ -76,6 +73,20 @@ export default function OnboardingWizard({ isOpen, onClose }: OnboardingWizardPr
   const handleCreateProduct = async () => {
     if (!productData.name.trim()) return;
     
+    const costValidation = validateNumber(String(productData.cost), { required: true, min: 0.01, fieldName: 'Costo unitario' });
+    if (!costValidation.isValid) {
+      toast.error(costValidation.error);
+      return;
+    }
+    
+    if (productData.is_individual) {
+      const priceValidation = validateNumber(String(productData.price), { required: true, min: 0.01, fieldName: 'Precio de venta' });
+      if (!priceValidation.isValid) {
+        toast.error(priceValidation.error);
+        return;
+      }
+    }
+    
     setIsLoading(true);
     try {
       await addProduct({
@@ -85,13 +96,8 @@ export default function OnboardingWizard({ isOpen, onClose }: OnboardingWizardPr
         quantity: productData.quantity,
         price: productData.price,
         cost: productData.cost,
-        rop: productData.rop,
-        eoq: productData.eoq,
         description: productData.description,
         is_individual: productData.is_individual,
-        lead_time: productData.lead_time,
-        order_cost: productData.order_cost,
-        holding_cost: productData.holding_cost,
         expiration_date: productData.expiration_date || null,
         is_active: true
       });
@@ -234,19 +240,14 @@ export default function OnboardingWizard({ isOpen, onClose }: OnboardingWizardPr
                     <span title="Unidad de medida: kg, L, unidades, etc." className="cursor-help text-primary">ⓘ</span>
                   </label>
                   <select
+                    id="product-unit"
                     value={productData.unit}
                     onChange={(e) => setProductData({ ...productData, unit: e.target.value })}
                     className="w-full px-4 py-2.5 bg-bg border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
                   >
-                    <option value="u">Unidades (u)</option>
-                    <option value="kg">Kilogramos (kg)</option>
-                    <option value="g">Gramos (g)</option>
-                    <option value="lb">Libras (lb)</option>
-                    <option value="oz">Onzas (oz)</option>
-                    <option value="L">Litros (L)</option>
-                    <option value="ml">Mililitros (ml)</option>
-                    <option value="gal">Galones (gal)</option>
-                    <option value="fl oz">Onzas líquidas (fl oz)</option>
+                    {Object.entries(UNIT_LABELS).map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -260,18 +261,6 @@ export default function OnboardingWizard({ isOpen, onClose }: OnboardingWizardPr
                     type="number"
                     value={productData.quantity}
                     onChange={(e) => setProductData({ ...productData, quantity: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-4 py-2.5 bg-bg border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-text flex items-center gap-1">
-                    Punto de reorden (ROP)
-                    <span title="Nivel mínimo que activa alerta de reposición" className="cursor-help text-primary">ⓘ</span>
-                  </label>
-                  <input
-                    type="number"
-                    value={productData.rop}
-                    onChange={(e) => setProductData({ ...productData, rop: parseFloat(e.target.value) || 0 })}
                     className="w-full px-4 py-2.5 bg-bg border border-border rounded-lg text-text focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
                   />
                 </div>

@@ -22,6 +22,7 @@ export interface Product {
   is_individual: boolean;
   is_active: boolean;
   in_transit?: number;
+  is_gasto_variable?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -30,7 +31,7 @@ export interface Movement {
   id: string;
   user_id: string;
   product_id: string;
-  type: 'ENTRADA' | 'SALIDA' | 'MERMA';
+  type: 'ENTRADA' | 'SALIDA' | 'MERMA' | 'AJUSTE';
   quantity: number;
   unit: string;
   date: string;
@@ -39,6 +40,7 @@ export interface Movement {
   status?: string;
   justification?: string;
   justification_date?: string;
+  is_gasto_variable?: boolean;
   created_at: string;
 }
 
@@ -179,6 +181,8 @@ export interface Employee {
   email?: string;
   nit_id?: string;
   category?: string;
+  photo_url?: string;
+  hire_date?: string;
   created_at: string;
 }
 
@@ -271,7 +275,7 @@ export interface PayrollEntry {
 const capitalize = (str: string) =>
   str.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
 
-const DEFAULT_TIMEOUT = 15000; // 15 segundos
+const DEFAULT_TIMEOUT = 30000; // 30 segundos
 
 const isRateLimitError = (err: any): boolean => {
   return err?.status === 429 || err?.code === '429' || 
@@ -374,6 +378,7 @@ interface DatabaseState {
   consumeFromTransit: (productId: string, quantity: number, reason?: string) => Promise<{ success: boolean; error?: string }>;
   cancelTransit: (transitItemId: string, quantity: number, reason: string) => Promise<{ success: boolean; error?: string }>;
   registerWasteFromTransit: (transitItemId: string, quantity: number, reason: string) => Promise<{ success: boolean; error?: string }>;
+  registerManualConsumption: (transitItemId: string, quantity: number, note?: string) => Promise<{ success: boolean; error?: string }>;
   
   addSale: (sale: Omit<Sale, 'id' | 'user_id' | 'created_at'>) => Promise<{ success: boolean; error?: string }>;
   
@@ -756,7 +761,7 @@ addProduct: async (product) => {
     
     // Si está online, proceder normalmente
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
+    if (!session) throw new Error('Sesión expirada. Por favor, inicia sesión nuevamente.');
 
     const { data: newMovement, error: movementError } = await supabase
       .from('movements')
@@ -1021,8 +1026,9 @@ addProduct: async (product) => {
 
       newMovement = movementData;
 
-      if (movementError && import.meta.env.DEV) {
+      if (movementError) {
         console.error('Error recording sale movement:', movementError);
+        throw new Error('No se pudo registrar el movimiento de venta');
       }
 
       const { error: productError } = await supabase
@@ -1223,6 +1229,96 @@ addProduct: async (product) => {
 
       const newInTransit = Math.max(0, Number(product.in_transit || 0) - quantity);
       const newQuantity = Math.max(0, Number(product.quantity || 0) - quantity);
+
+      return {
+        transitItems: updatedTransitItems,
+        products: state.products.map(p =>
+          p.id === product.id
+            ? { ...p, in_transit: newInTransit, quantity: newQuantity }
+            : p
+        ),
+      };
+    });
+
+    return { success: true };
+  },
+
+  registerManualConsumption: async (transitItemId: string, quantity: number, note?: string) => {
+    const user = useAuthStore.getState().user;
+    if (!user) return { success: false, error: 'No autenticado' };
+
+    const transitItem = get().transitItems.find(t => t.id === transitItemId);
+    if (!transitItem) return { success: false, error: 'Item no encontrado' };
+
+    if (quantity <= 0) return { success: false, error: 'La cantidad debe ser mayor a 0' };
+    if (quantity > transitItem.remaining) {
+      return { success: false, error: `La cantidad no puede exceder ${transitItem.remaining}` };
+    }
+
+    const product = get().products.find(p => p.id === transitItem.product_id);
+    if (!product) return { success: false, error: 'Producto no encontrado' };
+
+    const newRemaining = transitItem.remaining - quantity;
+    const newConsumed = (transitItem.consumed || 0) + quantity;
+
+    const { error: updateError } = await supabase
+      .from('transit_items')
+      .update({ remaining: newRemaining, consumed: newConsumed })
+      .eq('id', transitItemId);
+
+    if (updateError) {
+      return { success: false, error: 'No se pudo actualizar el item en tránsito' };
+    }
+
+    const newInTransit = Math.max(0, Number(product.in_transit || 0) - quantity);
+    const newQuantity = Math.max(0, Number(product.quantity || 0) - quantity);
+
+    const { error: productUpdateError } = await supabase
+      .from('products')
+      .update({ in_transit: newInTransit, quantity: newQuantity })
+      .eq('id', product.id);
+
+    if (productUpdateError) {
+      await supabase.from('transit_items').update({ remaining: transitItem.remaining, consumed: transitItem.consumed }).eq('id', transitItemId);
+      return { success: false, error: 'No se pudo actualizar el producto' };
+    }
+
+    const isGastoVariable = product.is_gasto_variable === true;
+
+    const { data: movementData, error: movementError } = await supabase
+      .from('movements')
+      .insert({
+        user_id: user.id,
+        product_id: product.id,
+        type: 'SALIDA',
+        quantity,
+        unit: product.unit,
+        date: new Date().toISOString(),
+        cost: Number(product.cost),
+        reason: isGastoVariable ? 'Gasto variable registrado desde tránsito' : 'Consumo manual desde tránsito',
+        note: note || null,
+        is_consumo_directo: !isGastoVariable,
+        is_gasto_variable: isGastoVariable,
+        status: 'NORMAL',
+      })
+      .select()
+      .single();
+
+    if (movementError) {
+      if (import.meta.env.DEV) console.error('Error registering consumption movement:', movementError);
+    } else if (movementData) {
+      set((state) => ({ movements: [movementData, ...state.movements] }));
+    }
+
+    set((state) => {
+      const updatedTransitItems = state.transitItems
+        .map(t => {
+          if (t.id === transitItemId) {
+            return { ...t, remaining: newRemaining, consumed: newConsumed };
+          }
+          return t;
+        })
+        .filter(t => t.remaining > 0);
 
       return {
         transitItems: updatedTransitItems,

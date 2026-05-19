@@ -4,7 +4,7 @@ import { useAuthStore } from '../../store/authStore';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
-import { PackagePlus, ArrowRightLeft, Settings2, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { PackagePlus, ArrowRightLeft, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   convertUnit,
@@ -15,6 +15,7 @@ import {
   UnitAbbrev,
   UNIT_LABELS,
 } from '../../lib/unitConversion';
+import { validateNumber, getNumberFromString } from '../../lib/utils';
 
 const DEFAULT_CATEGORIES = [
   "Bebidas y Refrescos",
@@ -37,7 +38,6 @@ export default function InventoryView() {
   
   const activeProducts = products.filter(p => p.is_active !== false);
 
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [isCustomCategory, setIsCustomCategory] = useState(false);
   const [customCategory, setCustomCategory] = useState('');
 
@@ -69,6 +69,8 @@ export default function InventoryView() {
     expiration_date: '',
     description: '',
     is_individual: false,
+    is_consumo_directo: false,
+    is_gasto_variable: false,
     lead_time: 0,
     order_cost: 0,
     holding_cost: 0,
@@ -83,6 +85,7 @@ export default function InventoryView() {
     date: new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16),
     cost: 0,
     reason: '',
+    note: '',
     status: 'NORMAL' as 'NORMAL' | 'ANOMALIA' | 'JUSTIFICADO',
   });
   const [isSubmittingMovement, setIsSubmittingMovement] = useState(false);
@@ -94,10 +97,20 @@ export default function InventoryView() {
     e.preventDefault();
     if (!user) return;
     
-    // Validar precio si es indivdual
-    if (newProduct.is_individual && (!newProduct.price || newProduct.price < 0.01)) {
-      toast.error('El precio de venta debe ser mayor a $0 para productos que se venden individualmente');
+    const costValidation = validateNumber(String(newProduct.cost), { required: true, min: 0.01, fieldName: 'Costo unitario' });
+    if (!costValidation.isValid) {
+      toast.error(costValidation.error);
+      setIsSubmittingProduct(false);
       return;
+    }
+    
+    if (newProduct.is_individual) {
+      const priceValidation = validateNumber(String(newProduct.price), { required: true, min: 0.01, fieldName: 'Precio de venta' });
+      if (!priceValidation.isValid) {
+        toast.error(priceValidation.error);
+        setIsSubmittingProduct(false);
+        return;
+      }
     }
     
     try {
@@ -114,8 +127,9 @@ export default function InventoryView() {
       });
       
       setNewProduct({
-        name: '', category: '', unit: 'unidades', quantity: 0, price: 0, cost: 0,
+        name: '', category: '', unit: 'u', quantity: 0, price: 0, cost: 0,
         rop: 0, eoq: 0, expiration_date: '', description: '', is_individual: false,
+        is_consumo_directo: false, is_gasto_variable: false,
         lead_time: 0, order_cost: 0, holding_cost: 0,
       });
       setIsCustomCategory(false);
@@ -145,11 +159,25 @@ export default function InventoryView() {
       return;
     }
 
+    const quantityValidation = validateNumber(String(movement.quantity), { required: true, min: 0.0001, fieldName: 'Cantidad' });
+    if (!quantityValidation.isValid) {
+      toast.error(quantityValidation.error);
+      return;
+    }
+
+    // Validar nota obligatoria para CONSUMO_DIRECTO
+    if (movement.type === 'CONSUMO_DIRECTO' && !movement.note.trim()) {
+      toast.error('La nota es obligatoria para Consumo Directo');
+      return;
+    }
+
     const product = products.find(p => p.id === movement.product_id);
     if (!product) {
       toast.error('Producto no encontrado');
       return;
     }
+
+    
     
     const baseUnit = normalizeUnit(product.unit);
     const quantityInBase = convertUnit(movement.quantity, movement.displayUnit, baseUnit);
@@ -159,6 +187,7 @@ export default function InventoryView() {
       return;
     }
     
+    // SALIDA requiere validación de stock
     if (movement.type === 'SALIDA') {
       const availableStock = Number(product.quantity) - (Number(product.in_transit) || 0);
       if (quantityInBase > availableStock) {
@@ -169,6 +198,7 @@ export default function InventoryView() {
 
     setIsSubmittingMovement(true);
     try {
+      const isConsumoDirecto = product.is_consumo_directo === true;
       const isAnomaly = movement.type === 'SALIDA' && quantityInBase > (Number(product.quantity) * 0.5);
 
       const movementCost = movement.type === 'ENTRADA' 
@@ -182,6 +212,7 @@ export default function InventoryView() {
         unit: baseUnit,
         cost: movementCost,
         reason: movement.reason || null,
+        note: isConsumoDirecto ? (movement.note || null) : null,
         status: isAnomaly ? 'ANOMALIA' : 'NORMAL',
         date: convertToUTC(movement.date),
       };
@@ -192,7 +223,8 @@ export default function InventoryView() {
         product_name: product.name,
         quantity: movement.quantity,
         unit: movement.displayUnit,
-        reason: movement.reason
+        reason: movement.reason,
+        note: movement.note
       });
       
       saveLastUsedUnit(movement.product_id, movement.displayUnit);
@@ -206,6 +238,7 @@ export default function InventoryView() {
         date: new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16),
         cost: 0,
         reason: '',
+        note: '',
         status: 'NORMAL',
       });
       toast.success('Movimiento registrado exitosamente');
@@ -242,7 +275,7 @@ export default function InventoryView() {
                 <Input id="name" required value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="category">Categoría *</Label>
+                <Label htmlFor={!isCustomCategory ? "category" : "custom_category"}>Categoría *</Label>
                 {!isCustomCategory ? (
                   <select
                     id="category"
@@ -302,15 +335,9 @@ export default function InventoryView() {
                   value={newProduct.unit}
                   onChange={e => setNewProduct({...newProduct, unit: e.target.value})}
                 >
-                  <option value="u">Unidades (u)</option>
-                  <option value="kg">Kilogramos (kg)</option>
-                  <option value="g">Gramos (g)</option>
-                  <option value="lb">Libras (lb)</option>
-                  <option value="oz">Onzas (oz)</option>
-                  <option value="L">Litros (L)</option>
-                  <option value="ml">Mililitros (ml)</option>
-                  <option value="gal">Galones (gal)</option>
-                  <option value="fl oz">Onzas líquidas (fl oz)</option>
+                  {Object.entries(UNIT_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -351,8 +378,9 @@ export default function InventoryView() {
                   checked={newProduct.is_individual}
                   onChange={e => setNewProduct({...newProduct, is_individual: e.target.checked})}
                 />
-                <Label htmlFor="is_individual" className="cursor-pointer">¿Se vende individualmente?</Label>
+                <Label htmlFor="is_individual" className="cursor-pointer">Se vende individualmente</Label>
               </div>
+              <p className="text-xs text-text-secondary pl-6">Ej: Bebidas, postres, platos (se asigna un precio de venta por unidad)</p>
               
               {newProduct.is_individual && (
                 <div className="space-y-2 sm:w-1/2">
@@ -360,48 +388,35 @@ export default function InventoryView() {
                   <Input id="price" type="number" min="0.01" step="0.01" required value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: Number(e.target.value)})} />
                 </div>
               )}
-            </div>
 
-            <div className="pt-4">
-              <button 
-                type="button" 
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                className="flex items-center gap-2 text-sm font-medium text-primary hover:underline"
-              >
-                <Settings2 className="h-4 w-4" />
-                {showAdvanced ? 'Ocultar Parámetros Avanzados' : 'Mostrar Parámetros Avanzados (ROP, EOQ)'}
-              </button>
-            </div>
-
-            {showAdvanced && (
-              <div className="grid gap-4 rounded-lg border border-border bg-bg/50 p-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="rop" className="text-xs">ROP (Punto de Reorden)</Label>
-                  <Input id="rop" type="number" min="0" value={newProduct.rop} onChange={e => setNewProduct({...newProduct, rop: Number(e.target.value)})} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="eoq" className="text-xs">EOQ (Cant. Económica)</Label>
-                  <Input id="eoq" type="number" min="0" value={newProduct.eoq} onChange={e => setNewProduct({...newProduct, eoq: Number(e.target.value)})} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lead_time" className="text-xs">Tiempo de Entrega (días)</Label>
-                  <Input id="lead_time" type="number" min="0" value={newProduct.lead_time} onChange={e => setNewProduct({...newProduct, lead_time: Number(e.target.value)})} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="order_cost" className="text-xs">Costo de Pedido</Label>
-                  <Input id="order_cost" type="number" min="0" value={newProduct.order_cost} onChange={e => setNewProduct({...newProduct, order_cost: Number(e.target.value)})} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="expiration_date" className="text-xs">Fecha de Vencimiento</Label>
-                  <Input 
-                    id="expiration_date" 
-                    type="date" 
-                    value={newProduct.expiration_date} 
-                    onChange={e => setNewProduct({...newProduct, expiration_date: e.target.value})}
-                  />
-                </div>
+              <div className="flex items-center gap-2 pt-2">
+                <input 
+                  type="checkbox" 
+                  id="is_consumo_directo" 
+                  className="h-4 w-4 rounded border-border bg-bg text-primary focus:ring-primary"
+                  checked={newProduct.is_consumo_directo}
+                  onChange={e => setNewProduct({...newProduct, is_consumo_directo: e.target.checked})}
+                />
+                <Label htmlFor="is_consumo_directo" className="cursor-pointer">Producto de consumo directo</Label>
               </div>
-            )}
+              <p className="text-xs text-text-secondary pl-6">Ej: Sal, orégano, especias (se registra al final del día por peso)</p>
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 pt-2">
+                <input 
+                  type="checkbox" 
+                  id="is_gasto_variable" 
+                  className="h-4 w-4 rounded border-border bg-bg text-primary focus:ring-primary"
+                  checked={newProduct.is_gasto_variable}
+                  onChange={e => setNewProduct({...newProduct, is_gasto_variable: e.target.checked})}
+                />
+                <Label htmlFor="is_gasto_variable" className="cursor-pointer">Gasto variable</Label>
+              </div>
+              <p className="text-xs text-text-secondary pl-6">Ej: Servilletas, carbón, gasolina (se registra el gasto manualmente desde Tránsito)</p>
+            </div>
+
+            
 
             <Button type="submit" className="mt-6 px-8" disabled={isSubmittingProduct}>
               {isSubmittingProduct ? 'Agregando...' : 'Agregar Producto'}
@@ -427,7 +442,7 @@ export default function InventoryView() {
                 onChange={e => setMovement({...movement, type: e.target.value as any})}
               >
                 <option value="ENTRADA">Entrada (Aumenta Stock)</option>
-                <option value="SALIDA">Salida (Disminuye Stock)</option>
+                <option value="SALIDA">Salida (Hacia Tránsito/Cocina)</option>
                 <option value="MERMA">Merma (Pérdida/Desperdicio)</option>
               </select>
             </div>
@@ -458,7 +473,8 @@ export default function InventoryView() {
                 }}
               >
                 <option value="">Seleccione un producto...</option>
-                {activeProducts.map(p => {
+                {activeProducts
+                  .map(p => {
                   const availableStock = Number(p.quantity) - (Number(p.in_transit) || 0);
                   return (
                     <option key={p.id} value={p.id}>{p.name} (Stock: {availableStock} {p.unit})</option>
@@ -524,6 +540,8 @@ export default function InventoryView() {
                 placeholder={movement.type === 'MERMA' ? 'Ej: Producto caducado, daño en almacén...' : 'Ej: Compra a proveedor, ajuste de inventario...'}
               />
             </div>
+
+            
 
             <Button 
               type="submit" 
