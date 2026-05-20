@@ -1,4 +1,4 @@
-import { Package, ShoppingCart, ChefHat, Sparkles, ChevronDown, CheckCircle2, Loader2, Users, Instagram, Facebook, Phone, MapPin, DollarSign, Headphones, MessageCircle, Menu, X, LogIn, UserPlus, ClipboardList, TrendingUp, Store, BarChart3, Database, Activity } from 'lucide-react';
+import { Package, ShoppingCart, ChefHat, Sparkles, ChevronDown, CheckCircle2, Loader2, Users, Instagram, Facebook, Phone, MapPin, DollarSign, Headphones, MessageCircle, Menu, X, LogIn, UserPlus, ClipboardList, TrendingUp, Store, BarChart3, Database, Activity, Star, Quote } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
@@ -10,6 +10,7 @@ export default function Landing() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [stats, setStats] = useState<{ products: number; movements: number; users: number; sales: number } | null>(null);
+  const [isAnnual, setIsAnnual] = useState(false);
 
   useEffect(() => {
     supabase.rpc('get_public_stats').then(({ data, error }) => {
@@ -44,6 +45,24 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-bg text-text selection:bg-primary/30">
+      <style>{`
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-8px); }
+        }
+        @keyframes pulse-glow {
+          0%, 100% { box-shadow: 0 0 20px rgba(255,193,7,0.15); }
+          50% { box-shadow: 0 0 40px rgba(255,193,7,0.3); }
+        }
+        .animate-float { animation: float 4s ease-in-out infinite; }
+        .animate-pulse-glow { animation: pulse-glow 3s ease-in-out infinite; }
+        .delay-100 { transition-delay: 100ms; }
+        .delay-200 { transition-delay: 200ms; }
+        .delay-300 { transition-delay: 300ms; }
+        .fade-up.visible { opacity: 1; transform: translateY(0); }
+        .hero-fade.visible { opacity: 1; transform: translateY(0); }
+        .hero-glow { animation: pulse-glow 3s ease-in-out infinite; }
+      `}</style>
       <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-bg/80 backdrop-blur-xl supports-[backdrop-filter]:bg-bg/60 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-2">
@@ -155,8 +174,8 @@ export default function Landing() {
               </div>
 
               {/* Dashboard Mockup */}
-              <div className="hero-fade fade-up mx-auto mt-16 max-w-4xl">
-                <div className="relative rounded-2xl border border-border/50 bg-surface/80 backdrop-blur-sm shadow-2xl overflow-hidden">
+              <div className="hero-fade fade-up mx-auto mt-16 max-w-4xl animate-float">
+                <div className="relative rounded-2xl border border-border/50 bg-surface/80 backdrop-blur-sm shadow-2xl overflow-hidden animate-pulse-glow">
                   <div className="flex items-center gap-1.5 border-b border-border/50 px-4 py-3">
                     <div className="h-3 w-3 rounded-full bg-red-500/80" />
                     <div className="h-3 w-3 rounded-full bg-yellow-500/80" />
@@ -383,11 +402,77 @@ export default function Landing() {
           </div>
         </section>
 
+        {/* Testimonios */}
+        <section className="py-24 bg-surface/30">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-16 fade-up">
+              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">Lo que dicen nuestros usuarios</h2>
+              <p className="text-text-secondary max-w-2xl mx-auto">Dueños de negocios como el tuyo ya confían en InventarioY</p>
+            </div>
+            <div className="grid gap-6 md:grid-cols-3">
+              {[
+                {
+                  name: 'María García',
+                  role: 'Dueña de Cafetería, La Habana',
+                  quote: 'Antes perdía el control de mi inventario todos los meses. Con InventarioY sé exactamente qué tengo, qué falta y cuánto he vendido en tiempo real.',
+                  rating: 5,
+                },
+                {
+                  name: 'Carlos Pérez',
+                  role: 'Restaurante El Criollo, Matanzas',
+                  quote: 'El módulo de recetas me cambió la vida. Ahora calculo costos por plato al instante y sé cuánto gano en cada comida que sirvo.',
+                  rating: 5,
+                },
+                {
+                  name: 'Laura Sánchez',
+                  role: 'Dueña de Paladar, Santiago',
+                  quote: 'Lo mejor es que mis empleados pueden acceder con PIN sin necesidad de email. Y el soporte siempre responde rápido por WhatsApp.',
+                  rating: 5,
+                },
+              ].map((t, idx) => (
+                <div key={t.name} className="fade-up rounded-2xl border border-border/50 bg-surface p-8 transition-all hover:border-primary/30 hover:shadow-[0_0_30px_-10px_rgba(255,193,7,0.15)]" style={{ transitionDelay: `${idx * 100}ms` }}>
+                  <div className="flex gap-1 mb-4">
+                    {Array.from({ length: t.rating }).map((_, i) => (
+                      <Star key={i} className="h-4 w-4 fill-primary text-primary" />
+                    ))}
+                  </div>
+                  <Quote className="h-6 w-6 text-primary/30 mb-3" />
+                  <p className="text-text-secondary text-sm leading-relaxed mb-6">"{t.quote}"</p>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20 text-sm font-bold text-primary">
+                      {t.name.split(' ').map(n => n[0]).join('')}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">{t.name}</p>
+                      <p className="text-xs text-text-secondary">{t.role}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         <section id="pricing" className="py-24">
           <div className="container mx-auto px-4">
             <div className="text-center mb-16 fade-up">
               <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">Precio simple y transparente</h2>
               <p className="text-text-secondary max-w-2xl mx-auto">Sin sorpresas ni costos ocultos. Un solo plan con todo incluido.</p>
+            </div>
+
+            {/* Toggle Anual / Mensual */}
+            <div className="flex items-center justify-center gap-4 mb-10 fade-up">
+              <span className={`text-sm font-medium transition-colors ${!isAnnual ? 'text-text' : 'text-text-secondary'}`}>Mensual</span>
+              <button
+                onClick={() => setIsAnnual(!isAnnual)}
+                className="relative h-7 w-14 rounded-full bg-primary/20 border border-primary/30 transition-colors hover:bg-primary/30"
+              >
+                <div className={`absolute top-0.5 h-6 w-6 rounded-full bg-primary shadow-md transition-transform duration-300 ${isAnnual ? 'translate-x-7' : 'translate-x-0.5'}`} />
+              </button>
+              <span className={`text-sm font-medium transition-colors ${isAnnual ? 'text-text' : 'text-text-secondary'}`}>
+                Anual
+                <span className="ml-1.5 inline-flex items-center rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">Ahorra 10%</span>
+              </span>
             </div>
 
             <div className="mx-auto max-w-md">
@@ -396,9 +481,23 @@ export default function Landing() {
                   Plan Profesional
                 </div>
                 <div className="mb-8 text-center pt-4">
-                  <span className="text-5xl font-extrabold">5000 CUP</span>
-                  <span className="text-text-secondary">/mes</span>
-                  <p className="mt-4 text-sm text-text-secondary">30 Días de Prueba Gratis. Sin costos ocultos.</p>
+                  {isAnnual ? (
+                    <>
+                      <span className="text-5xl font-extrabold">54,000 CUP</span>
+                      <span className="text-text-secondary">/año</span>
+                      <p className="mt-2 text-sm">
+                        <span className="text-text-secondary line-through">60,000 CUP</span>
+                        <span className="text-success ml-2 font-medium">Ahorras 6,000 CUP</span>
+                      </p>
+                      <p className="mt-1 text-xs text-text-secondary">Equivale a 4,500 CUP/mes</p>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-5xl font-extrabold">5,000 CUP</span>
+                      <span className="text-text-secondary">/mes</span>
+                      <p className="mt-4 text-sm text-text-secondary">30 Días de Prueba Gratis. Sin costos ocultos.</p>
+                    </>
+                  )}
                 </div>
                 
                 <ul className="mb-8 grid grid-cols-2 gap-3">
