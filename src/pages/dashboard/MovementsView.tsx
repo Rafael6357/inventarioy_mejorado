@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { exportToExcel } from '../../lib/utils';
 
 export default function MovementsView() {
-  const { movements, products, fetchMore } = useDatabaseStore();
+  const { movements, products, fetchMore, warehouses, currentWarehouseId } = useDatabaseStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [startDate, setStartDate] = useState('');
@@ -26,17 +26,17 @@ export default function MovementsView() {
     const productBalances: Record<string, number> = {};
 
     const movementsWithBal = sortedMovements.map(m => {
-      const prevBalance = productBalances[m.product_id] || 0;
+      const balanceKey = `${m.product_id}::${m.warehouse_id || '__legacy__'}`;
+      const prevBalance = productBalances[balanceKey] || 0;
       let currentBalance = prevBalance;
       
       if (m.type === 'ENTRADA') {
         currentBalance += m.quantity;
       } else {
-        // SALIDA o MERMA: restan del stock
         currentBalance -= m.quantity;
       }
       
-      productBalances[m.product_id] = currentBalance;
+      productBalances[balanceKey] = currentBalance;
       
       return {
         ...m,
@@ -47,7 +47,7 @@ export default function MovementsView() {
     // Paso 2: Aplicar filtros
     return movementsWithBal
       .filter(m => {
-        const isInventoryMovement = m.type === 'ENTRADA' || m.type === 'SALIDA' || m.type === 'MERMA' || m.type === 'AJUSTE';
+        const isInventoryMovement = m.type === 'ENTRADA' || m.type === 'SALIDA' || m.type === 'MERMA' || m.type === 'AJUSTE' || m.type === 'TRANSFER';
         const matchesSearch = getProductName(m.product_id).toLowerCase().includes(searchTerm.toLowerCase());
         
         let matchesType = true;
@@ -65,20 +65,32 @@ export default function MovementsView() {
         if (startDate) {
           matchesDate = matchesDate && new Date(m.date) >= new Date(startDate);
         }
-        if (endDate) {
+if (endDate) {
           const end = new Date(endDate);
           end.setHours(23, 59, 59, 999);
           matchesDate = matchesDate && new Date(m.date) <= end;
         }
+
+        let matchesWarehouse = true;
+        if (currentWarehouseId) {
+          // Mostrar: movimientos del almacén específico O movimientos históricos (sin warehouse_id)
+          matchesWarehouse = m.warehouse_id === currentWarehouseId || m.warehouse_id === null || m.warehouse_id === undefined;
+        }
         
-        return isInventoryMovement && matchesSearch && matchesType && matchesDate;
+        return isInventoryMovement && matchesSearch && matchesType && matchesDate && matchesWarehouse;
       })
-      .reverse(); // Mostrar los más recientes primero en la tabla
-  }, [movements, searchTerm, typeFilter, startDate, endDate, products]);
+      .reverse();
+  }, [movements, searchTerm, typeFilter, startDate, endDate, products, currentWarehouseId]);
 
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, typeFilter, startDate, endDate]);
+
+  useEffect(() => {
+    if (typeFilter === 'TRANSFER' && currentWarehouseId) {
+      useDatabaseStore.getState().setCurrentWarehouse('');
+    }
+  }, [typeFilter]);
 
   const totalPages = Math.ceil(filteredMovements.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -163,12 +175,28 @@ export default function MovementsView() {
                 <option value="ALL">Todos los tipos</option>
                 <option value="ENTRADA">Entradas</option>
                 <option value="SALIDA">Salidas</option>
+                <option value="TRANSFER">Transferencias</option>
                 <option value="MERMA">Mermas</option>
                 <option value="AJUSTE">Ajustes de Inventario</option>
                 <option value="CONSUMO_DIRECTO">Consumo Directo</option>
                 <option value="GASTO_VARIABLE">Gasto Variable</option>
               </select>
             </div>
+
+            {warehouses.length > 1 && (
+              <div className="flex items-center gap-2">
+                <select
+                  value={currentWarehouseId || 'ALL'}
+                  onChange={(e) => useDatabaseStore.getState().setCurrentWarehouse(e.target.value === 'ALL' ? '' : e.target.value)}
+                  className="h-10 rounded-md border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  <option value="ALL">Todos los almacenes</option>
+                  {warehouses.map(w => (
+                    <option key={w.id} value={w.id}>{w.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </div>
 

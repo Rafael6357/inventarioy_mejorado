@@ -22,7 +22,10 @@ import {
   ChevronRight,
   DollarSign,
   FileText,
-  LockOpen
+  LockOpen,
+  Phone,
+  UserPlus,
+  Crown
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useDatabaseStore, MODULE_ROLES } from '../store/dbStore';
@@ -30,6 +33,7 @@ import InventarioYLogo from '../components/InventarioYLogo';
 import SubscriptionBanner from '../components/SubscriptionBanner';
 import SyncStatus from '../components/SyncStatus';
 import PinModal from '../components/PinModal';
+import WarehouseSelector from '../components/WarehouseSelector';
 import StockView from './dashboard/StockView';
 import InventoryView from './dashboard/InventoryView';
 import TransitView from './dashboard/TransitView';
@@ -46,10 +50,13 @@ import SettingsView from './dashboard/SettingsView';
 import ActionLogsView from './dashboard/ActionLogsView';
 import PaymentsView from './dashboard/PaymentsView';
 import DailyClosingsView from './dashboard/DailyClosingsView';
+import ProspectsView from './dashboard/ProspectsView';
 import OnboardingWizard, { shouldShowOnboarding } from '../components/OnboardingWizard';
+import PhoneModal from '../components/PhoneModal';
 
 export default function Dashboard() {
   const [showOnboarding, setShowOnboarding] = useState(() => shouldShowOnboarding());
+  const [showPhoneModal, setShowPhoneModal] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const sidebarTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -100,11 +107,18 @@ export default function Dashboard() {
   ], []);
 
   const navigation = useMemo(() => {
+    let nav = [...baseNav];
+    
     if (user?.role === 'admin') {
-      return [...baseNav, { name: 'Gestión de Pagos', href: '/dashboard/payments', icon: CreditCard }];
+      nav.push({ name: 'Gestión de Pagos', href: '/dashboard/payments', icon: CreditCard });
     }
-    return baseNav;
-  }, [user?.role, baseNav]);
+    
+    if (user?.email === 'nikko6357@gmail.com') {
+      nav.push({ name: 'Prospectos', href: '/dashboard/prospects', icon: UserPlus });
+    }
+    
+    return nav;
+  }, [user?.role, user?.email, baseNav]);
 
   // Detectar acceso por PIN y cargar datos del negocio
   useEffect(() => {
@@ -232,6 +246,15 @@ export default function Dashboard() {
     };
   }, []);
 
+  useEffect(() => {
+    if (user && !user.phone) {
+      const hasSeenPhoneModal = localStorage.getItem('phone_modal_seen');
+      if (!hasSeenPhoneModal) {
+        setShowPhoneModal(true);
+      }
+    }
+  }, [user]);
+
   if (authLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-bg">
@@ -281,8 +304,8 @@ export default function Dashboard() {
       )}
 
       <div 
-        className="fixed inset-y-0 left-0 w-4 z-40 hidden lg:flex items-center justify-center group"
-        onMouseEnter={handleSidebarMouseEnter}
+        className="fixed inset-y-0 left-0 w-4 z-40 hidden lg:flex items-center justify-center group cursor-pointer"
+        onClick={() => setIsSidebarVisible(true)}
       >
         {!isSidebarVisible && (
           <div className="absolute left-0 w-6 h-12 bg-surface/80 border border-border/50 border-l-0 rounded-r-xl flex items-center justify-center shadow-[0_0_10px_rgba(255,193,7,0.2)] transition-all group-hover:w-8 group-hover:bg-surface cursor-pointer">
@@ -292,17 +315,17 @@ export default function Dashboard() {
       </div>
 
       <aside
-        onMouseEnter={handleSidebarMouseEnter}
         onMouseLeave={handleSidebarMouseLeave}
         className={`fixed inset-y-0 left-0 z-50 w-64 transform border-r border-border/50 bg-surface/80 backdrop-blur-xl transition-transform duration-300 ease-in-out ${
           isMobileMenuOpen || isSidebarVisible ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <div className="flex h-16 items-center justify-between px-4 border-b border-border/50">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <InventarioYLogo size="lg" />
+            <WarehouseSelector />
           </div>
-          <button 
+          <button
             onClick={() => {
               setIsMobileMenuOpen(false);
               setIsSidebarVisible(false);
@@ -317,6 +340,7 @@ export default function Dashboard() {
           <nav className="space-y-1">
             {navigation.map((item) => {
               const isActive = location.pathname === item.href || (item.href === '/dashboard' && location.pathname === '/dashboard/');
+              const isExclusive = item.name === 'Gestión de Pagos' || item.name === 'Prospectos';
               return (
                 <Link
                   key={item.name}
@@ -325,11 +349,14 @@ export default function Dashboard() {
                   className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-300 ${
                     isActive
                       ? 'bg-gradient-to-r from-primary/20 to-transparent border-l-2 border-primary shadow-[inset_0_0_20px_rgba(255,193,7,0.05)]'
-                      : 'text-text-secondary hover:bg-surface-hover hover:text-text'
+                      : isExclusive
+                        ? 'text-text-secondary hover:bg-surface-hover hover:text-text border-l-2 border-warning/30'
+                        : 'text-text-secondary hover:bg-surface-hover hover:text-text'
                   }`}
                 >
                   <item.icon className={`h-5 w-5 ${isActive ? 'text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]' : 'text-text-secondary'}`} />
                   {item.name}
+                  {isExclusive && <Crown className="h-3 w-3 text-warning ml-auto" />}
                 </Link>
               );
             })}
@@ -399,6 +426,20 @@ export default function Dashboard() {
         </header>
 
         <main className="flex-1 overflow-y-auto bg-transparent p-4 md:p-6 lg:p-8">
+          {!user?.phone && (
+            <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Phone className="h-4 w-4 text-amber-500" />
+                <span className="text-sm text-amber-500">Teléfono no registrado</span>
+              </div>
+              <button
+                onClick={() => setShowPhoneModal(true)}
+                className="text-xs px-3 py-1 bg-amber-500 text-bg rounded-md hover:bg-amber-600 transition-colors font-medium"
+              >
+                Agregar
+              </button>
+            </div>
+          )}
           <div key={location.pathname} className="page-transition">
             <Routes>
               <Route path="/" element={<StockView />} />
@@ -418,6 +459,9 @@ export default function Dashboard() {
               <Route path="/action-logs" element={<ActionLogsView />} />
               {user.role === 'admin' && (
                 <Route path="/payments" element={<PaymentsView />} />
+              )}
+              {user?.email === 'nikko6357@gmail.com' && (
+                <Route path="/prospects" element={<ProspectsView />} />
               )}
             </Routes>
           </div>
@@ -463,6 +507,11 @@ export default function Dashboard() {
         <OnboardingWizard
           isOpen={showOnboarding}
           onClose={() => setShowOnboarding(false)}
+        />
+
+        <PhoneModal
+          isOpen={showPhoneModal}
+          onClose={() => setShowPhoneModal(false)}
         />
       </div>
     </div>

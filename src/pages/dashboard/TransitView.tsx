@@ -17,7 +17,7 @@ import {
 import { validateNumber, getNumberFromString } from '../../lib/utils';
 
 export default function TransitView() {
-  const { transitItems, products, cancelTransit, registerWasteFromTransit, registerManualConsumption, logAction } = useDatabaseStore();
+  const { transitItems, products, cancelTransit, registerWasteFromTransit, registerManualConsumption, logAction, warehouses, currentWarehouseId, setCurrentWarehouse } = useDatabaseStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [cancelModal, setCancelModal] = useState<{
     item: any;
@@ -250,6 +250,21 @@ const handleWaste = async () => {
         </p>
       </div>
 
+      {warehouses.length > 1 && (
+        <div className="flex items-center gap-2">
+          <select
+            value={currentWarehouseId || ''}
+            onChange={(e) => setCurrentWarehouse(e.target.value)}
+            className="h-10 rounded-md border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          >
+            <option value="">Todos los almacenes</option>
+            {warehouses.map(w => (
+              <option key={w.id} value={w.id}>{w.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="rounded-xl border border-border bg-surface p-4 shadow-sm">
           <div className="flex items-center gap-3">
@@ -257,7 +272,7 @@ const handleWaste = async () => {
               <Package className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-text">{totalInTransit}</p>
+              <p className="text-2xl font-bold text-text">{Number(totalInTransit).toFixed(3)}</p>
               <p className="text-xs text-text-secondary">En Transito</p>
             </div>
           </div>
@@ -269,7 +284,7 @@ const handleWaste = async () => {
               <TrendingDown className="h-5 w-5 text-success" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-text">{totalConsumed}</p>
+              <p className="text-2xl font-bold text-text">{Number(totalConsumed).toFixed(3)}</p>
               <p className="text-xs text-text-secondary">Consumido</p>
             </div>
           </div>
@@ -281,7 +296,7 @@ const handleWaste = async () => {
               <RefreshCw className="h-5 w-5 text-warning" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-text">{totalSent}</p>
+              <p className="text-2xl font-bold text-text">{Number(totalSent).toFixed(3)}</p>
               <p className="text-xs text-text-secondary">Total Enviado</p>
             </div>
           </div>

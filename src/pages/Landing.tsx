@@ -1,4 +1,4 @@
-import { Package, ShoppingCart, ChefHat, Sparkles, ChevronDown, CheckCircle2, Loader2, Users } from 'lucide-react';
+import { Package, ShoppingCart, ChefHat, Sparkles, ChevronDown, CheckCircle2, Loader2, Users, Instagram, Facebook, Phone, MapPin, DollarSign, Headphones, MessageCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
@@ -6,8 +6,6 @@ import { Button } from '../components/ui/button';
 import InventarioYLogo from '../components/InventarioYLogo';
 
 export default function Landing() {
-  const [contactLoading, setContactLoading] = useState(false);
-
   // Animaciones de scroll con Intersection Observer
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -26,32 +24,6 @@ export default function Landing() {
 
     return () => observer.disconnect();
   }, []);
-
-  const handleContactSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setContactLoading(true);
-    const form = e.currentTarget;
-    const data = new FormData(form);
-
-    try {
-      const response = await fetch('https://formspree.io/f/mqedqlev', {
-        method: 'POST',
-        body: data,
-        headers: { Accept: 'application/json' }
-      });
-
-      if (response.ok) {
-        toast.success('Mensaje enviado. Te responderemos pronto.');
-        form.reset();
-      } else {
-        toast.error('Error al enviar el mensaje. Intenta de nuevo.');
-      }
-    } catch {
-      toast.error('Error de conexión. Verifica tu internet.');
-    } finally {
-      setContactLoading(false);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-bg text-text selection:bg-primary/30">
@@ -100,7 +72,7 @@ export default function Landing() {
                 Gestiona tu inventario <span className="text-gradient drop-shadow-[0_0_15px_rgba(255,193,7,0.3)] hero-glow">inteligente y fácil</span>
               </h1>
               <p className="mx-auto max-w-2xl text-lg text-text-secondary sm:text-xl">
-                La solución integral para tu negocio con IA integrada. Controla tu stock, ventas, recetas y personal en un solo lugar.
+                La solución integral para restaurantes, cafeterías y comercios en Cuba. Controla tu stock, ventas, recetas y personal en un solo lugar.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
                 <Link to="/register">
@@ -113,6 +85,74 @@ export default function Landing() {
                     Ver Plan
                   </Button>
                 </a>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Por qué elegirnos */}
+        <section className="py-16 border-y border-border/50">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-12 fade-up">
+              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">¿Por qué elegir InventarioY?</h2>
+              <p className="text-text-secondary max-w-2xl mx-auto">Diseñado específicamente para las necesidades de negocios cubanos</p>
+            </div>
+            <div className="grid gap-8 md:grid-cols-3">
+              <div className="text-center fade-up" style={{ transitionDelay: '0ms' }}>
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                  <MapPin className="h-8 w-8 text-primary" />
+                </div>
+                <h3 className="text-lg font-semibold mb-2">Hecho en Cuba</h3>
+                <p className="text-text-secondary text-sm">Desarrollado específicamente para negocios cubanos, entiende la realidad local</p>
+              </div>
+              <div className="text-center fade-up" style={{ transitionDelay: '100ms' }}>
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                  <DollarSign className="h-8 w-8 text-primary" />
+                </div>
+                <h3 className="text-lg font-semibold mb-2">Precio Accesible</h3>
+                <p className="text-text-secondary text-sm">Pensado para su negocio en Cuba: comience con 30 días sin pagar. Sí desea continuar luego de este tiempo, abone 5,000 CUP por mes. Ni un centavo más.</p>
+              </div>
+              <div className="text-center fade-up" style={{ transitionDelay: '200ms' }}>
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                  <Headphones className="h-8 w-8 text-primary" />
+                </div>
+                <h3 className="text-lg font-semibold mb-2">Soporte Cercano</h3>
+                <p className="text-text-secondary text-sm">Atención personalizada directamente por nosotros. Le acompañamos en todo el proceso</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Trust Badges */}
+        <section className="py-12 bg-surface/50">
+          <div className="container mx-auto px-4">
+            <div className="flex flex-wrap justify-center gap-8 md:gap-16">
+              <div className="flex items-center gap-3 fade-up">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success/10">
+                  <svg className="h-5 w-5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-text">Datos seguros</p>
+                  <p className="text-xs text-text-secondary">Encriptación SSL</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 fade-up" style={{ transitionDelay: '100ms' }}>
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                  <svg className="h-5 w-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-text">Privacidad garantizada</p>
+                  <p className="text-xs text-text-secondary">Tus datos son tuyos</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 fade-up" style={{ transitionDelay: '200ms' }}>
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500/10">
+                  <svg className="h-5 w-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" /></svg>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-text">100% en la nube</p>
+                  <p className="text-xs text-text-secondary">Accede desde cualquier lugar</p>
+                </div>
               </div>
             </div>
           </div>
@@ -160,6 +200,33 @@ export default function Landing() {
           </div>
         </section>
 
+        {/* Cómo funciona */}
+        <section className="py-20 border-y border-border/50">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-12 fade-up">
+              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">Así de fácil es empezar</h2>
+              <p className="text-text-secondary max-w-2xl mx-auto">En solo 3 pasos puede tener su negocio controlado</p>
+            </div>
+            <div className="grid gap-8 md:grid-cols-3">
+              <div className="text-center fade-up" style={{ transitionDelay: '0ms' }}>
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary text-2xl font-bold text-black">1</div>
+                <h3 className="text-lg font-semibold mb-2">Regístrese</h3>
+                <p className="text-text-secondary text-sm">Cree su cuenta en segundos. Sin necesidad de tarjeta de crédito.</p>
+              </div>
+              <div className="text-center fade-up" style={{ transitionDelay: '100ms' }}>
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary text-2xl font-bold text-black">2</div>
+                <h3 className="text-lg font-semibold mb-2">Pruebe gratis</h3>
+                <p className="text-text-secondary text-sm">Use todos los beneficios durante 30 días sin pagar nada.</p>
+              </div>
+              <div className="text-center fade-up" style={{ transitionDelay: '200ms' }}>
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary text-2xl font-bold text-black">3</div>
+                <h3 className="text-lg font-semibold mb-2">Suscríbase</h3>
+                <p className="text-text-secondary text-sm">Si le gusta, aboná 5,000 CUP/mes. Sin contratos ni compromisos.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section id="pricing" className="py-24">
           <div className="container mx-auto px-4">
             <div className="text-center mb-16 fade-up">
@@ -173,30 +240,33 @@ export default function Landing() {
                   Plan Profesional
                 </div>
                 <div className="mb-8 text-center pt-4">
-                  <span className="text-5xl font-extrabold">$10</span>
+                  <span className="text-5xl font-extrabold">5000 CUP</span>
                   <span className="text-text-secondary">/mes</span>
-                  <p className="mt-4 text-sm text-text-secondary">Incluye 30 Días de Prueba Gratis</p>
+                  <p className="mt-4 text-sm text-text-secondary">30 Días de Prueba Gratis. Sin costos ocultos.</p>
                 </div>
                 
-                <ul className="mb-8 space-y-4">
+                <ul className="mb-8 grid grid-cols-2 gap-3">
                   {[
                     "Productos ilimitados",
                     "Control de inventario con alertas de stock",
                     "Registro de movimientos (entradas, salidas, mermas)",
+                    "Ajuste de inventario con auditoría completa",
                     "Módulo de Tránsito para control de ingredientes",
                     "Cierres de caja diarios",
                     "Gestión de pagos y gastos",
                     "Punto de venta integrado",
                     "Recetas y control de producción",
                     "Control de empleados y nómina",
+                    "Biblioteca de documentos para empleados (PNO, Reglamento)",
                     "Gráficos y estadísticas en tiempo real",
                     "Análisis con IA de tu negocio",
+                    "Exportación de datos a Excel",
                     "Acceso desde cualquier dispositivo con internet",
                     "Soporte prioritario",
                   ].map((item) => (
-                    <li key={item} className="flex items-center gap-3">
-                      <CheckCircle2 className="h-5 w-5 text-primary shrink-0" />
-                      <span className="text-text-secondary">{item}</span>
+                    <li key={item} className="flex items-start gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                      <span className="text-sm text-text-secondary">{item}</span>
                     </li>
                   ))}
                 </ul>
@@ -257,40 +327,17 @@ export default function Landing() {
               <p className="text-text-secondary">¿Tienes alguna duda? Escríbenos y te responderemos lo antes posible.</p>
             </div>
             
-            <form onSubmit={handleContactSubmit} className="space-y-6 rounded-2xl border border-border bg-surface p-8">
-              <div className="grid gap-6 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <label htmlFor="name" className="text-sm font-medium text-text-secondary">Nombre</label>
-                  <input type="text" id="name" name="name" required className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" />
-                </div>
-                <div className="space-y-2">
-                  <label htmlFor="email" className="text-sm font-medium text-text-secondary">Email</label>
-                  <input type="email" id="email" name="email" required className="w-full rounded-md border border-border bg-bg px-3 py-2 text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="phone" className="text-sm font-medium text-text-secondary">Teléfono</label>
-                <input type="tel" id="phone" name="phone" className="w-full rounded-md border border-border bg-bg px-3 py-2 text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="subject" className="text-sm font-medium text-text-secondary">Asunto</label>
-                <input type="text" id="subject" name="subject" required className="w-full rounded-md border border-border bg-bg px-3 py-2 text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="message" className="text-sm font-medium text-text-secondary">Mensaje</label>
-                <textarea id="message" name="message" rows={4} required className="w-full rounded-md border border-border bg-bg px-3 py-2 text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"></textarea>
-              </div>
-              <div className="flex justify-center">
-                <Button type="submit" className="h-12 px-8 text-base" disabled={contactLoading}>
-                  {contactLoading ? (
-                    <span className="flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Enviando...
-                    </span>
-                  ) : 'Enviar Mensaje'}
-                </Button>
-              </div>
-            </form>
+            <div className="flex justify-center">
+              <a 
+                href="https://wa.me/5354523884?text=Hola,%20tengo%20una%20consulta%20sobre%20InventarioY"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-3 h-14 px-8 text-lg font-medium bg-green-500 hover:bg-green-600 text-white rounded-xl transition-colors shadow-lg shadow-green-500/20"
+              >
+                <MessageCircle className="h-6 w-6" />
+                Escríbenos por WhatsApp
+              </a>
+            </div>
           </div>
         </section>
       </main>
@@ -300,6 +347,38 @@ export default function Landing() {
           <div className="flex items-center justify-center gap-2 mb-6">
             <InventarioYLogo size="lg" />
           </div>
+          
+          {/* Redes Sociales */}
+          <div className="flex justify-center gap-6 mb-8">
+            <a 
+              href="https://instagram.com/rafael.espinosar" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-sm hover:text-primary transition-colors"
+            >
+              <Instagram className="h-5 w-5" />
+              <span>Instagram</span>
+            </a>
+            <a 
+              href="https://facebook.com/Rafael Nicolas Espinosa Rodriguez" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-sm hover:text-primary transition-colors"
+            >
+              <Facebook className="h-5 w-5" />
+              <span>Facebook</span>
+            </a>
+            <a 
+              href="https://wa.me/5354523884" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-sm hover:text-primary transition-colors"
+            >
+              <Phone className="h-5 w-5" />
+              <span>WhatsApp</span>
+            </a>
+          </div>
+          
           <div className="flex justify-center gap-6 mb-8 text-sm">
             <a href="#" className="hover:text-primary transition-colors">Términos y Condiciones</a>
             <a href="#" className="hover:text-primary transition-colors">Política de Privacidad</a>

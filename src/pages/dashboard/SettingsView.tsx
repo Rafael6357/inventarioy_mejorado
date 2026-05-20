@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { useDatabaseStore } from '../../store/dbStore';
-import { Settings, Save, Building2, User, Shield, Printer, MessageSquare, DollarSign, QrCode, Copy, ExternalLink, Download, RefreshCw, Sparkles, RotateCcw, Lock, ShoppingCart } from 'lucide-react';
+import { Settings, Save, Building2, User, Shield, Printer, MessageSquare, DollarSign, QrCode, Copy, ExternalLink, Download, Sparkles, RotateCcw, Lock, ShoppingCart, X } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
@@ -14,6 +14,7 @@ import QRCode from 'react-qr-code';
 
 export default function SettingsView() {
   const { user, fetchUser } = useAuthStore();
+  const { warehouses, addWarehouse, updateWarehouse, deleteWarehouse, productWarehouse } = useDatabaseStore();
   
   const [formData, setFormData] = useState({
     name: user?.name || '',
@@ -35,6 +36,21 @@ export default function SettingsView() {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Modal para almacenes
+  const [warehouseModal, setWarehouseModal] = useState<{
+    isOpen: boolean;
+    mode: 'add' | 'edit';
+    warehouseId?: string;
+    currentName: string;
+  }>({ isOpen: false, mode: 'add', currentName: '' });
+  
+  // Modal de confirmación para eliminar
+  const [deleteModal, setDeleteModal] = useState<{
+    isOpen: boolean;
+    warehouseId?: string;
+    warehouseName?: string;
+  }>({ isOpen: false });
 
   useEffect(() => {
     if (user) {
@@ -517,7 +533,79 @@ export default function SettingsView() {
         </div>
 
         {/* ============================================
-            SECCIÓN 3: CONTROL DE ACCESO
+            SECCIÓN 3: ALMACENES
+            Card completo
+            ============================================ */}
+        <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(255,193,7,0.15)]">
+          <h2 className="text-lg font-semibold text-text mb-4 flex items-center gap-2">
+            <Building2 className="h-5 w-5 text-primary" />
+            Almacenes
+          </h2>
+          <div className="space-y-3">
+            {warehouses.length === 0 && (
+              <p className="text-sm text-text-secondary">No hay almacenes configurados</p>
+            )}
+            {warehouses.map(w => (
+              <div key={w.id} className="flex items-center justify-between p-3 bg-bg/50 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <Building2 className="h-4 w-4 text-text-secondary" />
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-text">{w.name}</span>
+                    <span className="text-xs text-text-secondary">
+                      ({productWarehouse.filter(pw => pw.warehouse_id === w.id).length})
+                    </span>
+                    {w.is_main && (
+                      <span className="ml-1 inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                        Principal
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setWarehouseModal({ isOpen: true, mode: 'edit', warehouseId: w.id, currentName: w.name });
+                    }}
+                  >
+                    Editar
+                  </Button>
+                  {!w.is_main && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-danger hover:text-danger"
+                      onClick={() => {
+                        setDeleteModal({ isOpen: true, warehouseId: w.id, warehouseName: w.name });
+                      }}
+                    >
+                      Eliminar
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+            {warehouses.length < 3 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full gap-2"
+                onClick={() => {
+                  setWarehouseModal({ isOpen: true, mode: 'add', currentName: '' });
+                }}
+              >
+                + Agregar almacén
+              </Button>
+            )}
+            {warehouses.length >= 3 && (
+              <p className="text-xs text-text-secondary text-center">Máximo 3 almacenes permitidos</p>
+            )}
+          </div>
+        </div>
+
+        {/* ============================================
+            SECCIÓN 4: CONTROL DE ACCESO
             Card completo
             ============================================ */}
         <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(255,193,7,0.15)]">
@@ -529,7 +617,7 @@ export default function SettingsView() {
         </div>
 
         {/* ============================================
-            SECCIÓN 4: SISTEMA
+            SECCIÓN 5: SISTEMA
             Card completo
             ============================================ */}
         <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(255,193,7,0.15)]">
@@ -555,7 +643,121 @@ export default function SettingsView() {
             </Button>
           </div>
         </div>
-      </div>
-    </>
-  );
-}
+        </div>
+
+        {/* Modal para almacenes */}
+        {warehouseModal.isOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="w-full max-w-md rounded-xl bg-surface p-6 shadow-xl border border-border">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-text flex items-center gap-2">
+                  <Building2 className="h-5 w-5 text-primary" />
+                  {warehouseModal.mode === 'add' ? 'Nuevo Almacén' : 'Editar Almacén'}
+                </h3>
+                <button onClick={() => setWarehouseModal({ isOpen: false, mode: 'add', currentName: '' })} className="text-text-secondary hover:text-text">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="warehouseName">Nombre</Label>
+                  <Input
+                    id="warehouseName"
+                    value={warehouseModal.currentName}
+                    onChange={(e) => setWarehouseModal({ ...warehouseModal, currentName: e.target.value })}
+                    placeholder="Nombre del almacén"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    className="flex-1"
+                    onClick={() => setWarehouseModal({ isOpen: false, mode: 'add', currentName: '' })}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button 
+                    type="button" 
+                    className="flex-1 gap-2"
+                    onClick={async () => {
+                      if (!warehouseModal.currentName.trim()) {
+                        toast.error('El nombre no puede estar vacío');
+                        return;
+                      }
+                      
+                      if (warehouseModal.mode === 'add') {
+                        await addWarehouse(warehouseModal.currentName.trim(), false);
+                        toast.success('Almacén creado');
+                      } else if (warehouseModal.mode === 'edit' && warehouseModal.warehouseId) {
+                        await updateWarehouse(warehouseModal.warehouseId, warehouseModal.currentName.trim());
+                        toast.success('Almacén actualizado');
+                      }
+                      
+                      setWarehouseModal({ isOpen: false, mode: 'add', currentName: '' });
+                    }}
+                  >
+                    <Save className="h-4 w-4" />
+                    {warehouseModal.mode === 'add' ? 'Crear' : 'Guardar'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+)}
+
+        {/* Modal de confirmación para eliminar */}
+        {deleteModal.isOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="w-full max-w-md rounded-xl bg-surface p-6 shadow-xl border border-border">
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-text flex items-center gap-2">
+                  <X className="h-5 w-5 text-danger" />
+                  Eliminar Almacén
+                </h3>
+                <button onClick={() => setDeleteModal({ isOpen: false })} className="text-text-secondary hover:text-text">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <p className="text-sm text-text">
+                  ¿Estás seguro de que deseas eliminar el almacén <strong className="text-text">"{deleteModal.warehouseName}"</strong>?
+                </p>
+<p className="text-xs text-text-secondary">
+                  El stock de este almacén será migrado al almacén principal.
+                </p>
+
+                <div className="flex gap-2 pt-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    className="flex-1"
+                    onClick={() => setDeleteModal({ isOpen: false })}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button 
+                    type="button" 
+                    className="flex-1 gap-2 bg-danger hover:bg-danger/90"
+                    onClick={async () => {
+                      if (deleteModal.warehouseId) {
+                        await deleteWarehouse(deleteModal.warehouseId);
+                      }
+                      setDeleteModal({ isOpen: false });
+                    }}
+                  >
+                    <X className="h-4 w-4" />
+                    Eliminar
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }

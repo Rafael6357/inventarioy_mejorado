@@ -10,6 +10,15 @@ import { validateNumber, getNumberFromString, calculateMargin, exportToExcel } f
 import { normalizeUnit, getCompatibleUnits, convertUnit } from '../../lib/unitConversion';
 
 export default function StockView() {
+  // Helper to get stock per warehouse
+  const getStockForWarehouse = (productId: string) => {
+    if (!currentWarehouseId || productWarehouse.length === 0) {
+      return null;
+    }
+    const pw = productWarehouse.find(p => p.product_id === productId && p.warehouse_id === currentWarehouseId);
+    return pw ? { quantity: pw.quantity, in_transit: pw.in_transit } : null;
+  };
+
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
@@ -39,6 +48,10 @@ export default function StockView() {
   const updateProduct = useDatabaseStore((state) => state.updateProduct);
   const accessPins = useDatabaseStore((state) => state.accessPins);
   const logAction = useDatabaseStore((state) => state.logAction);
+  const currentWarehouseId = useDatabaseStore((state) => state.currentWarehouseId);
+  const warehouses = useDatabaseStore((state) => state.warehouses);
+  const productWarehouse = useDatabaseStore((state) => state.productWarehouse);
+  const currentWarehouse = warehouses.find(w => w.id === currentWarehouseId);
 
   const canEdit = (): boolean => {
     const activePin = accessPins?.find(p => p.is_active);
@@ -89,7 +102,10 @@ export default function StockView() {
       const matchesCategory = categoryFilter === 'ALL' || product.category === categoryFilter;
       
       let matchesStatus = true;
-      const physicalStock = Number(product.quantity) - (Number(product.in_transit) || 0);
+      const warehouseStock = getStockForWarehouse(product.id);
+      const quantity = warehouseStock ? warehouseStock.quantity : Number(product.quantity);
+      const inTransit = warehouseStock ? warehouseStock.in_transit : Number(product.in_transit || 0);
+      const physicalStock = quantity - inTransit;
       const effectiveRop = product.rop > 0 ? product.rop : autoCalculatedRop(product.id, physicalStock);
       
       if (statusFilter === 'LOW_STOCK') {
@@ -114,8 +130,10 @@ export default function StockView() {
       let valA: any;
       let valB: any;
 
-      const physA = Number(a.quantity) - (Number(a.in_transit) || 0);
-      const physB = Number(b.quantity) - (Number(b.in_transit) || 0);
+      const stockA = getStockForWarehouse(a.id);
+      const stockB = getStockForWarehouse(b.id);
+      const physA = stockA ? stockA.quantity - stockA.in_transit : Number(a.quantity) - (Number(a.in_transit) || 0);
+      const physB = stockB ? stockB.quantity - stockB.in_transit : Number(b.quantity) - (Number(b.in_transit) || 0);
 
       switch (sortBy) {
         case 'name':
@@ -279,17 +297,21 @@ export default function StockView() {
 
   const totalInventoryValue = useMemo(() => {
     return filteredProducts.reduce((total, product) => {
-      const inTransit = Number(product.in_transit) || 0;
-      const availableStock = Number(product.quantity) - inTransit;
+      const warehouseStock = getStockForWarehouse(product.id);
+      const inTransit = warehouseStock ? warehouseStock.in_transit : Number(product.in_transit || 0);
+      const quantity = warehouseStock ? warehouseStock.quantity : Number(product.quantity);
+      const availableStock = quantity - inTransit;
       return total + (availableStock * Number(product.cost));
     }, 0);
-  }, [filteredProducts]);
+  }, [filteredProducts, productWarehouse, currentWarehouseId]);
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-text">Almacén</h1>
+          <h1 className="text-2xl font-bold text-text">
+            Almacén {currentWarehouse ? `- ${currentWarehouse.name}` : ''}
+          </h1>
           <p className="text-sm text-text-secondary">
             Vista rápida del inventario en tiempo real
           </p>
@@ -330,13 +352,16 @@ export default function StockView() {
                   { header: 'ROP', key: 'rop', format: (v: number) => v?.toString() || '0' },
                 ];
                 const data = filteredProducts.map(p => {
-                  const physicalStock = Number(p.quantity) - (Number(p.in_transit) || 0);
+                  const warehouseStock = getStockForWarehouse(p.id);
+                  const quantity = warehouseStock ? warehouseStock.quantity : Number(p.quantity);
+                  const inTransit = warehouseStock ? warehouseStock.in_transit : Number(p.in_transit || 0);
+                  const physicalStock = quantity - inTransit;
                   const margin = p.price && p.price > 0 ? ((p.price - p.cost) / p.price) * 100 : 0;
                   return {
                     ...p,
                     type: p.is_consumo_directo ? 'Consumo Directo' : p.is_gasto_variable ? 'Gasto Variable' : p.is_individual ? 'Venta Rápida' : 'Ingrediente',
                     available: physicalStock,
-                    in_transit: Number(p.in_transit) || 0,
+                    in_transit: inTransit,
                     cost: Number(p.cost) || 0,
                     margin: margin,
                     total: physicalStock * Number(p.cost),
@@ -471,8 +496,10 @@ export default function StockView() {
                 </tr>
               ) : (
                 filteredProducts.map((product) => {
-                  const inTransit = Number(product.in_transit) || 0;
-                  const physicalStock = Number(product.quantity) - inTransit;
+                  const warehouseStock = getStockForWarehouse(product.id);
+                  const quantity = warehouseStock ? warehouseStock.quantity : Number(product.quantity);
+                  const inTransit = warehouseStock ? warehouseStock.in_transit : Number(product.in_transit || 0);
+                  const physicalStock = quantity - inTransit;
                   const isOutOfStock = physicalStock <= 0;
                   const effectiveRop = product.rop > 0 ? product.rop : autoCalculatedRop(product.id, physicalStock);
                   const isLowStock = physicalStock <= effectiveRop && !isOutOfStock;
@@ -580,11 +607,15 @@ export default function StockView() {
                             onClick={() => {
                               const baseUnit = normalizeUnit(product.unit);
                               const compatibleUnits = getCompatibleUnits(baseUnit);
+                              const warehouseStock = getStockForWarehouse(product.id);
+                              const adjustedProduct = warehouseStock
+                                ? { ...product, quantity: warehouseStock.quantity, in_transit: warehouseStock.in_transit }
+                                : product;
                               setAdjustmentModal({
-                                product,
+                                product: adjustedProduct,
                                 physicalStock: 0,
                                 unit: compatibleUnits.includes(product.unit) ? product.unit : baseUnit,
-                                date: new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16),
+                                date: new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 19),
                               });
                             }}
                             className="rounded-lg p-2 text-text-secondary hover:bg-success/10 hover:text-success transition-colors"
@@ -851,8 +882,8 @@ export default function StockView() {
                   <Input
                     id="adjust_date"
                     type="datetime-local"
-                    value={adjustmentModal.date}
-                    onChange={(e) => setAdjustmentModal({...adjustmentModal, date: e.target.value})}
+                    value={adjustmentModal.date.slice(0, 16)}
+                    onChange={(e) => { const val = e.target.value; setAdjustmentModal({...adjustmentModal, date: val.length <= 16 ? val + ':00' : val}); }}
                   />
                 </div>
 
@@ -882,31 +913,30 @@ export default function StockView() {
                     }
                     
                     setIsAdjusting(true);
-                    try {
-                      const product = adjustmentModal.product;
-                      const physicalStockInBase = convertUnit(adjustmentModal.physicalStock, adjustmentModal.unit as any, normalizeUnit(product.unit));
-                      
-                      const { updateProduct, addMovement, logAction } = useDatabaseStore.getState();
-                      
-                      await updateProduct(product.id, { quantity: physicalStockInBase });
-                      
-                      await addMovement({
-                          product_id: product.id,
-                          type: 'AJUSTE' as any,
-                          quantity: physicalStockInBase - Number(product.quantity),
-                          unit: normalizeUnit(product.unit),
-                          cost: product.cost,
-                          reason: 'Ajuste de inventario',
-                          status: 'NORMAL',
-                          date: new Date(adjustmentModal.date).toISOString(),
-                        });
+                      try {
+                        const product = adjustmentModal.product;
+                        const physicalStockInBase = convertUnit(adjustmentModal.physicalStock, adjustmentModal.unit as any, normalizeUnit(product.unit));
                         
-                        await logAction('stock', 'AJUSTE', {
-                          product_id: product.id,
-                          product_name: product.name,
-                          old_quantity: product.quantity,
-                          new_quantity: physicalStockInBase,
-                        });
+                        const { addMovement, logAction } = useDatabaseStore.getState();
+                        
+                        await addMovement({
+                            product_id: product.id,
+                            type: 'AJUSTE' as any,
+                            quantity: physicalStockInBase - Number(product.quantity),
+                            unit: normalizeUnit(product.unit),
+                            cost: product.cost,
+                            reason: 'Ajuste de inventario',
+                            status: 'NORMAL',
+                            date: new Date(adjustmentModal.date).toISOString(),
+                            warehouse_id: currentWarehouseId || null,
+                          });
+                          
+                          await logAction('stock', 'AJUSTE', {
+                            product_id: product.id,
+                            product_name: product.name,
+                            old_quantity: product.quantity,
+                            new_quantity: physicalStockInBase,
+                          });
                       
                       toast.success('Stock actualizado correctamente');
                       setAdjustmentModal(null);

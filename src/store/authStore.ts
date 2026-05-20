@@ -47,7 +47,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  register: (email: string, password: string, name: string, businessName: string) => Promise<{ success: boolean; error?: string }>;
+  register: (email: string, password: string, name: string, businessName: string, phone?: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   updateSubscription: (updates: Partial<User['subscription']>) => void;
   fetchUser: () => Promise<void>;
@@ -413,7 +413,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     return { success: false, error: 'Error desconocido al iniciar sesión' };
   },
 
-  register: async (email: string, password: string, name: string, businessName: string) => {
+  register: async (email: string, password: string, name: string, businessName: string, phone?: string) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -421,6 +421,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         data: {
           name,
           business_name: businessName,
+          phone: phone || '',
         },
       },
     });
@@ -435,6 +436,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         email,
         name,
         business_name: businessName,
+        phone: phone || '',
         role: 'user',
         subscription_status: 'trialing',
         trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
