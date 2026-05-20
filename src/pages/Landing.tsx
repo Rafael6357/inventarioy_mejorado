@@ -1,11 +1,22 @@
-import { Package, ShoppingCart, ChefHat, Sparkles, ChevronDown, CheckCircle2, Loader2, Users, Instagram, Facebook, Phone, MapPin, DollarSign, Headphones, MessageCircle } from 'lucide-react';
+import { Package, ShoppingCart, ChefHat, Sparkles, ChevronDown, CheckCircle2, Loader2, Users, Instagram, Facebook, Phone, MapPin, DollarSign, Headphones, MessageCircle, Menu, X, LogIn, UserPlus, ClipboardList, TrendingUp, Store, BarChart3, Database, Activity } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
 import InventarioYLogo from '../components/InventarioYLogo';
+import { supabase } from '../lib/supabase';
 
 export default function Landing() {
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [stats, setStats] = useState<{ products: number; movements: number; users: number; sales: number } | null>(null);
+
+  useEffect(() => {
+    supabase.rpc('get_public_stats').then(({ data, error }) => {
+      if (!error && data) setStats(data);
+    });
+  }, []);
+
   // Animaciones de scroll con Intersection Observer
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -22,6 +33,12 @@ export default function Landing() {
     const fadeElements = document.querySelectorAll('.fade-up');
     fadeElements.forEach((el) => observer.observe(el));
 
+    // Animación de entrada para el hero al cargar
+    const heroElements = document.querySelectorAll('.hero-fade');
+    heroElements.forEach((el, i) => {
+      setTimeout(() => el.classList.add('visible'), 200 + i * 150);
+    });
+
     return () => observer.disconnect();
   }, []);
 
@@ -37,7 +54,15 @@ export default function Landing() {
             <a href="#pricing" className="hover:text-primary transition-colors">Plan</a>
             <a href="#faq" className="hover:text-primary transition-colors">FAQ</a>
           </nav>
-          <div className="flex items-center gap-4">
+          <button
+            className="md:hidden p-2 text-text-secondary hover:text-text transition-colors"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            aria-label="Abrir menú"
+          >
+            <Menu className="h-6 w-6" />
+          </button>
+
+          <div className="hidden md:flex items-center gap-4">
             <Link to="/login">
               <Button variant="outline" className="hidden sm:inline-flex">Acceder</Button>
             </Link>
@@ -57,24 +82,66 @@ export default function Landing() {
         </div>
       </header>
 
+      {/* Menú móvil */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 z-40 md:hidden">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setIsMobileMenuOpen(false)} />
+          <div className="absolute right-0 top-0 h-full w-64 bg-surface border-l border-border shadow-2xl animate-in slide-in-from-right">
+            <div className="flex items-center justify-between p-4 border-b border-border">
+              <InventarioYLogo size="md" />
+              <button onClick={() => setIsMobileMenuOpen(false)} className="text-text-secondary hover:text-text">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <nav className="flex flex-col p-4 space-y-2">
+              <a href="#features" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-text-secondary hover:bg-surface-hover hover:text-text transition-colors">
+                <Package className="h-4 w-4" />
+                Características
+              </a>
+              <a href="#pricing" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-text-secondary hover:bg-surface-hover hover:text-text transition-colors">
+                <DollarSign className="h-4 w-4" />
+                Plan
+              </a>
+              <a href="#faq" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-text-secondary hover:bg-surface-hover hover:text-text transition-colors">
+                <MessageCircle className="h-4 w-4" />
+                FAQ
+              </a>
+              <hr className="my-2 border-border" />
+              <Link to="/login" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-text-secondary hover:bg-surface-hover hover:text-text transition-colors">
+                <LogIn className="h-4 w-4" />
+                Acceder
+              </Link>
+              <Link to="/register" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors">
+                <UserPlus className="h-4 w-4" />
+                Registrarse
+              </Link>
+              <Link to="/acceso" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-text-secondary hover:bg-surface-hover hover:text-text transition-colors">
+                <Users className="h-4 w-4" />
+                Acceso de Empleados
+              </Link>
+            </nav>
+          </div>
+        </div>
+      )}
+
       <main className="flex-1">
         <section className="relative overflow-hidden py-24 lg:py-32">
           <div className="absolute inset-0 opacity-20 mix-blend-overlay" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noise\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.8\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noise)\'/%3E%3C/svg%3E")', backgroundRepeat: 'repeat', backgroundSize: '128px 128px' }}></div>
           <div className="absolute inset-0 bg-gradient-to-b from-primary/10 via-bg to-bg"></div>
           
           <div className="container relative mx-auto px-4 text-center">
-            <div className="mx-auto max-w-3xl space-y-8">
-              <div className="inline-flex items-center rounded-full border border-primary/50 bg-primary/10 px-3 py-1 text-sm font-medium text-primary shadow-[0_0_15px_rgba(255,193,7,0.2)]">
+              <div className="mx-auto max-w-3xl space-y-8">
+              <div className="hero-fade fade-up inline-flex items-center rounded-full border border-primary/50 bg-primary/10 px-3 py-1 text-sm font-medium text-primary shadow-[0_0_15px_rgba(255,193,7,0.2)]">
                 <Sparkles className="mr-2 h-4 w-4 drop-shadow-[0_0_5px_rgba(255,193,7,0.8)]" />
                 30 Días de Prueba Gratis
               </div>
-              <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
+              <h1 className="hero-fade fade-up text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
                 Gestiona tu inventario <span className="text-gradient drop-shadow-[0_0_15px_rgba(255,193,7,0.3)] hero-glow">inteligente y fácil</span>
               </h1>
-              <p className="mx-auto max-w-2xl text-lg text-text-secondary sm:text-xl">
+              <p className="hero-fade fade-up mx-auto max-w-2xl text-lg text-text-secondary sm:text-xl">
                 La solución integral para restaurantes, cafeterías y comercios en Cuba. Controla tu stock, ventas, recetas y personal en un solo lugar.
               </p>
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+              <div className="hero-fade fade-up flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
                 <Link to="/register">
                   <Button size="lg" className="w-full sm:w-auto text-base h-12 px-8">
                     Comenzar Gratis
@@ -85,6 +152,50 @@ export default function Landing() {
                     Ver Plan
                   </Button>
                 </a>
+              </div>
+
+              {/* Dashboard Mockup */}
+              <div className="hero-fade fade-up mx-auto mt-16 max-w-4xl">
+                <div className="relative rounded-2xl border border-border/50 bg-surface/80 backdrop-blur-sm shadow-2xl overflow-hidden">
+                  <div className="flex items-center gap-1.5 border-b border-border/50 px-4 py-3">
+                    <div className="h-3 w-3 rounded-full bg-red-500/80" />
+                    <div className="h-3 w-3 rounded-full bg-yellow-500/80" />
+                    <div className="h-3 w-3 rounded-full bg-green-500/80" />
+                    <span className="ml-3 text-xs text-text-secondary">InventarioY Dashboard</span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-3 p-4">
+                    <div className="col-span-1 space-y-3">
+                      {['Productos', 'Movimientos', 'Ventas'].map((label) => (
+                        <div key={label} className="rounded-lg bg-primary/10 p-3 text-left">
+                          <p className="text-xs text-text-secondary">{label}</p>
+                          <div className="mt-1 h-4 w-16 rounded bg-primary/20" />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="col-span-3 space-y-3">
+                      <div className="flex gap-3">
+                        {['Stock Total', 'Valor Inventario', 'Ventas Hoy'].map((label) => (
+                          <div key={label} className="flex-1 rounded-lg bg-primary/5 p-3 text-left">
+                            <p className="text-xs text-text-secondary">{label}</p>
+                            <div className="mt-1 h-4 w-12 rounded bg-primary/20" />
+                          </div>
+                        ))}
+                      </div>
+                      <div className="rounded-lg border border-border/30 p-3">
+                        <div className="mb-2 flex items-center justify-between">
+                          <p className="text-xs font-medium text-text-secondary">Productos Recientes</p>
+                          <div className="h-3 w-16 rounded bg-primary/20" />
+                        </div>
+                        {[80, 60, 40].map((w) => (
+                          <div key={w} className="mb-1.5 flex items-center gap-2">
+                            <div className="h-2 w-2 rounded-full bg-primary/40" />
+                            <div className="h-3 flex-1 rounded bg-primary/10" style={{ maxWidth: `${w}%` }} />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -158,6 +269,34 @@ export default function Landing() {
           </div>
         </section>
 
+        {/* Estadísticas en tiempo real */}
+        <section className="py-16">
+          <div className="container mx-auto px-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
+              {[
+                { icon: Package, label: 'Productos', value: stats?.products, color: 'text-primary' },
+                { icon: Activity, label: 'Movimientos', value: stats?.movements, color: 'text-blue-500' },
+                { icon: ShoppingCart, label: 'Ventas', value: stats?.sales, color: 'text-green-500' },
+                { icon: Users, label: 'Usuarios', value: stats?.users, color: 'text-purple-500' },
+              ].map((stat, idx) => (
+                <div key={stat.label} className="fade-up text-center rounded-2xl border border-border/50 bg-surface p-6 hover:border-primary/30 transition-all" style={{ transitionDelay: `${idx * 100}ms` }}>
+                  <div className={`mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl ${stat.color}/10`}>
+                    <stat.icon className={`h-6 w-6 ${stat.color}`} />
+                  </div>
+                  <div className="text-3xl font-bold mb-1">
+                    {stat.value !== undefined ? (
+                      <span className="animate-in fade-in">{stat.value.toLocaleString()}</span>
+                    ) : (
+                      <span className="text-text-secondary/40">---</span>
+                    )}
+                  </div>
+                  <div className="text-sm text-text-secondary">{stat.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         <section id="features" className="py-24 bg-surface/30">
           <div className="container mx-auto px-4">
             <div className="text-center mb-16 fade-up">
@@ -197,6 +336,14 @@ export default function Landing() {
                 </div>
               ))}
             </div>
+
+            <div className="text-center mt-12 fade-up">
+              <Link to="/register">
+                <Button size="lg" className="text-base h-12 px-8">
+                  Comenzar ahora
+                </Button>
+              </Link>
+            </div>
           </div>
         </section>
 
@@ -209,17 +356,26 @@ export default function Landing() {
             </div>
             <div className="grid gap-8 md:grid-cols-3">
               <div className="text-center fade-up" style={{ transitionDelay: '0ms' }}>
-                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary text-2xl font-bold text-black">1</div>
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary relative">
+                  <UserPlus className="h-7 w-7 text-black" />
+                  <span className="absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-black text-xs font-bold text-primary">1</span>
+                </div>
                 <h3 className="text-lg font-semibold mb-2">Regístrese</h3>
                 <p className="text-text-secondary text-sm">Cree su cuenta en segundos. Sin necesidad de tarjeta de crédito.</p>
               </div>
               <div className="text-center fade-up" style={{ transitionDelay: '100ms' }}>
-                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary text-2xl font-bold text-black">2</div>
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary relative">
+                  <Sparkles className="h-7 w-7 text-black" />
+                  <span className="absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-black text-xs font-bold text-primary">2</span>
+                </div>
                 <h3 className="text-lg font-semibold mb-2">Pruebe gratis</h3>
                 <p className="text-text-secondary text-sm">Use todos los beneficios durante 30 días sin pagar nada.</p>
               </div>
               <div className="text-center fade-up" style={{ transitionDelay: '200ms' }}>
-                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary text-2xl font-bold text-black">3</div>
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary relative">
+                  <DollarSign className="h-7 w-7 text-black" />
+                  <span className="absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-black text-xs font-bold text-primary">3</span>
+                </div>
                 <h3 className="text-lg font-semibold mb-2">Suscríbase</h3>
                 <p className="text-text-secondary text-sm">Si le gusta, aboná 5,000 CUP/mes. Sin contratos ni compromisos.</p>
               </div>
@@ -303,19 +459,27 @@ export default function Landing() {
                   q: "¿Cómo se realiza el pago?",
                   a: "El pago se realiza de forma manual y directa con nuestro equipo local. Una vez realizado el pago, activaremos tu suscripción en el sistema."
                 }
-              ].map((faq) => (
-                <details key={faq.q} className="group rounded-xl border border-border bg-surface p-6 [&_summary::-webkit-details-marker]:hidden">
-                  <summary className="flex cursor-pointer items-center justify-between gap-1.5 font-medium text-text">
-                    <h3 className="text-lg">{faq.q}</h3>
-                    <span className="shrink-0 rounded-full bg-bg p-1.5 text-text-secondary sm:p-3">
-                      <ChevronDown className="h-5 w-5 transition duration-300 group-open:-rotate-180" />
-                    </span>
-                  </summary>
-                  <p className="mt-4 leading-relaxed text-text-secondary">
-                    {faq.a}
-                  </p>
-                </details>
-              ))}
+              ].map((faq, idx) => {
+                const isOpen = openFaq === idx;
+                return (
+                  <div key={faq.q} className="rounded-xl border border-border bg-surface overflow-hidden">
+                    <button
+                      onClick={() => setOpenFaq(isOpen ? null : idx)}
+                      className="flex w-full cursor-pointer items-center justify-between gap-1.5 p-6 font-medium text-text transition-colors hover:bg-bg/30"
+                    >
+                      <h3 className="text-lg text-left">{faq.q}</h3>
+                      <span className="shrink-0 rounded-full bg-bg p-1.5 text-text-secondary sm:p-3 transition-transform duration-300" style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                        <ChevronDown className="h-5 w-5" />
+                      </span>
+                    </button>
+                    <div className="overflow-hidden transition-all duration-300" style={{ maxHeight: isOpen ? '200px' : '0px' }}>
+                      <p className="px-6 pb-6 leading-relaxed text-text-secondary">
+                        {faq.a}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </section>
@@ -380,9 +544,9 @@ export default function Landing() {
           </div>
           
           <div className="flex justify-center gap-6 mb-8 text-sm">
-            <a href="#" className="hover:text-primary transition-colors">Términos y Condiciones</a>
-            <a href="#" className="hover:text-primary transition-colors">Política de Privacidad</a>
-            <a href="#" className="hover:text-primary transition-colors">Manual de Usuario</a>
+            <a href="#features" className="hover:text-primary transition-colors">Características</a>
+            <a href="#pricing" className="hover:text-primary transition-colors">Precios</a>
+            <a href="#faq" className="hover:text-primary transition-colors">FAQ</a>
           </div>
           <p className="text-sm">© {new Date().getFullYear()} InventarioY. Todos los derechos reservados.</p>
         </div>
