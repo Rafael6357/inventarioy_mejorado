@@ -6,7 +6,7 @@ import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { validateNumber, getNumberFromString, calculateMargin, exportToExcel } from '../../lib/utils';
+import { validateNumber, getNumberFromString, exportToExcel } from '../../lib/utils';
 import { normalizeUnit, getCompatibleUnits, convertUnit } from '../../lib/unitConversion';
 
 export default function StockView() {
@@ -155,10 +155,6 @@ export default function StockView() {
         case 'total':
           valA = physA * Number(a.cost);
           valB = physB * Number(b.cost);
-          break;
-        case 'margin':
-          valA = a.price && a.price > 0 ? ((a.price - a.cost) / a.price) * 100 : 0;
-          valB = b.price && b.price > 0 ? ((b.price - b.cost) / b.price) * 100 : 0;
           break;
         case 'date':
           valA = lastMovementDates[a.id] ? new Date(lastMovementDates[a.id]).getTime() : 0;
@@ -346,7 +342,6 @@ export default function StockView() {
                   { header: 'Disponible', key: 'available', format: (v: number) => v?.toFixed(3).replace('.', ',') || '0' },
                   { header: 'En Tránsito', key: 'in_transit', format: (v: number) => v?.toFixed(3).replace('.', ',') || '0' },
                   { header: 'Costo Unit.', key: 'cost', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
-                  { header: 'Margen %', key: 'margin', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
                   { header: 'Total', key: 'total', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
                   { header: 'Unidad', key: 'unit' },
                   { header: 'ROP', key: 'rop', format: (v: number) => v?.toString() || '0' },
@@ -356,14 +351,12 @@ export default function StockView() {
                   const quantity = warehouseStock ? warehouseStock.quantity : Number(p.quantity);
                   const inTransit = warehouseStock ? warehouseStock.in_transit : Number(p.in_transit || 0);
                   const physicalStock = quantity - inTransit;
-                  const margin = p.price && p.price > 0 ? ((p.price - p.cost) / p.price) * 100 : 0;
                   return {
                     ...p,
                     type: p.is_consumo_directo ? 'Consumo Directo' : p.is_gasto_variable ? 'Gasto Variable' : p.is_individual ? 'Venta Rápida' : 'Ingrediente',
                     available: physicalStock,
                     in_transit: inTransit,
                     cost: Number(p.cost) || 0,
-                    margin: margin,
                     total: physicalStock * Number(p.cost),
                   };
                 });
@@ -473,10 +466,7 @@ export default function StockView() {
                 <th className="px-3 py-3 font-medium text-right min-w-[90px] cursor-pointer hover:text-text" onClick={() => toggleSort('cost')}>
                   <div className="flex items-center justify-end">Costo Unit. <SortIcon field="cost" /></div>
                 </th>
-                <th className="px-3 py-3 font-medium text-right min-w-[70px] cursor-pointer hover:text-text" onClick={() => toggleSort('margin')}>
-                  <div className="flex items-center justify-end">Margen % <SortIcon field="margin" /></div>
-                </th>
-                <th className="px-3 py-3 font-medium text-right min-w-[80px] cursor-pointer hover:text-text" onClick={() => toggleSort('total')}>
+                <th className="px-3 py-3 font-medium text-right min-w-[90px] cursor-pointer hover:text-text" onClick={() => toggleSort('total')}>
                   <div className="flex items-center justify-end">Total <SortIcon field="total" /></div>
                 </th>
                 <th className="px-3 py-3 font-medium min-w-[80px]">Unidad</th>
@@ -555,15 +545,6 @@ export default function StockView() {
                       </td>
                       <td className="px-4 py-3 text-right font-mono">
                         ${Number(product.cost).toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono">
-                        {product.price && product.price > 0 ? (
-                          <span className={calculateMargin(Number(product.cost), Number(product.price)) < 30 ? 'text-warning' : 'text-green-600'}>
-                            {calculateMargin(Number(product.cost), Number(product.price)).toFixed(2)}%
-                          </span>
-                        ) : (
-                          <span className="text-text-secondary">-</span>
-                        )}
                       </td>
                       <td className="px-4 py-3 text-right font-mono font-medium text-primary">
                         ${(physicalStock * Number(product.cost)).toFixed(2)}

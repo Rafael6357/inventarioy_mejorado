@@ -10,11 +10,23 @@ export default function Landing() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [stats, setStats] = useState<{ products: number; movements: number; users: number; sales: number } | null>(null);
+  const [statsError, setStatsError] = useState(false);
   const [isAnnual, setIsAnnual] = useState(false);
 
   useEffect(() => {
     supabase.rpc('get_public_stats').then(({ data, error }) => {
-      if (!error && data) setStats(data);
+      if (error) {
+        console.error('Stats RPC error:', error);
+        setStatsError(true);
+        return;
+      }
+      if (data) {
+        if (typeof data === 'string') {
+          try { setStats(JSON.parse(data)); } catch { setStatsError(true); }
+        } else {
+          setStats(data as any);
+        }
+      }
     });
   }, []);
 
@@ -61,7 +73,6 @@ export default function Landing() {
         .delay-300 { transition-delay: 300ms; }
         .fade-up.visible { opacity: 1; transform: translateY(0); }
         .hero-fade.visible { opacity: 1; transform: translateY(0); }
-        .hero-glow { animation: pulse-glow 3s ease-in-out infinite; }
       `}</style>
       <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-bg/80 backdrop-blur-xl supports-[backdrop-filter]:bg-bg/60 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
@@ -155,7 +166,7 @@ export default function Landing() {
                 30 Días de Prueba Gratis
               </div>
               <h1 className="hero-fade fade-up text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
-                Gestiona tu inventario <span className="text-gradient drop-shadow-[0_0_15px_rgba(255,193,7,0.3)] hero-glow">inteligente y fácil</span>
+                Gestiona tu inventario <span className="text-gradient">inteligente y fácil</span>
               </h1>
               <p className="hero-fade fade-up mx-auto max-w-2xl text-lg text-text-secondary sm:text-xl">
                 La solución integral para restaurantes, cafeterías y comercios en Cuba. Controla tu stock, ventas, recetas y personal en un solo lugar.
@@ -258,8 +269,8 @@ export default function Landing() {
           <div className="container mx-auto px-4">
             <div className="flex flex-wrap justify-center gap-8 md:gap-16">
               <div className="flex items-center gap-3 fade-up">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success/10">
-                  <svg className="h-5 w-5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                  <svg className="h-5 w-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-text">Datos seguros</p>
@@ -276,8 +287,8 @@ export default function Landing() {
                 </div>
               </div>
               <div className="flex items-center gap-3 fade-up" style={{ transitionDelay: '200ms' }}>
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500/10">
-                  <svg className="h-5 w-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" /></svg>
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                  <svg className="h-5 w-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" /></svg>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-text">100% en la nube</p>
@@ -294,17 +305,17 @@ export default function Landing() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
               {[
                 { icon: Package, label: 'Productos', value: stats?.products, color: 'text-primary' },
-                { icon: Activity, label: 'Movimientos', value: stats?.movements, color: 'text-blue-500' },
-                { icon: ShoppingCart, label: 'Ventas', value: stats?.sales, color: 'text-green-500' },
-                { icon: Users, label: 'Usuarios', value: stats?.users, color: 'text-purple-500' },
+                { icon: TrendingUp, label: 'Movimientos', value: stats?.movements, color: 'text-primary' },
+                { icon: ShoppingCart, label: 'Ventas', value: stats?.sales, color: 'text-primary' },
+                { icon: Users, label: 'Usuarios', value: stats?.users, color: 'text-primary' },
               ].map((stat, idx) => (
                 <div key={stat.label} className="fade-up text-center rounded-2xl border border-border/50 bg-surface p-6 hover:border-primary/30 transition-all" style={{ transitionDelay: `${idx * 100}ms` }}>
                   <div className={`mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl ${stat.color}/10`}>
                     <stat.icon className={`h-6 w-6 ${stat.color}`} />
                   </div>
                   <div className="text-3xl font-bold mb-1">
-                    {stat.value !== undefined ? (
-                      <span className="animate-in fade-in">{stat.value.toLocaleString()}</span>
+                    {stat.value !== undefined && stat.value !== null ? (
+                      <span>{stat.value.toLocaleString()}</span>
                     ) : (
                       <span className="text-text-secondary/40">---</span>
                     )}

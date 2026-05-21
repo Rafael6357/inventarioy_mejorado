@@ -15,3 +15,6 @@ begin
   return result;
 end;
 $$;
+
+grant execute on function get_public_stats() to anon;
+grant execute on function get_public_stats() to authenticated;
