@@ -248,10 +248,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (user && !user.phone) {
-      const hasSeenPhoneModal = localStorage.getItem('phone_modal_seen');
-      if (!hasSeenPhoneModal) {
-        setShowPhoneModal(true);
-      }
+      setShowPhoneModal(true);
     }
   }, [user]);
 

@@ -46,6 +46,17 @@ export default function OnboardingWizard({ isOpen, onClose }: OnboardingWizardPr
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleComplete();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
+
   const handleComplete = () => {
     localStorage.setItem(STORAGE_KEY, 'true');
     onClose();
@@ -120,8 +131,8 @@ export default function OnboardingWizard({ isOpen, onClose }: OnboardingWizardPr
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="relative w-full max-w-2xl mx-4 bg-surface rounded-2xl shadow-2xl border border-border/50 overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) handleComplete(); }}>
+      <div className="relative w-full max-w-2xl mx-4 bg-surface rounded-2xl shadow-2xl border border-border/50 overflow-hidden opacity-100 visible">
         <button
           onClick={handleComplete}
           className="absolute top-4 right-4 text-text-secondary hover:text-text transition-colors"

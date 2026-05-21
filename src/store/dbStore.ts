@@ -612,7 +612,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
         queryWithRetry(() => supabase.from('pending_accounts').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(limit)),
         queryWithRetry(() => supabase.from('access_pins').select('*').eq('user_id', user.id).limit(limit)),
         queryWithRetry(() => supabase.from('action_logs').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(limit)),
-        queryWithRetry(() => supabase.from('payroll_config').select('*').eq('user_id', user.id).single()),
+        queryWithRetry(() => supabase.from('payroll_config').select('*').eq('user_id', user.id).maybeSingle()),
       ]);
 
       const recipes = recipesRes.data?.map(r => ({

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Phone, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
@@ -13,6 +13,17 @@ export default function PhoneModal({ isOpen, onClose }: PhoneModalProps) {
   const [phone, setPhone] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const { fetchUser } = useAuthStore();
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -42,7 +53,6 @@ export default function PhoneModal({ isOpen, onClose }: PhoneModalProps) {
       console.error('Error saving phone:', error);
     } else {
       toast.success('Teléfono guardado correctamente');
-      localStorage.setItem('phone_modal_seen', 'true');
       await fetchUser();
       onClose();
     }
@@ -51,13 +61,12 @@ export default function PhoneModal({ isOpen, onClose }: PhoneModalProps) {
   };
 
   const handleClose = () => {
-    localStorage.setItem('phone_modal_seen', 'true');
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-md mx-4 bg-surface border border-border rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-300">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
+      <div className="w-full max-w-md mx-4 bg-surface border border-border rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-300 opacity-100 visible">
         <div className="flex items-center justify-between p-6 border-b border-border">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20">
