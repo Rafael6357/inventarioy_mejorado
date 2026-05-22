@@ -1091,7 +1091,7 @@ export default function HRView() {
                                         toast.error((err as Error).message);
                                       }
                                     }}
-                                    className="flex items-center justify-center h-7 w-7 rounded-lg text-text-secondary hover:text-primary hover:bg-primary/10 transition-colors"
+                                    className="flex items-center justify-center h-8 w-8 rounded-lg text-text-secondary hover:text-primary hover:bg-primary/10 transition-colors"
                                     title="Regenerar valores por defecto"
                                   >
                                     <RefreshCw className="h-3.5 w-3.5" />

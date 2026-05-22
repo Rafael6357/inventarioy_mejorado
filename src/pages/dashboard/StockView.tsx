@@ -443,7 +443,7 @@ export default function StockView() {
             <ChevronLeft className="h-5 w-5" />
           </button>
           
-          <div className="flex-1 overflow-x-auto" id="stock-table-container"
+          <div className="flex-1 overflow-x-auto table-scroll-hint" id="stock-table-container"
                ref={tableContainerRef}
                onScroll={(e) => {
                  const topScroll = document.getElementById('top-scrollbar');

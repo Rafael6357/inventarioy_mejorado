@@ -95,6 +95,11 @@
     animation: glow-pulse 3s infinite alternate;
   }
 
+  /* Hint visual de scroll horizontal en tablas móvil */
+  .table-scroll-hint {
+    background: linear-gradient(to right, transparent 95%, rgba(255, 193, 7, 0.06) 100%);
+  }
+
   /* Hide number input arrows */
   .no-spin::-webkit-inner-spin-button,
   .no-spin::-webkit-outer-spin-button {

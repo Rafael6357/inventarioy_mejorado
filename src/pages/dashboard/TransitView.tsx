@@ -431,7 +431,7 @@ const handleWaste = async () => {
                                           const defaultUnit = savedUnit && compatibleUnits.includes(savedUnit) ? savedUnit : baseUnit;
                                           setConsumptionModal({ item, quantity: item.remaining, unit: defaultUnit, note: '' });
                                         }}
-                                        className="flex items-center justify-center h-7 w-7 rounded-lg text-text-secondary hover:text-success hover:bg-success/10 transition-colors shrink-0"
+                                        className="flex items-center justify-center h-8 w-8 rounded-lg text-text-secondary hover:text-success hover:bg-success/10 transition-colors shrink-0"
                                         title="Registrar consumo manual"
                                       >
                                         <TrendingDown className="h-3.5 w-3.5" />
@@ -449,7 +449,7 @@ const handleWaste = async () => {
                                           const defaultUnit = savedUnit && compatibleUnits.includes(savedUnit) ? savedUnit : baseUnit;
                                           setConsumptionModal({ item, quantity: item.remaining, unit: defaultUnit, note: '' });
                                         }}
-                                        className="flex items-center justify-center h-7 w-7 rounded-lg text-text-secondary hover:text-purple-600 hover:bg-purple-500/10 transition-colors shrink-0"
+                                        className="flex items-center justify-center h-8 w-8 rounded-lg text-text-secondary hover:text-purple-600 hover:bg-purple-500/10 transition-colors shrink-0"
                                         title="Registrar gasto variable"
                                       >
                                         <TrendingDown className="h-3.5 w-3.5" />
@@ -466,7 +466,7 @@ const handleWaste = async () => {
                                         const defaultUnit = savedUnit && compatibleUnits.includes(savedUnit) ? savedUnit : baseUnit;
                                         setWasteModal({ item, quantity: item.remaining, reason: '', unit: defaultUnit });
                                       }}
-                                      className="flex items-center justify-center h-7 w-7 rounded-lg text-text-secondary hover:text-warning hover:bg-warning/10 transition-colors shrink-0"
+                                      className="flex items-center justify-center h-8 w-8 rounded-lg text-text-secondary hover:text-warning hover:bg-warning/10 transition-colors shrink-0"
                                       title="Registrar merma"
                                     >
                                       <AlertTriangle className="h-3.5 w-3.5" />
@@ -482,7 +482,7 @@ const handleWaste = async () => {
                                         const defaultUnit = savedUnit && compatibleUnits.includes(savedUnit) ? savedUnit : baseUnit;
                                         setCancelModal({ item, quantity: item.remaining, reason: '', unit: defaultUnit });
                                       }}
-                                      className="flex items-center justify-center h-7 w-7 rounded-lg text-text-secondary hover:text-danger hover:bg-danger/10 transition-colors shrink-0"
+                                      className="flex items-center justify-center h-8 w-8 rounded-lg text-text-secondary hover:text-danger hover:bg-danger/10 transition-colors shrink-0"
                                       title="Devolver cantidad al stock"
                                     >
                                       <RotateCcw className="h-3.5 w-3.5" />

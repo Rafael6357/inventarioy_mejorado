@@ -145,7 +145,7 @@ export default function Register() {
                     <ChevronDown className={`h-3.5 w-3.5 text-text-secondary transition-transform duration-200 ${showCountries ? 'rotate-180' : ''}`} />
                   </button>
                   {showCountries && (
-                    <div className="absolute top-full mt-1 left-0 z-50 max-h-60 w-64 overflow-y-auto rounded-xl border border-border bg-surface shadow-lg">
+                    <div className="absolute top-full mt-1 right-0 z-50 max-h-60 sm:w-64 w-56 overflow-y-auto rounded-xl border border-border bg-surface shadow-lg">
                       {countries.map((country) => (
                         <button
                           key={country.code}

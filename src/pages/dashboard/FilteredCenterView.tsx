@@ -223,7 +223,7 @@ export default function FilteredCenterView() {
 
       {/* Results Table */}
       <div className="rounded-xl border border-border bg-surface shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto table-scroll-hint">
           <table className="w-full text-left text-sm text-text [&_tr]:divide-x [&_tr]:divide-border/50">
             <thead className="border-b border-border bg-bg/50 text-xs uppercase text-text-secondary">
               <tr>

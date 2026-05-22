@@ -854,7 +854,7 @@ setShowTicket(true);
                         </button>
                         <Button
                           size="sm"
-                          className="h-7 text-xs bg-success hover:bg-success/80"
+                          className="text-xs bg-success hover:bg-success/80"
                           onClick={() => {
                             setSelectedAccountForCharge(account);
                             setChargeBreakdown({ efectivo: 0, transferencia: 0, usd: 0, eur: 0 });
@@ -866,7 +866,7 @@ setShowTicket(true);
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-7 text-xs text-danger hover:text-danger"
+                          className="text-xs text-danger hover:text-danger"
                           onClick={() => {
                             setSelectedAccountForCancel(account);
                             setCancelJustification('');

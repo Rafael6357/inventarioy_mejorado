@@ -47,7 +47,7 @@ export default function SyncStatusComponent() {
       </button>
 
       {showTooltip && (
-        <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 z-50 px-3 py-2 rounded-xl bg-surface border border-border shadow-lg whitespace-nowrap">
+        <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 z-50 px-3 py-2 rounded-xl bg-surface border border-border shadow-lg max-w-[200px] text-center">
           <p className={`text-xs font-semibold ${isOnline ? 'text-primary' : 'text-danger'}`}>
             {isOnline ? 'Conectado' : 'Sin conexión'}
           </p>

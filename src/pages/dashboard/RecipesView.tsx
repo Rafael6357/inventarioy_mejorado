@@ -273,12 +273,12 @@ export default function RecipesView() {
                       const quantityInBase = convertUnit(ing.quantity, ing.displayUnit as UnitAbbrev, baseUnit);
                       
                       return (
-                        <div key={ing.product_id} className="flex items-center justify-between gap-3 rounded-md bg-surface p-2 border border-border">
+                        <div key={ing.product_id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-md bg-surface p-2 border border-border">
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-text truncate">{product.name}</p>
                             <p className="text-xs text-text-secondary">Costo: ${(product.cost * quantityInBase).toFixed(2)}</p>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 self-end sm:self-auto">
                             <Input 
                               type="number" 
                               min="0.0001" 
