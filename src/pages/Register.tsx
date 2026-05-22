@@ -1,27 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Sparkles, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Sparkles, Loader2, Eye, EyeOff, ChevronDown } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
 import InventarioYLogo from '../components/InventarioYLogo';
+import { countries, defaultCountry } from '../lib/countries';
+import type { Country } from '../lib/countries';
 
 export default function Register() {
   const [name, setName] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('+53 ');
+  const [selectedCountry, setSelectedCountry] = useState<Country>(defaultCountry);
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [showCountries, setShowCountries] = useState(false);
+  const countryRef = useRef<HTMLDivElement>(null);
 
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    if (value.length < 4) { setPhone('+53 '); return; }
-    if (!value.startsWith('+53')) {
-      const digits = value.replace(/[^\d]/g, '');
-      setPhone('+53 ' + digits);
-      return;
-    }
-    setPhone(value);
-  };
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (countryRef.current && !countryRef.current.contains(e.target as Node)) {
+        setShowCountries(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
@@ -48,7 +53,8 @@ export default function Register() {
       return;
     }
 
-    const result = await register(email, password, name, businessName, phone);
+    const fullPhone = `${selectedCountry.dial}${phoneNumber}`;
+    const result = await register(email, password, name, businessName, fullPhone);
     setIsLoading(false);
 
     if (result.success) {
@@ -127,15 +133,52 @@ export default function Register() {
               <label htmlFor="phone" className="block text-sm font-medium text-text-secondary mb-1">
                 Teléfono (WhatsApp) *
               </label>
-              <input
-                id="phone"
-                type="tel"
-                required
-                value={phone}
-                 onChange={handlePhoneChange}
-                 className="flex h-10 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-text ring-offset-bg placeholder:text-text-secondary transition-all duration-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary focus-visible:shadow-[0_0_15px_-3px_rgba(255,193,7,0.3)]"
-                 placeholder="+53 12345678"
-              />
+              <div className="flex gap-2">
+                <div className="relative" ref={countryRef}>
+                  <button
+                    type="button"
+                    onClick={() => setShowCountries(!showCountries)}
+                    className="flex h-10 items-center gap-1 rounded-xl border border-border bg-bg px-3 text-sm text-text hover:border-primary/50 transition-colors whitespace-nowrap"
+                  >
+                    <span className="text-base leading-none">{selectedCountry.flag}</span>
+                    <span className="text-text-secondary">{selectedCountry.dial}</span>
+                    <ChevronDown className={`h-3.5 w-3.5 text-text-secondary transition-transform duration-200 ${showCountries ? 'rotate-180' : ''}`} />
+                  </button>
+                  {showCountries && (
+                    <div className="absolute top-full mt-1 left-0 z-50 max-h-60 w-64 overflow-y-auto rounded-xl border border-border bg-surface shadow-lg">
+                      {countries.map((country) => (
+                        <button
+                          key={country.code}
+                          type="button"
+                          onClick={() => {
+                            setSelectedCountry(country);
+                            setShowCountries(false);
+                          }}
+                          className={`flex w-full items-center gap-3 px-3 py-2 text-sm text-left transition-colors hover:bg-surface-hover ${selectedCountry.code === country.code ? 'bg-primary/10' : ''}`}
+                        >
+                          <span className="text-base leading-none">{country.flag}</span>
+                          <span className="text-text-secondary text-xs">{country.dial}</span>
+                          <span className="flex-1 text-text">{country.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="relative flex-1">
+                  <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-text-secondary">
+                    {selectedCountry.dial}
+                  </div>
+                  <input
+                    id="phone"
+                    type="tel"
+                    required
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
+                    className="flex h-10 w-full rounded-xl border border-border bg-bg pl-16 pr-3 py-2 text-sm text-text ring-offset-bg placeholder:text-text-secondary transition-all duration-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary focus-visible:shadow-[0_0_15px_-3px_rgba(255,193,7,0.3)]"
+                    placeholder="12345678"
+                  />
+                </div>
+              </div>
               <p className="text-xs text-text-secondary mt-1">Le contactaremos por WhatsApp para explicarle para su negocio especificamente como podria sacarle el maximo beneficio</p>
             </div>
             <div>
