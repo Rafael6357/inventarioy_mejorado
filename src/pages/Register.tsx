@@ -53,7 +53,7 @@ export default function Register() {
       return;
     }
 
-    const fullPhone = `${selectedCountry.dial}${phoneNumber}`;
+    const fullPhone = `${selectedCountry.dial} ${phoneNumber}`;
     const result = await register(email, password, name, businessName, fullPhone);
     setIsLoading(false);
 

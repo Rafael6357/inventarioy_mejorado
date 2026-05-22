@@ -141,9 +141,6 @@ export default function ProspectsView() {
     if (cleanPhone.length === 8) {
       cleanPhone = '53' + cleanPhone;
     }
-    if (cleanPhone.length === 10 && cleanPhone.startsWith('53') && !phone.startsWith('+')) {
-      cleanPhone = '+' + cleanPhone;
-    }
     const message = encodeURIComponent(
       `Saludos usuario, gracias por registrarse en InventarioY a través de nuestra publicación, su sistema de gestión y control de inventario pensado para negocios cubanos como el suyo. Quien comunica es el desarrollador y estoy a su disposición para brindarle asesoría personalizada y resolver cualquier duda que pueda tener sobre la plataforma. ¿Le gustaría que le explique las funcionalidades principales para llevar el control adecuado de sus entradas y salidas de almacén, o sus recetas, productos vendidos, finanzas, margen? Nuestro sistema puede llevar de manera automática muchos cálculos, actualizaciones, procesos en su negocio, que un excel o de manera manual sería tedioso y muy complejo llevar a cabo.`
     );
