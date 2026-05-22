@@ -138,7 +138,7 @@ export default function ProspectsView() {
 
   const getWhatsAppLink = (phone: string) => {
     let cleanPhone = phone.replace(/\D/g, '');
-    if (!cleanPhone.startsWith('53')) {
+    if (cleanPhone.length === 8) {
       cleanPhone = '53' + cleanPhone;
     }
     const message = encodeURIComponent(
