@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
-import { Users, Phone, Search, Download, CheckCircle, XCircle, Clock, ExternalLink, User, Building2, ChevronLeft, ChevronRight, CreditCard, DollarSign, ShieldCheck, CheckCircle2, AlertCircle, ArrowUpDown } from 'lucide-react';
+import { Users, Phone, Search, Download, CheckCircle, XCircle, Clock, User, Building2, ChevronLeft, ChevronRight, CreditCard, DollarSign, ShieldCheck, CheckCircle2, AlertCircle, ArrowUpDown } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
@@ -21,6 +21,7 @@ interface UserProfile {
   valid_until: string | null;
   created_at: string;
   phone: string;
+  last_contacted_at: string | null;
 }
 
 interface Payment {
@@ -85,7 +86,7 @@ export default function UsersView() {
 
       let query = supabase
         .from('profiles')
-        .select('id, email, name, business_name, role, subscription_status, trial_ends_at, valid_until, created_at, phone', { count: 'exact' })
+        .select('id, email, name, business_name, role, subscription_status, trial_ends_at, valid_until, created_at, phone, last_contacted_at', { count: 'exact' })
         .order('created_at', { ascending: dateOrder === 'asc' })
         .range(from, to);
 
@@ -93,7 +94,9 @@ export default function UsersView() {
         query = query.or(`name.ilike.%${debouncedSearch}%,business_name.ilike.%${debouncedSearch}%,email.ilike.%${debouncedSearch}%,phone.ilike.%${debouncedSearch}%`);
       }
 
-      if (statusFilter !== 'all') {
+      if (statusFilter === 'uncontacted') {
+        query = query.is('last_contacted_at', null).not('phone', 'is', null).neq('phone', '');
+      } else if (statusFilter !== 'all') {
         query = query.eq('subscription_status', statusFilter);
       }
 
@@ -301,6 +304,21 @@ export default function UsersView() {
     }
   };
 
+  const handleContact = async (profile: UserProfile) => {
+    if (!isMountedRef.current) return;
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from('profiles')
+      .update({ last_contacted_at: now })
+      .eq('id', profile.id);
+    if (error) {
+      toast.error('Error al registrar el contacto');
+      return;
+    }
+    setProfiles(prev => prev.map(p => p.id === profile.id ? { ...p, last_contacted_at: now } : p));
+    window.open(getWhatsAppLink(profile.phone), '_blank', 'noopener,noreferrer');
+  };
+
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= totalPages) {
       setPage(newPage);
@@ -456,6 +474,12 @@ export default function UsersView() {
           >
             <XCircle className="h-3 w-3" /> Cancelados
           </button>
+          <button
+            onClick={() => { setStatusFilter('uncontacted'); setPage(1); }}
+            className={`px-3 py-1.5 text-xs rounded-full transition-colors flex items-center gap-1 ${statusFilter === 'uncontacted' ? 'bg-primary text-black' : 'bg-bg text-text-secondary hover:bg-surface-hover'}`}
+          >
+            <Phone className="h-3 w-3" /> Pendientes
+          </button>
         </div>
 
         <button
@@ -538,15 +562,24 @@ export default function UsersView() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         {profile.phone && (
-                          <a
-                            href={getWhatsAppLink(profile.phone)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 rounded-lg bg-success/10 px-3 py-1.5 text-xs font-medium text-success hover:bg-success/20 transition-colors"
-                          >
-                            <Phone className="h-3 w-3" />
-                            Contactar
-                          </a>
+                          profile.last_contacted_at ? (
+                            <button
+                              onClick={() => handleContact(profile)}
+                              className="inline-flex items-center gap-1 rounded-lg bg-text-secondary/10 px-3 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:bg-text-secondary/20"
+                              title={`Contactado el ${new Date(profile.last_contacted_at).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`}
+                            >
+                              <CheckCircle className="h-3 w-3" />
+                              Contactado
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleContact(profile)}
+                              className="inline-flex items-center gap-1 rounded-lg bg-success/10 px-3 py-1.5 text-xs font-medium text-success hover:bg-success/20 transition-colors"
+                            >
+                              <Phone className="h-3 w-3" />
+                              Contactar
+                            </button>
+                          )
                         )}
                         <button
                           onClick={() => openPaymentModal(profile)}
