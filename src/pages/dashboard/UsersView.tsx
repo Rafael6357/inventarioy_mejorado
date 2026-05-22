@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
-import { Users, Phone, Search, Download, CheckCircle, XCircle, Clock, User, Building2, ChevronLeft, ChevronRight, CreditCard, DollarSign, ShieldCheck, CheckCircle2, AlertCircle, ArrowUpDown } from 'lucide-react';
+import { Users, Phone, Search, Download, CheckCircle2, XCircle, Clock, User, Building2, ChevronLeft, ChevronRight, CreditCard, DollarSign, ShieldCheck, CheckCircle2, AlertCircle, ArrowUpDown } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
@@ -568,8 +568,8 @@ export default function UsersView() {
                               className="inline-flex items-center gap-1 rounded-lg bg-text-secondary/10 px-3 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:bg-text-secondary/20"
                               title={`Contactado el ${new Date(profile.last_contacted_at).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`}
                             >
-                              <CheckCircle className="h-3 w-3" />
-                              Contactado
+                              <Phone className="h-3 w-3" />
+                              Recontactar
                             </button>
                           ) : (
                             <button
