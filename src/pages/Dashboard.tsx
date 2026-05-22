@@ -14,7 +14,6 @@ import {
   Filter, 
   Sparkles, 
   Settings, 
-  CreditCard,
   LogOut,
   Menu,
   X,
@@ -24,7 +23,6 @@ import {
   FileText,
   LockOpen,
   Phone,
-  UserPlus,
   Crown
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
@@ -48,9 +46,8 @@ import FilteredCenterView from './dashboard/FilteredCenterView';
 import AIView from './dashboard/AIView';
 import SettingsView from './dashboard/SettingsView';
 import ActionLogsView from './dashboard/ActionLogsView';
-import PaymentsView from './dashboard/PaymentsView';
+import UsersView from './dashboard/UsersView';
 import DailyClosingsView from './dashboard/DailyClosingsView';
-import ProspectsView from './dashboard/ProspectsView';
 import OnboardingWizard, { shouldShowOnboarding } from '../components/OnboardingWizard';
 import PhoneModal from '../components/PhoneModal';
 
@@ -109,12 +106,8 @@ export default function Dashboard() {
   const navigation = useMemo(() => {
     let nav = [...baseNav];
     
-    if (user?.role === 'admin') {
-      nav.push({ name: 'Gestión de Pagos', href: '/dashboard/payments', icon: CreditCard });
-    }
-    
     if (user?.email === 'nikko6357@gmail.com') {
-      nav.push({ name: 'Prospectos', href: '/dashboard/prospects', icon: UserPlus });
+      nav.push({ name: 'Gestión de Usuarios', href: '/dashboard/users', icon: Users });
     }
     
     return nav;
@@ -337,7 +330,7 @@ export default function Dashboard() {
           <nav className="space-y-1">
             {navigation.map((item) => {
               const isActive = location.pathname === item.href || (item.href === '/dashboard' && location.pathname === '/dashboard/');
-              const isExclusive = item.name === 'Gestión de Pagos' || item.name === 'Prospectos';
+              const isExclusive = item.name === 'Gestión de Usuarios';
               return (
                 <Link
                   key={item.name}
@@ -454,11 +447,8 @@ export default function Dashboard() {
               <Route path="/ai" element={<AIView />} />
               <Route path="/settings" element={<SettingsView />} />
               <Route path="/action-logs" element={<ActionLogsView />} />
-              {user.role === 'admin' && (
-                <Route path="/payments" element={<PaymentsView />} />
-              )}
               {user?.email === 'nikko6357@gmail.com' && (
-                <Route path="/prospects" element={<ProspectsView />} />
+                <Route path="/users" element={<UsersView />} />
               )}
             </Routes>
           </div>
