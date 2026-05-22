@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
-import { Users, Phone, Search, Download, CheckCircle2, XCircle, Clock, User, Building2, ChevronLeft, ChevronRight, CreditCard, DollarSign, ShieldCheck, CheckCircle2, AlertCircle, ArrowUpDown } from 'lucide-react';
+import { Users, Phone, Search, Download, CheckCircle2, XCircle, Clock, User, Building2, ChevronLeft, ChevronRight, CreditCard, DollarSign, ShieldCheck, AlertCircle, ArrowUpDown } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
