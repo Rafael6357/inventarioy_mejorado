@@ -10,7 +10,18 @@ export default function Register() {
   const [name, setName] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState('+53 ');
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (value.length < 4) { setPhone('+53 '); return; }
+    if (!value.startsWith('+53')) {
+      const digits = value.replace(/[^\d]/g, '');
+      setPhone('+53 ' + digits);
+      return;
+    }
+    setPhone(value);
+  };
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
@@ -121,9 +132,9 @@ export default function Register() {
                 type="tel"
                 required
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="flex h-10 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-text ring-offset-bg placeholder:text-text-secondary transition-all duration-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary focus-visible:shadow-[0_0_15px_-3px_rgba(255,193,7,0.3)]"
-                placeholder="+53 12345678"
+                 onChange={handlePhoneChange}
+                 className="flex h-10 w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-text ring-offset-bg placeholder:text-text-secondary transition-all duration-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary focus-visible:shadow-[0_0_15px_-3px_rgba(255,193,7,0.3)]"
+                 placeholder="+53 12345678"
               />
               <p className="text-xs text-text-secondary mt-1">Le contactaremos por WhatsApp para explicarle para su negocio especificamente como podria sacarle el maximo beneficio</p>
             </div>
