@@ -96,6 +96,9 @@ export default function UsersView() {
 
       if (statusFilter === 'uncontacted') {
         query = query.is('last_contacted_at', null).not('phone', 'is', null).neq('phone', '');
+      } else if (statusFilter === 'past_due') {
+        const now = new Date().toISOString();
+        query = query.or(`subscription_status.eq.past_due,and(subscription_status.eq.trialing,trial_ends_at.lt.${now})`);
       } else if (statusFilter !== 'all') {
         query = query.eq('subscription_status', statusFilter);
       }
@@ -175,6 +178,13 @@ export default function UsersView() {
       return days > 0 ? days : 0;
     }
     return 0;
+  };
+
+  const getEffectiveStatus = (profile: UserProfile) => {
+    if (profile.subscription_status === 'trialing' && profile.trial_ends_at && new Date(profile.trial_ends_at) < new Date()) {
+      return 'past_due';
+    }
+    return profile.subscription_status;
   };
 
   const formatDate = (dateString: string) => {
@@ -356,9 +366,9 @@ export default function UsersView() {
 
   const stats = {
     total: totalCount,
-    active: profiles.filter(p => p.subscription_status === 'active').length,
-    trialing: profiles.filter(p => p.subscription_status === 'trialing').length,
-    inactive: profiles.filter(p => ['past_due', 'canceled'].includes(p.subscription_status)).length,
+    active: profiles.filter(p => getEffectiveStatus(p) === 'active').length,
+    trialing: profiles.filter(p => getEffectiveStatus(p) === 'trialing' && !(p.trial_ends_at && new Date(p.trial_ends_at) < new Date())).length,
+    inactive: profiles.filter(p => ['past_due', 'canceled'].includes(getEffectiveStatus(p))).length,
   };
 
   if (user?.email !== 'nikko6357@gmail.com') {
@@ -545,12 +555,12 @@ export default function UsersView() {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      {getStatusBadge(profile.subscription_status)}
+                      {getStatusBadge(getEffectiveStatus(profile))}
                     </td>
                     <td className="px-4 py-3 text-xs">
                       <span className={
-                        profile.subscription_status === 'trialing' ? 'text-warning' :
-                        profile.subscription_status === 'active' ? 'text-success' :
+                        getEffectiveStatus(profile) === 'trialing' ? 'text-warning' :
+                        getEffectiveStatus(profile) === 'active' ? 'text-success' :
                         'text-text-secondary'
                       }>
                         {getDaysLeft(profile)}
@@ -682,14 +692,14 @@ export default function UsersView() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-text-secondary">Estado Actual</p>
-                    <div className="mt-1">{getStatusBadge(selectedUser.subscription_status)}</div>
+                    <div className="mt-1">{getStatusBadge(getEffectiveStatus(selectedUser))}</div>
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-text-secondary">Días Restantes</p>
                     <p className="mt-1 font-bold text-text">{getDaysLeft(selectedUser)}</p>
                   </div>
                 </div>
-                {selectedUser.subscription_status !== 'canceled' && (
+                {getEffectiveStatus(selectedUser) !== 'canceled' && (
                   <div className="mt-3 pt-3 border-t border-border">
                     <button
                       onClick={() => {
