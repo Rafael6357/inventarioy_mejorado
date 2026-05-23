@@ -124,7 +124,10 @@ export default function UsersView() {
       setProfiles(data || []);
       setTotalCount(count || 0);
     } catch (error: any) {
-      if (error?.name === 'AbortError') {
+      const isTimeout = error?.name === 'AbortError'
+        || error?.message?.includes('timeout')
+        || error?.message?.includes('Timeout');
+      if (isTimeout) {
         toast.error('La consulta tardó demasiado. Intenta de nuevo.');
       } else {
         console.error('Error fetching profiles:', error);
@@ -157,7 +160,10 @@ export default function UsersView() {
         setPayments(prev => ({ ...prev, [userId]: data || [] }));
       }
     } catch (error: any) {
-      if (error?.name === 'AbortError') {
+      const isTimeout = error?.name === 'AbortError'
+        || error?.message?.includes('timeout')
+        || error?.message?.includes('Timeout');
+      if (isTimeout) {
         toast.error('La consulta tardó demasiado. Intenta de nuevo.');
       } else {
         console.error('Error fetching payments:', error);
