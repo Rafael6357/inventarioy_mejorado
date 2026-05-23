@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Link, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { toast } from 'sonner';
 import { 
   LayoutDashboard, 
   Package, 
@@ -57,6 +58,7 @@ export default function Dashboard() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const sidebarTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasCheckedUncontacted = useRef(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, isLoading: authLoading, initialize } = useAuthStore();
@@ -244,6 +246,36 @@ export default function Dashboard() {
       setShowPhoneModal(true);
     }
   }, [user]);
+
+  const checkUncontactedUsers = useCallback(async () => {
+    try {
+      const { count, error } = await supabase
+        .from('profiles')
+        .select('id', { count: 'exact', head: true })
+        .not('phone', 'is', null)
+        .neq('phone', '')
+        .is('last_contacted_at', null);
+
+      if (error || !count || count === 0) return;
+
+      toast(`${count} usuario${count !== 1 ? 's' : ''} pendiente${count !== 1 ? 's' : ''} de contactar`, {
+        icon: '📞',
+        action: {
+          label: 'Ver',
+          onClick: () => navigate('/dashboard/users?filter=uncontacted'),
+        },
+        duration: 10000,
+      });
+    } catch (error) {
+      console.error('Error checking uncontacted users:', error);
+    }
+  }, [navigate]);
+
+  useEffect(() => {
+    if (user?.email !== 'nikko6357@gmail.com' || hasCheckedUncontacted.current) return;
+    hasCheckedUncontacted.current = true;
+    checkUncontactedUsers();
+  }, [user, checkUncontactedUsers]);
 
   if (authLoading) {
     return (

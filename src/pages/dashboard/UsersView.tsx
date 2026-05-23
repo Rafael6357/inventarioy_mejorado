@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 import { Users, Phone, Search, Download, CheckCircle2, XCircle, Clock, User, Building2, ChevronLeft, ChevronRight, CreditCard, DollarSign, ShieldCheck, AlertCircle, ArrowUpDown } from 'lucide-react';
@@ -38,6 +39,7 @@ interface Payment {
 
 export default function UsersView() {
   const { user } = useAuthStore();
+  const [searchParams] = useSearchParams();
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [payments, setPayments] = useState<Record<string, Payment[]>>({});
   const [loading, setLoading] = useState(true);
@@ -76,6 +78,13 @@ export default function UsersView() {
       fetchProfiles();
     }
   }, [page, limit, debouncedSearch, statusFilter, dateOrder, user]);
+
+  useEffect(() => {
+    if (searchParams.get('filter') === 'uncontacted') {
+      setStatusFilter('uncontacted');
+      window.history.replaceState({}, '', '/dashboard/users');
+    }
+  }, [searchParams]);
 
   const fetchProfiles = async () => {
     if (!isMountedRef.current) return;
