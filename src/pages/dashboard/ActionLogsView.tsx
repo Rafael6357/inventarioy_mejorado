@@ -374,9 +374,14 @@ export default function ActionLogsView() {
                 variant="outline"
                 onClick={async () => {
                   setLoadingMore(true);
-                  const result = await fetchMore(50);
-                  setHasMoreLogs(result.hasMore);
-                  setLoadingMore(false);
+                  try {
+                    const result = await fetchMore(50);
+                    setHasMoreLogs(result.hasMore);
+                  } catch (error) {
+                    console.error('Error loading more logs:', error);
+                  } finally {
+                    setLoadingMore(false);
+                  }
                 }}
                 disabled={loadingMore}
               >

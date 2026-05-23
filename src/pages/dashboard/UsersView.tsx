@@ -80,6 +80,10 @@ export default function UsersView() {
   const fetchProfiles = async () => {
     if (!isMountedRef.current) return;
     setLoading(true);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
     try {
       const from = (page - 1) * limit;
       const to = from + limit - 1;
@@ -103,14 +107,20 @@ export default function UsersView() {
         query = query.eq('subscription_status', statusFilter);
       }
 
-      const { data, error, count } = await query;
+      const { data, error, count } = await query.abortSignal(controller.signal);
+
+      clearTimeout(timeoutId);
 
       if (error) throw error;
       setProfiles(data || []);
       setTotalCount(count || 0);
-    } catch (error) {
-      console.error('Error fetching profiles:', error);
-      toast.error('Error al cargar los usuarios');
+    } catch (error: any) {
+      if (error?.name === 'AbortError') {
+        toast.error('La consulta tardó demasiado. Intenta de nuevo.');
+      } else {
+        console.error('Error fetching profiles:', error);
+        toast.error('Error al cargar los usuarios');
+      }
     } finally {
       if (isMountedRef.current) setLoading(false);
     }
@@ -119,20 +129,31 @@ export default function UsersView() {
   const fetchUserPayments = async (userId: string) => {
     if (!isMountedRef.current) return;
     setLoadingPayments(true);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
     try {
       const { data, error } = await supabase
         .from('payments')
         .select('*')
         .eq('user_id', userId)
-        .order('payment_date', { ascending: false });
+        .order('payment_date', { ascending: false })
+        .abortSignal(controller.signal);
+
+      clearTimeout(timeoutId);
 
       if (error) throw error;
       if (isMountedRef.current) {
         setPayments(prev => ({ ...prev, [userId]: data || [] }));
       }
-    } catch (error) {
-      console.error('Error fetching payments:', error);
-      toast.error('Error al cargar los pagos');
+    } catch (error: any) {
+      if (error?.name === 'AbortError') {
+        toast.error('La consulta tardó demasiado. Intenta de nuevo.');
+      } else {
+        console.error('Error fetching payments:', error);
+        toast.error('Error al cargar los pagos');
+      }
     } finally {
       if (isMountedRef.current) setLoadingPayments(false);
     }
