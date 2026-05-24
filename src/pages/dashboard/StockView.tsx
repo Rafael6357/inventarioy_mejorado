@@ -54,11 +54,13 @@ export default function StockView() {
   const currentWarehouse = warehouses.find(w => w.id === currentWarehouseId);
 
   const canEdit = (): boolean => {
-    const activePin = accessPins?.find(p => p.is_active);
-    const sessionRole = typeof window !== 'undefined' 
-      ? localStorage.getItem('verifiedRole') 
+    if (!accessPins || accessPins.length === 0) return true;
+
+    const activePin = accessPins.find(p => p.is_active);
+    const sessionRole = typeof window !== 'undefined'
+      ? localStorage.getItem('verifiedRole')
       : null;
-    
+
     return (activePin && ['owner', 'economist'].includes(activePin.role)) ||
            (sessionRole && ['owner', 'economist'].includes(sessionRole));
   };
@@ -737,7 +739,7 @@ export default function StockView() {
 
               {editingProduct.is_individual && (
                 <div className="space-y-2">
-                  <Label htmlFor="edit_price">Precio de Venta ($)</Label>
+                  <Label htmlFor="edit_price">Precio de Venta Unitario ($)</Label>
                   <Input
                     id="edit_price"
                     type="number"
@@ -746,25 +748,10 @@ export default function StockView() {
                     value={editParams.price}
                     onChange={(e) => setEditParams({...editParams, price: Number(e.target.value)})}
                   />
-                  <p className="text-xs text-text-secondary">Precio de venta por unidad</p>
+                  <p className="text-xs text-text-secondary">Precio por unidad (ej: $350 por cerveza)</p>
                 </div>
               )}
             </div>
-
-              {editingProduct.is_individual && (
-                <div className="space-y-2">
-                  <Label htmlFor="edit_price">Precio de Venta ($)</Label>
-                  <Input
-                    id="edit_price"
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    value={editParams.price}
-                    onChange={(e) => setEditParams({...editParams, price: Number(e.target.value)})}
-                  />
-                  <p className="text-xs text-text-secondary">Precio de venta por unidad</p>
-                </div>
-              )}
 
             <div className="mt-6 flex gap-3 shrink-0">
               <Button 

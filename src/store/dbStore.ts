@@ -423,6 +423,7 @@ interface DatabaseState {
   productWarehouse: ProductWarehouse[];
   currentWarehouseId: string | null;
   isLoading: boolean;
+  isFetchingWarehouses: boolean;
 
   fetchAll: (limit?: number) => Promise<void>;
   fetchMore: (limit?: number) => Promise<{ hasMore: boolean }>;
@@ -555,6 +556,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
   currentWarehouseId: null,
   pendingAccounts: [],
   isLoading: true,
+  isFetchingWarehouses: false,
 
   clearVerifiedRole: () => {
     localStorage.removeItem('verifiedRole');
@@ -1042,40 +1044,46 @@ addProduct: async (product) => {
   },
 
   fetchWarehouses: async () => {
-    const user = useAuthStore.getState().user;
-    if (!user) return;
-    
-    const { data, error } = await supabase
-      .from('warehouses')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: true });
-    
-    if (error) {
-      console.error('Error fetching warehouses:', error);
-      return;
-    }
-    
-    let warehouses = data as Warehouse[];
-    
-    // Auto-crear Almacén Principal si no existe ninguno
-    if (warehouses.length === 0) {
-      const { data: newWarehouse, error: createError } = await supabase
+    if (get().isFetchingWarehouses) return;
+    set({ isFetchingWarehouses: true });
+    try {
+      const user = useAuthStore.getState().user;
+      if (!user) return;
+
+      const { data, error } = await supabase
         .from('warehouses')
-        .insert({ user_id: user.id, name: 'Almacén', is_main: true })
-        .select()
-        .single();
-      
-      if (!createError && newWarehouse) {
-        warehouses = [newWarehouse as Warehouse];
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching warehouses:', error);
+        return;
       }
-    }
-    
-    set({ warehouses });
-    
-    const mainWarehouse = warehouses.find(w => w.is_main) || warehouses[0];
-    if (mainWarehouse && !get().currentWarehouseId) {
-      set({ currentWarehouseId: mainWarehouse.id });
+
+      let warehouses = data as Warehouse[];
+
+      // Auto-crear Almacén Principal si no existe ninguno
+      if (warehouses.length === 0) {
+        const { data: newWarehouse, error: createError } = await supabase
+          .from('warehouses')
+          .insert({ user_id: user.id, name: 'Almacén', is_main: true })
+          .select()
+          .single();
+
+        if (!createError && newWarehouse) {
+          warehouses = [newWarehouse as Warehouse];
+        }
+      }
+
+      set({ warehouses });
+
+      const mainWarehouse = warehouses.find(w => w.is_main) || warehouses[0];
+      if (mainWarehouse && !get().currentWarehouseId) {
+        set({ currentWarehouseId: mainWarehouse.id });
+      }
+    } finally {
+      set({ isFetchingWarehouses: false });
     }
   },
 
@@ -2201,6 +2209,9 @@ const { error } = await supabase
 
     const requiredRoles = MODULE_ROLES[modulePath] || [];
     if (requiredRoles.length === 0) return { success: true };
+
+    const anyPin = get().accessPins.find(p => p.is_active);
+    if (!anyPin) return { success: false, error: 'No hay pines activos configurados' };
 
     const pinHash = await get().hashPin(pin);
     const matchingPins = get().accessPins.filter(p => p.is_active && requiredRoles.includes(p.role));

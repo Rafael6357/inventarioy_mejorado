@@ -22,6 +22,7 @@ export default function RecipesView() {
   const { products, recipes, addRecipe, deleteRecipe, updateRecipe, logAction, accessPins } = useDatabaseStore();
 
   const canEdit = (): boolean => {
+    if (!accessPins || accessPins.length === 0) return true;
     const activePin = accessPins.find(p => p.is_active);
     return activePin && ['owner', 'economist'].includes(activePin.role);
   };

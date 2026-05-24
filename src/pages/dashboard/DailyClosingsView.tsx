@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { exportToExcel } from '../../lib/utils';
 
 export default function DailyClosingsView() {
-  const { dailyClosings, sales, employees, logAction, products } = useDatabaseStore();
+  const { dailyClosings, sales, employees, logAction, products, accessPins } = useDatabaseStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClosing, setSelectedClosing] = useState<any>(null);
   const [startDate, setStartDate] = useState('');
@@ -216,7 +216,7 @@ export default function DailyClosingsView() {
     return grouped;
   };
 
-  const canPrint = verifiedRole && ['owner', 'economist', 'supervisor', 'clerk'].includes(verifiedRole);
+  const canPrint = !accessPins || accessPins.length === 0 || (verifiedRole && ['owner', 'economist', 'supervisor', 'clerk'].includes(verifiedRole));
 
   return (
     <div className="space-y-6">
