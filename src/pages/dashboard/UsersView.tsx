@@ -103,32 +103,46 @@ export default function UsersView() {
       const from = (page - 1) * limit;
       const to = from + limit - 1;
 
-      let query = supabase
+      let countQuery = supabase
         .from('profiles')
-        .select('id, email, name, business_name, role, subscription_status, trial_ends_at, valid_until, created_at, phone, last_contacted_at', { count: 'estimated' })
+        .select('id', { count: 'exact', head: true });
+
+      let dataQuery = supabase
+        .from('profiles')
+        .select('id, email, name, business_name, role, subscription_status, trial_ends_at, valid_until, created_at, phone, last_contacted_at')
         .order('created_at', { ascending: dateOrder === 'asc' })
         .range(from, to);
 
       if (debouncedSearch) {
-        query = query.or(`name.ilike.%${debouncedSearch}%,business_name.ilike.%${debouncedSearch}%,email.ilike.%${debouncedSearch}%,phone.ilike.%${debouncedSearch}%`);
+        const filter = `or(name.ilike.%${debouncedSearch}%,business_name.ilike.%${debouncedSearch}%,email.ilike.%${debouncedSearch}%,phone.ilike.%${debouncedSearch}%)`;
+        countQuery = countQuery.or(filter);
+        dataQuery = dataQuery.or(filter);
       }
 
       if (statusFilter === 'uncontacted') {
-        query = query.is('last_contacted_at', null).not('phone', 'is', null).neq('phone', '');
+        countQuery = countQuery.is('last_contacted_at', null).not('phone', 'is', null).neq('phone', '');
+        dataQuery = dataQuery.is('last_contacted_at', null).not('phone', 'is', null).neq('phone', '');
       } else if (statusFilter === 'past_due') {
         const now = new Date().toISOString();
-        query = query.or(`subscription_status.eq.past_due,and(subscription_status.eq.trialing,trial_ends_at.lt.${now})`);
+        const filter = `or(subscription_status.eq.past_due,and(subscription_status.eq.trialing,trial_ends_at.lt.${now}))`;
+        countQuery = countQuery.or(filter);
+        dataQuery = dataQuery.or(filter);
       } else if (statusFilter !== 'all') {
-        query = query.eq('subscription_status', statusFilter);
+        countQuery = countQuery.eq('subscription_status', statusFilter);
+        dataQuery = dataQuery.eq('subscription_status', statusFilter);
       }
 
-      const { data, error, count } = await query.abortSignal(controller.signal);
+      const [countResult, dataResult] = await Promise.all([
+        countQuery.abortSignal(controller.signal),
+        dataQuery.abortSignal(controller.signal),
+      ]);
 
       clearTimeout(timeoutId);
 
-      if (error) throw error;
-      setProfiles(data || []);
-      setTotalCount(count || 0);
+      if (countResult.error) throw countResult.error;
+      if (dataResult.error) throw dataResult.error;
+      setProfiles(dataResult.data || []);
+      setTotalCount(countResult.count || 0);
     } catch (error: any) {
       const isTimeout = error?.name === 'AbortError'
         || error?.message?.includes('timeout')

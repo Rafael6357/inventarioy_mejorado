@@ -182,45 +182,34 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     }
 
     try {
-      // Aumentar timeout a 30 segundos para conexiones lentas
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      // Timeout de 30 segundos para getSession mediante Promise.race
+      const { data: { session } } = await Promise.race([
+        supabase.auth.getSession(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('AuthTimeout')), 30000)
+        ),
+      ]);
 
-      try {
-        // Primero verificar si hay una sesión activa de Supabase
-        const { data: { session } } = await supabase.auth.getSession();
-        clearTimeout(timeoutId);
-        
-        if (session?.user) {
-          // Sesión activa - obtener datos del usuario
-          await get().fetchUser();
-        } else {
-          // No hay sesión activa, intentar auto-login con credenciales guardadas
-          if (navigator.onLine && savedCredentials) {
-            try {
-              const creds = JSON.parse(atob(savedCredentials));
-              const { error: signInError } = await supabase.auth.signInWithPassword({
-                email: creds.email,
-                password: creds.password,
-              });
-              
-              if (!signInError) {
-                // Login exitoso - obtener datos del usuario
-                await get().fetchUser();
-              } else {
-                // Credenciales expiradas o inválidas
-                console.warn('Credenciales expiradas, guardando sesión actual temporalmente');
-                // Mantener los datos del usuario temporalmente hasta que se requiera recargar
-                if (savedUserData) {
-                  const userData = JSON.parse(savedUserData);
-                  set({ user: userData, isAuthenticated: true, isLoading: false });
-                } else {
-                  set({ isLoading: false });
-                }
-              }
-            } catch (autoLoginErr) {
-              console.warn('Login automático falló:', autoLoginErr);
-              // Mantener sesión si hay datos guardados
+      if (session?.user) {
+        // Sesión activa - obtener datos del usuario
+        await get().fetchUser();
+      } else {
+        // No hay sesión activa, intentar auto-login con credenciales guardadas
+        if (navigator.onLine && savedCredentials) {
+          try {
+            const creds = JSON.parse(atob(savedCredentials));
+            const { error: signInError } = await supabase.auth.signInWithPassword({
+              email: creds.email,
+              password: creds.password,
+            });
+
+            if (!signInError) {
+              // Login exitoso - obtener datos del usuario
+              await get().fetchUser();
+            } else {
+              // Credenciales expiradas o inválidas
+              console.warn('Credenciales expiradas, guardando sesión actual temporalmente');
+              // Mantener los datos del usuario temporalmente hasta que se requiera recargar
               if (savedUserData) {
                 const userData = JSON.parse(savedUserData);
                 set({ user: userData, isAuthenticated: true, isLoading: false });
@@ -228,8 +217,9 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
                 set({ isLoading: false });
               }
             }
-          } else {
-            // Sin internet o sin credenciales guardadas
+          } catch (autoLoginErr) {
+            console.warn('Login automático falló:', autoLoginErr);
+            // Mantener sesión si hay datos guardados
             if (savedUserData) {
               const userData = JSON.parse(savedUserData);
               set({ user: userData, isAuthenticated: true, isLoading: false });
@@ -237,26 +227,15 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
               set({ isLoading: false });
             }
           }
-        }
-      } catch (abortErr: any) {
-        clearTimeout(timeoutId);
-        if (abortErr.name === 'AbortError') {
-          console.warn('Timeout en getSession');
-          // Mantener sesión existente si hay datos guardados
+        } else {
+          // Sin internet o sin credenciales guardadas
           if (savedUserData) {
-            try {
-              const userData = JSON.parse(savedUserData);
-              set({ user: userData, isAuthenticated: true, isLoading: false });
-            } catch {
-              set({ isLoading: false });
-            }
+            const userData = JSON.parse(savedUserData);
+            set({ user: userData, isAuthenticated: true, isLoading: false });
           } else {
             set({ isLoading: false });
           }
-          _isInitializing = false;
-          return;
         }
-        throw abortErr;
       }
 
       if (!_authListenerSubscription) {
@@ -275,7 +254,19 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         });
       }
     } catch (err: any) {
-      if (err?.message?.includes('429') || err?.status === 429) {
+      if (err?.message === 'AuthTimeout') {
+        console.warn('Timeout en getSession');
+        if (savedUserData) {
+          try {
+            const userData = JSON.parse(savedUserData);
+            set({ user: userData, isAuthenticated: true, isLoading: false });
+          } catch {
+            set({ isLoading: false });
+          }
+        } else {
+          set({ isLoading: false });
+        }
+      } else if (err?.message?.includes('429') || err?.status === 429) {
         console.warn('Rate limit alcanzado en autenticación, reintentando en 5 segundos...');
         await new Promise(r => setTimeout(r, 5000));
         try {

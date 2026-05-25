@@ -151,11 +151,13 @@ export default function Dashboard() {
   useEffect(() => {
     if (user && user.id !== fetchedUserId.current) {
       fetchedUserId.current = user.id;
-      try {
-        fetchAll();
-      } catch (err) {
-        console.error('[Dashboard] Error en fetchAll:', err);
-      }
+      (async () => {
+        try {
+          await fetchAll();
+        } catch (err) {
+          console.error('[Dashboard] Error en fetchAll:', err);
+        }
+      })();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
