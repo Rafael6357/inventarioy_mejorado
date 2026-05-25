@@ -78,7 +78,7 @@ export default function UsersView() {
     if (user?.email === 'nikko6357@gmail.com') {
       fetchProfiles();
     }
-  }, [page, limit, debouncedSearch, statusFilter, dateOrder, user]);
+  }, [page, limit, debouncedSearch, statusFilter, dateOrder, user?.email]);
 
   useEffect(() => {
     if (searchParams.get('filter') === 'uncontacted') {
@@ -105,7 +105,7 @@ export default function UsersView() {
 
       let query = supabase
         .from('profiles')
-        .select('id, email, name, business_name, role, subscription_status, trial_ends_at, valid_until, created_at, phone, last_contacted_at', { count: 'exact' })
+        .select('id, email, name, business_name, role, subscription_status, trial_ends_at, valid_until, created_at, phone, last_contacted_at', { count: 'estimated' })
         .order('created_at', { ascending: dateOrder === 'asc' })
         .range(from, to);
 
@@ -230,6 +230,7 @@ export default function UsersView() {
   };
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return '-';
     return new Date(dateString).toLocaleDateString('es-ES', {
       day: '2-digit',
       month: '2-digit',
@@ -240,6 +241,7 @@ export default function UsersView() {
   };
 
   const getWhatsAppLink = (phone: string) => {
+    if (!phone) return '#';
     let cleanPhone = phone.replace(/\D/g, '');
     if (cleanPhone.length === 8) {
       cleanPhone = '53' + cleanPhone;
@@ -362,13 +364,17 @@ export default function UsersView() {
     // Actualización optimista local y apertura de WhatsApp (síncrono, antes del await)
     setProfiles(prev => prev.map(p => p.id === profile.id ? { ...p, last_contacted_at: now } : p));
     window.open(getWhatsAppLink(profile.phone), '_blank', 'noopener,noreferrer');
-    const { error } = await supabase
-      .from('profiles')
-      .update({ last_contacted_at: now })
-      .eq('id', profile.id);
-    if (error) {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ last_contacted_at: now })
+        .eq('id', profile.id);
+      if (error) {
+        toast.error('Error al registrar el contacto');
+        setProfiles(prev => prev.map(p => p.id === profile.id ? { ...p, last_contacted_at: profile.last_contacted_at } : p));
+      }
+    } catch {
       toast.error('Error al registrar el contacto');
-      // Revertir estado local
       setProfiles(prev => prev.map(p => p.id === profile.id ? { ...p, last_contacted_at: profile.last_contacted_at } : p));
     }
   };
