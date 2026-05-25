@@ -34,7 +34,7 @@ const DEFAULT_CATEGORIES = [
 
 export default function InventoryView() {
   const { user } = useAuthStore();
-  const { products, addProduct, addMovement, logAction, warehouses, currentWarehouseId, productWarehouse, updateProductWarehouseQuantity, set } = useDatabaseStore();
+  const { products, addProduct, addMovement, logAction, warehouses, currentWarehouseId, productWarehouse, updateProductWarehouseQuantity, set, transitItems } = useDatabaseStore();
   
   const activeProducts = products.filter(p => p.is_active !== false);
 
@@ -645,8 +645,13 @@ export default function InventoryView() {
                       ? productWarehouse.find(pw => pw.product_id === p.id && pw.warehouse_id === activeWarehouseId)
                       : null;
                     
+                    const computedInTransit = activeWarehouseId
+                      ? transitItems
+                        .filter(t => t.product_id === p.id && t.warehouse_id === activeWarehouseId)
+                        .reduce((sum, t) => sum + t.remaining, 0)
+                      : 0;
                     const availableStock = warehouseStock 
-                      ? Number(warehouseStock.quantity) - (Number(warehouseStock.in_transit) || 0)
+                      ? Number(warehouseStock.quantity) - computedInTransit
                       : 0;
                     
                     return (

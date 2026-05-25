@@ -1814,9 +1814,7 @@ setShowTicket(true);
                       return;
                     }
                     const selectedEmp = employees.find(e => e.id === employeeId);
-                    const usdConverted = user?.usdEnabled ? chargeBreakdown.usd * (user?.usdRate || 0) : 0;
-                    const eurConverted = user?.eurEnabled ? chargeBreakdown.eur * (user?.eurRate || 0) : 0;
-                    const paymentMethodStr = `Efectivo: ${chargeBreakdown.efectivo}${user?.cupTransferEnabled ? `, Transfer: ${chargeBreakdown.transferencia}` : ''}${user?.usdEnabled ? `, USD: ${usdConverted}` : ''}${user?.eurEnabled ? `, EUR: ${eurConverted}` : ''}`;
+                    const paymentMethodStr = `Efectivo: ${chargeBreakdown.efectivo}${user?.cupTransferEnabled ? `, Transfer: ${chargeBreakdown.transferencia}` : ''}${user?.usdEnabled ? `, USD: ${chargeBreakdown.usd}` : ''}${user?.eurEnabled ? `, EUR: ${chargeBreakdown.eur}` : ''}`;
                     const result = await chargePendingAccount(
                       selectedAccountForCharge.id,
                       employeeId || user?.id || '',

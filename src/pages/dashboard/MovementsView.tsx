@@ -47,6 +47,9 @@ export default function MovementsView() {
     // Paso 2: Aplicar filtros
     return movementsWithBal
       .filter(m => {
+        const isSaleMovement = m.reason?.startsWith('Venta #') || m.reason === 'Venta de producto/ingrediente';
+        if (isSaleMovement) return false;
+
         const isInventoryMovement = m.type === 'ENTRADA' || m.type === 'SALIDA' || m.type === 'MERMA' || m.type === 'AJUSTE' || m.type === 'TRANSFER';
         const matchesSearch = getProductName(m.product_id).toLowerCase().includes(searchTerm.toLowerCase());
         

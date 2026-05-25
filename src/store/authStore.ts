@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
+import { clearLocalData } from '../lib/dexieDb';
 
 const checkRealInternetConnection = async (): Promise<boolean> => {
   try {
@@ -265,6 +266,10 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
           if (event === 'SIGNED_IN' && session?.user) {
             await get().fetchUser();
           } else if (event === 'SIGNED_OUT') {
+            if (!navigator.onLine) {
+              console.log('[Auth] SIGNED_OUT ignorado — modo offline');
+              return;
+            }
             set({ user: null, isAuthenticated: false, isLoading: false });
           }
         });
@@ -467,6 +472,13 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       
       await supabase.auth.signOut();
       console.log('SignOut exitoso');
+
+      try {
+        await clearLocalData();
+        console.log('IndexedDB limpiado');
+      } catch (dbErr) {
+        console.warn('Error limpiando IndexedDB:', dbErr);
+      }
     } catch (err) {
       console.error('Error en logout:', err);
     } finally {

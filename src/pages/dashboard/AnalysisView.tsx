@@ -103,7 +103,7 @@ export default function AnalysisView() {
       .reduce((sum, m) => sum + Number(m.quantity), 0);
 
     const salidas = filteredMovements
-      .filter(m => m.type === 'SALIDA')
+      .filter(m => m.type === 'SALIDA' && !m.reason?.startsWith('Venta #') && m.reason !== 'Venta de producto/ingrediente')
       .reduce((sum, m) => sum + Number(m.quantity), 0);
 
     const merma = filteredMovements
@@ -212,6 +212,8 @@ export default function AnalysisView() {
       const salidasTransito = safeMovements.filter(m => 
         m.product_id === product.id && 
         m.type === 'SALIDA' &&
+        !m.reason?.startsWith('Venta #') &&
+        m.reason !== 'Venta de producto/ingrediente' &&
         new Date(m.date) >= fromDate && new Date(m.date) <= toDate
       ).reduce((sum, m) => sum + Number(m.quantity), 0);
       

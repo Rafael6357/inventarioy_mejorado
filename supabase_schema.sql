@@ -370,7 +370,8 @@ create table if not exists public.transit_items (
     reason text,
     sent_date timestamp with time zone default now(),
     created_at timestamp with time zone default now(),
-    updated_at timestamp with time zone default now()
+    updated_at timestamp with time zone default now(),
+    warehouse_id uuid references public.warehouses(id) on delete set null
 );
 
 alter table public.transit_items enable row level security;

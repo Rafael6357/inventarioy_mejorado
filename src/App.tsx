@@ -11,7 +11,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import MenuView from './pages/MenuView';
 import AccessPage from './pages/AccessPage';
-import ConnectionStatus from './components/ConnectionStatus';
+import ErrorBoundary from './components/ErrorBoundary';
 import { useEffect } from 'react';
 import { useAuthStore } from './store/authStore';
 
@@ -37,7 +37,6 @@ export default function App() {
           }
         }}
       />
-      <ConnectionStatus />
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
@@ -45,7 +44,7 @@ export default function App() {
         <Route path="/menu" element={<MenuView />} />
         <Route path="/acceso" element={<AccessPage />} />
         <Route path="/acceso/:businessCode" element={<AccessPage />} />
-        <Route path="/dashboard/*" element={<Dashboard />} />
+        <Route path="/dashboard/*" element={<ErrorBoundary><Dashboard /></ErrorBoundary>} />
       </Routes>
     </Router>
   );

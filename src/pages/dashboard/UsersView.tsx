@@ -57,6 +57,7 @@ export default function UsersView() {
   const [deletingPaymentId, setDeletingPaymentId] = useState<string | null>(null);
   const [subscriptionDays, setSubscriptionDays] = useState<30 | 365>(30);
   const isMountedRef = useRef(true);
+  const lastFetchController = useRef<AbortController | null>(null);
 
   const totalPages = Math.ceil(totalCount / limit);
 
@@ -88,9 +89,14 @@ export default function UsersView() {
 
   const fetchProfiles = async () => {
     if (!isMountedRef.current) return;
+
+    if (lastFetchController.current) {
+      lastFetchController.current.abort();
+    }
+    const controller = new AbortController();
+    lastFetchController.current = controller;
     setLoading(true);
 
-    const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
     try {
@@ -353,16 +359,18 @@ export default function UsersView() {
   const handleContact = async (profile: UserProfile) => {
     if (!isMountedRef.current) return;
     const now = new Date().toISOString();
+    // Actualización optimista local y apertura de WhatsApp (síncrono, antes del await)
+    setProfiles(prev => prev.map(p => p.id === profile.id ? { ...p, last_contacted_at: now } : p));
+    window.open(getWhatsAppLink(profile.phone), '_blank', 'noopener,noreferrer');
     const { error } = await supabase
       .from('profiles')
       .update({ last_contacted_at: now })
       .eq('id', profile.id);
     if (error) {
       toast.error('Error al registrar el contacto');
-      return;
+      // Revertir estado local
+      setProfiles(prev => prev.map(p => p.id === profile.id ? { ...p, last_contacted_at: profile.last_contacted_at } : p));
     }
-    setProfiles(prev => prev.map(p => p.id === profile.id ? { ...p, last_contacted_at: now } : p));
-    window.open(getWhatsAppLink(profile.phone), '_blank', 'noopener,noreferrer');
   };
 
   const handlePageChange = (newPage: number) => {

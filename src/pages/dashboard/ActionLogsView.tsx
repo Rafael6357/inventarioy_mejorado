@@ -30,6 +30,9 @@ const MODULE_TRANSLATIONS: Record<string, string> = {
   settings: 'Configuración',
   payroll: 'Nómina',
   stock: 'Stock',
+  accounts: 'Cuentas por Cobrar',
+  closing: 'Cierre Diario',
+  warehouse: 'Almacén',
 };
 
 const MODULE_ICONS: Record<string, string> = {
@@ -65,6 +68,14 @@ const ACTION_COLORS: Record<string, string> = {
   SUBIR: 'bg-surface-hover border-l-4 border-l-blue-500 text-blue-700',
   GENERAR_NOMINA: 'bg-surface-hover border-l-4 border-l-green-500 text-green-700',
   ACTUALIZAR_NOMINA: 'bg-surface-hover border-l-4 border-l-blue-500 text-blue-700',
+  AJUSTE: 'bg-surface-hover border-l-4 border-l-yellow-500 text-yellow-700',
+  TRANSFER: 'bg-surface-hover border-l-4 border-l-cyan-500 text-cyan-700',
+  ACTUALIZAR: 'bg-surface-hover border-l-4 border-l-blue-500 text-blue-700',
+  CANCELAR_TRANSITO: 'bg-surface-hover border-l-4 border-l-orange-500 text-orange-700',
+  MERMA_TRANSITO: 'bg-surface-hover border-l-4 border-l-red-500 text-red-700',
+  CONSUMO_MANUAL: 'bg-surface-hover border-l-4 border-l-amber-500 text-amber-700',
+  COBRAR: 'bg-surface-hover border-l-4 border-l-green-500 text-green-700',
+  MARCAR_PAGADO: 'bg-surface-hover border-l-4 border-l-teal-500 text-teal-700',
 };
 
 const ACTION_TRANSLATIONS: Record<string, string> = {
@@ -83,6 +94,14 @@ const ACTION_TRANSLATIONS: Record<string, string> = {
   SUBIR: 'Documento subido',
   GENERAR_NOMINA: 'Nómina Generada',
   ACTUALIZAR_NOMINA: 'Nómina Actualizada',
+  AJUSTE: 'Ajuste de inventario',
+  TRANSFER: 'Transferencia',
+  ACTUALIZAR: 'Actualizar',
+  CANCELAR_TRANSITO: 'Cancelar Tránsito',
+  MERMA_TRANSITO: 'Merma en Tránsito',
+  CONSUMO_MANUAL: 'Consumo Manual',
+  COBRAR: 'Cobrar cuenta',
+  MARCAR_PAGADO: 'Marcar como pagada',
 };
 
 export default function ActionLogsView() {
@@ -209,6 +228,19 @@ export default function ActionLogsView() {
     salary: 'Salario',
     justification: 'Justificación',
     payment_method: 'Método de Pago',
+    // Campos de syncEngine
+    product_id: 'ID Producto',
+    name: 'Nombre',
+    sale_id: 'ID Venta',
+    transitItemId: 'ID Tránsito',
+    productId: 'ID Producto',
+    customer: 'Cliente',
+    account_id: 'ID Cuenta',
+    accountId: 'ID Cuenta',
+    id: 'ID',
+    type: 'Tipo',
+    date: 'Fecha',
+    customer_name: 'Cliente',
   };
 
   const formatDetails = (details: Record<string, any>, module: string, action: string) => {
@@ -246,7 +278,7 @@ export default function ActionLogsView() {
       return String(value);
     };
     
-    const entries = Object.entries(details).slice(0, 4);
+    const entries = Object.entries(details);
     return entries.map(([key, value]) => {
       const displayKey = DETAIL_KEY_TRANSLATIONS[key] || key.replace(/_/g, ' ');
       return `${displayKey}: ${formatValue(value, key)}`;

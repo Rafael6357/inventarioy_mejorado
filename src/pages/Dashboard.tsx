@@ -24,13 +24,15 @@ import {
   FileText,
   LockOpen,
   Phone,
-  Crown
+  Crown,
+  AlertTriangle
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useDatabaseStore, MODULE_ROLES } from '../store/dbStore';
 import InventarioYLogo from '../components/InventarioYLogo';
 import SubscriptionBanner from '../components/SubscriptionBanner';
 import SyncStatus from '../components/SyncStatus';
+import OfflineBanner from '../components/OfflineBanner';
 import PinModal from '../components/PinModal';
 import WarehouseSelector from '../components/WarehouseSelector';
 import StockView from './dashboard/StockView';
@@ -57,8 +59,11 @@ export default function Dashboard() {
   const [showPhoneModal, setShowPhoneModal] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [logoutPendingCount, setLogoutPendingCount] = useState(0);
   const sidebarTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasCheckedUncontacted = useRef(false);
+  const fetchedUserId = useRef<string | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, isLoading: authLoading, initialize } = useAuthStore();
@@ -144,7 +149,8 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    if (user) {
+    if (user && user.id !== fetchedUserId.current) {
+      fetchedUserId.current = user.id;
       try {
         fetchAll();
       } catch (err) {
@@ -301,13 +307,21 @@ export default function Dashboard() {
     setLocalVerifiedRole(null);
     setLocalVerifiedRoleName(null);
     
-    // Limpiar datos de acceso por PIN
     if (isPinAccess) {
       localStorage.removeItem('temp_access');
       localStorage.removeItem('temp_user_id');
       setIsPinAccess(false);
       navigate('/acceso');
     } else {
+      try {
+        const { getSyncQueueCount } = await import('../lib/dexieDb');
+        const count = await getSyncQueueCount();
+        if (count > 0) {
+          setLogoutPendingCount(count);
+          setShowLogoutConfirm(true);
+          return;
+        }
+      } catch { }
       await logout();
     }
     console.log('logout completado');
@@ -318,6 +332,7 @@ export default function Dashboard() {
   return (
     <div className={`flex h-screen overflow-hidden bg-bg ${bannerPadding}`}>
       <SubscriptionBanner />
+      <OfflineBanner />
       {isMobileMenuOpen && (
         <div 
           className="fixed inset-0 z-40 bg-black/50 lg:hidden"
@@ -532,6 +547,40 @@ export default function Dashboard() {
           isOpen={showPhoneModal}
           onClose={() => setShowPhoneModal(false)}
         />
+
+        {showLogoutConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="w-full max-w-md rounded-xl bg-surface p-6 shadow-xl border border-border mx-4">
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold text-text flex items-center gap-2 mb-2">
+                  <AlertTriangle className="h-5 w-5 text-warning" />
+                  Cambios sin sincronizar
+                </h3>
+                <p className="text-sm text-text-secondary">
+                  Tenés <strong className="text-warning">{logoutPendingCount}</strong> cambio{logoutPendingCount !== 1 ? 's' : ''} pendiente{logoutPendingCount !== 1 ? 's' : ''} de sincronización.
+                  Si cerrás sesión ahora, se perder{logoutPendingCount !== 1 ? 'án' : 'á'}.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowLogoutConfirm(false)}
+                  className="flex-1 px-4 py-2 rounded-lg border border-border text-sm font-medium text-text hover:bg-surface-hover transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={async () => {
+                    setShowLogoutConfirm(false);
+                    await logout();
+                  }}
+                  className="flex-1 px-4 py-2 rounded-lg bg-danger text-sm font-medium text-white hover:bg-danger/90 transition-colors"
+                >
+                  Cerrar sesión igual
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

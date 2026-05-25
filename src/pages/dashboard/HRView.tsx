@@ -328,8 +328,6 @@ export default function HRView() {
 
     try {
       let photoUrl = null;
-      const { supabase } = useDatabaseStore.getState();
-      
       if (newEmployeePhoto) {
         const fileName = `employee-${Date.now()}-${newEmployeePhoto.name.replace(/[^a-zA-Z0-9.]/g, '')}`;
         const { data: uploadData, error: uploadError } = await supabase.storage
@@ -1380,7 +1378,6 @@ export default function HRView() {
                     
                     setIsUploadingOrgDoc(true);
                     try {
-                      const { supabase } = useDatabaseStore.getState();
                       const docType = orgDocModal === 'PNO' ? 'pno' : 'reglamento';
                       const fileName = `${docType}-${Date.now()}-${orgDocFile.name.replace(/[^a-zA-Z0-9.]/g, '')}`;
                       

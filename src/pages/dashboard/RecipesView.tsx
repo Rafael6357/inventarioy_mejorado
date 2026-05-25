@@ -123,7 +123,7 @@ export default function RecipesView() {
       return;
     }
 
-    const priceValidation = validateNumber(String(sellingPrice), { required: true, min: 0.01, fieldName: 'Precio de venta' });
+    const priceValidation = validateNumber(String(selling_price), { required: true, min: 0.01, fieldName: 'Precio de venta' });
     if (!priceValidation.isValid) {
       toast.error(priceValidation.error);
       return;
@@ -283,7 +283,7 @@ export default function RecipesView() {
                             <Input 
                               type="number" 
                               min="0.0001" 
-                              step="0.01" 
+                              step="any" 
                               className="h-8 w-20 text-right text-sm"
                               value={ing.quantity}
                               onChange={e => updateIngredientQuantity(ing.product_id, Number(e.target.value))}

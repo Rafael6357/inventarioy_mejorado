@@ -16,7 +16,10 @@ export default function StockView() {
       return null;
     }
     const pw = productWarehouse.find(p => p.product_id === productId && p.warehouse_id === currentWarehouseId);
-    return pw ? { quantity: pw.quantity, in_transit: pw.in_transit } : null;
+    const computedInTransit = transitItems
+      .filter(t => t.product_id === productId && t.warehouse_id === currentWarehouseId)
+      .reduce((sum, t) => sum + t.remaining, 0);
+    return pw ? { quantity: pw.quantity, in_transit: computedInTransit } : null;
   };
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -44,6 +47,7 @@ export default function StockView() {
   
   const products = useDatabaseStore((state) => state.products);
   const movements = useDatabaseStore((state) => state.movements);
+  const transitItems = useDatabaseStore((state) => state.transitItems);
   const deleteProduct = useDatabaseStore((state) => state.deleteProduct);
   const updateProduct = useDatabaseStore((state) => state.updateProduct);
   const accessPins = useDatabaseStore((state) => state.accessPins);
@@ -89,7 +93,7 @@ export default function StockView() {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     
     const recentUsage = movements
-      .filter(m => m.product_id === productId && (m.type === 'SALIDA' || m.type === 'CONSUMO') && new Date(m.date) >= thirtyDaysAgo)
+      .filter(m => m.product_id === productId && (m.type === 'SALIDA' || m.type === 'CONSUMO') && !m.reason?.startsWith('Venta #') && m.reason !== 'Venta de producto/ingrediente' && new Date(m.date) >= thirtyDaysAgo)
       .reduce((sum, m) => sum + Number(m.quantity), 0);
     
     const dailyAvg = recentUsage / 30;

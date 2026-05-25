@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { validateNumber, getNumberFromString } from '../../lib/utils';
 import { Switch } from '../../components/ui/switch';
 import AccessPinsConfig from '../../components/AccessPinsConfig';
+import SyncQueuePanel from '../../components/SyncQueuePanel';
 import QRCode from 'react-qr-code';
 
 export default function SettingsView() {
@@ -642,6 +643,13 @@ export default function SettingsView() {
               Reiniciar
             </Button>
           </div>
+        </div>
+
+        {/* ============================================
+            SECCIÓN 6: SINCRONIZACIÓN
+            ============================================ */}
+        <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(255,193,7,0.15)]">
+          <SyncQueuePanel />
         </div>
         </div>
 
