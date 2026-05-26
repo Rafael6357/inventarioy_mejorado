@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { validateNumber, getNumberFromString, exportToExcel } from '../../lib/utils';
 import { normalizeUnit, getCompatibleUnits, convertUnit } from '../../lib/unitConversion';
+import { useStaggerEnter } from '../../lib/animations/useStaggerEnter';
 
 export default function StockView() {
   // Helper to get stock per warehouse
@@ -307,6 +308,8 @@ export default function StockView() {
     }, 0);
   }, [filteredProducts, productWarehouse, currentWarehouseId]);
 
+  const stockTbodyRef = useStaggerEnter<HTMLTableSectionElement>([filteredProducts]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -483,7 +486,7 @@ export default function StockView() {
                 <th className="px-4 py-3 font-medium text-center">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody ref={stockTbodyRef} className="divide-y divide-border">
               {filteredProducts.length === 0 ? (
                 <tr>
                   <td colSpan={13} className="px-4 py-8 text-center text-text-secondary">

@@ -8,6 +8,7 @@ import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
 import { validateNumber, getNumberFromString, exportToExcel } from '../../lib/utils';
+import { useStaggerEnter } from '../../lib/animations/useStaggerEnter';
 
 const DOC_TYPE_LABELS: Record<string, string> = {
   MANUAL: 'Manual',
@@ -399,6 +400,8 @@ export default function HRView() {
     acc[doc.doc_type].push(doc);
     return acc;
   }, {} as Record<string, typeof hrDocuments>);
+
+  const hrTbodyRef = useStaggerEnter<HTMLTableSectionElement>([]);
 
   return (
     <div className="space-y-6">
@@ -996,7 +999,7 @@ export default function HRView() {
                             <th className="px-4 py-2 text-center">Acciones</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-border">
+                        <tbody ref={hrTbodyRef} className="divide-y divide-border">
                           {entries.map(entry => {
                             const employee = employees.find(e => e.id === entry.employee_id);
                             return (

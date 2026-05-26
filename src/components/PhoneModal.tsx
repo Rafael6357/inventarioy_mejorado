@@ -3,6 +3,7 @@ import { Phone, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import { toast } from 'sonner';
+import { useModalAnimation } from '../lib/animations/useModalAnimation';
 
 interface PhoneModalProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ export default function PhoneModal({ isOpen, onClose }: PhoneModalProps) {
   const [phone, setPhone] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const { fetchUser } = useAuthStore();
+  const { backdropRef, cardRef } = useModalAnimation(isOpen);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -65,8 +67,8 @@ export default function PhoneModal({ isOpen, onClose }: PhoneModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
-      <div className="w-full max-w-md mx-4 bg-surface border border-border rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-300 opacity-100 visible">
+    <div ref={backdropRef} className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
+      <div ref={cardRef} className="w-full max-w-md mx-4 bg-surface border border-border rounded-2xl shadow-2xl">
         <div className="flex items-center justify-between p-6 border-b border-border">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/20">

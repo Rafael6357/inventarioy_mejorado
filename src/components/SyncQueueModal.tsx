@@ -4,6 +4,7 @@ import { getPendingSyncItems, removeSyncItem, getCachedProducts, type SyncQueueI
 import { syncEngine } from '../lib/syncEngine';
 import { useDatabaseStore } from '../store/dbStore';
 import { useAuthStore } from '../store/authStore';
+import { useModalAnimation } from '../lib/animations/useModalAnimation';
 
 const operationMeta: Record<string, { label: string; icon: React.ReactNode }> = {
   addProduct: { label: 'Agregar producto', icon: <Package className="h-4 w-4" /> },
@@ -111,6 +112,7 @@ export default function SyncQueueModal({ onClose }: { onClose: () => void }) {
   const [cancelling, setCancelling] = useState<number | null>(null);
   const refreshSyncQueueCount = useDatabaseStore((s) => s.refreshSyncQueueCount);
   const user = useAuthStore((s) => s.user);
+  const { backdropRef, cardRef } = useModalAnimation(true);
 
   const loadItems = async () => {
     setLoading(true);
@@ -160,8 +162,8 @@ export default function SyncQueueModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-lg mx-4 max-h-[80vh] rounded-xl bg-surface border border-border shadow-2xl flex flex-col">
+    <div ref={backdropRef} className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div ref={cardRef} className="w-full max-w-lg mx-4 max-h-[80vh] rounded-xl bg-surface border border-border shadow-2xl flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h3 className="text-base font-semibold text-text">Cambios pendientes</h3>
           <button

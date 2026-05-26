@@ -5,6 +5,8 @@ import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { exportToExcel } from '../../lib/utils';
+import { useStaggerEnter } from '../../lib/animations/useStaggerEnter';
+import { useCountUp } from '../../lib/animations/useCountUp';
 
 function parseSaleItems(items: any): any[] {
   if (Array.isArray(items)) return items;
@@ -263,6 +265,14 @@ export default function AnalysisView() {
 
   const criticalProductsCount = turnoverData.filter(d => d.classification === 'Crítico').length;
 
+  const analysisStatsRef = useStaggerEnter([totalInventoryValue]);
+  const inventoryCountRef = useCountUp(totalInventoryValue, 0.8, 2);
+  const revenueCountRef = useCountUp(totalSalesRevenue, 0.8, 2);
+  const profitCountRef = useCountUp(grossProfit, 0.8, 2);
+  const alertsCountRef = useCountUp(criticalProductsCount, 0.8, 0);
+  const auditTbodyRef = useStaggerEnter<HTMLTableSectionElement>([auditData]);
+  const turnoverTbodyRef = useStaggerEnter<HTMLTableSectionElement>([turnoverData]);
+
   return (
     <div className="space-y-6">
       <div>
@@ -287,7 +297,7 @@ export default function AnalysisView() {
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div ref={analysisStatsRef} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(255,193,7,0.15)]">
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium text-text-secondary">Valor del Inventario</p>
@@ -295,7 +305,7 @@ export default function AnalysisView() {
               <Package className="h-4 w-4" />
             </div>
           </div>
-          <p className="mt-4 text-2xl font-bold text-text font-mono">${totalInventoryValue.toFixed(2)}</p>
+          <p className="mt-4 text-2xl font-bold text-text font-mono">$<span ref={inventoryCountRef}>0.00</span></p>
           <p className="mt-1 text-xs text-text-secondary">Capital inmovilizado</p>
         </div>
 
@@ -306,7 +316,7 @@ export default function AnalysisView() {
               <DollarSign className="h-4 w-4" />
             </div>
           </div>
-          <p className="mt-4 text-2xl font-bold text-text font-mono">${totalSalesRevenue.toFixed(2)}</p>
+          <p className="mt-4 text-2xl font-bold text-text font-mono">$<span ref={revenueCountRef}>0.00</span></p>
           <p className="mt-1 text-xs text-text-secondary">Histórico total</p>
         </div>
 
@@ -317,7 +327,7 @@ export default function AnalysisView() {
               <TrendingUp className="h-4 w-4" />
             </div>
           </div>
-          <p className="mt-4 text-2xl font-bold text-text font-mono">${grossProfit.toFixed(2)}</p>
+          <p className="mt-4 text-2xl font-bold text-text font-mono">$<span ref={profitCountRef}>0.00</span></p>
           <div className="mt-1 flex items-center gap-1 text-xs">
             <span className={grossProfit >= 0 ? 'text-success flex items-center' : 'text-danger flex items-center'}>
               {grossProfit >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
@@ -333,7 +343,7 @@ export default function AnalysisView() {
               <AlertTriangle className="h-4 w-4" />
             </div>
           </div>
-          <p className="mt-4 text-2xl font-bold text-text">{criticalProductsCount}</p>
+          <p className="mt-4 text-2xl font-bold text-text"><span ref={alertsCountRef}>0</span></p>
           <p className="mt-1 text-xs text-text-secondary">Productos críticos (≤3 días)</p>
         </div>
       </div>
@@ -448,7 +458,7 @@ export default function AnalysisView() {
                     <th className="px-4 py-3 font-medium">Razón</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border">
+                <tbody ref={auditTbodyRef} className="divide-y divide-border">
                   {auditData.movements.length === 0 ? (
                     <tr>
                       <td colSpan={4} className="px-4 py-8 text-center text-text-secondary">
@@ -585,7 +595,7 @@ export default function AnalysisView() {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border">
+                <tbody ref={turnoverTbodyRef} className="divide-y divide-border">
                   {turnoverData.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="px-4 py-8 text-center text-text-secondary">

@@ -5,6 +5,7 @@ import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
 import { exportToExcel } from '../../lib/utils';
+import { useStaggerEnter } from '../../lib/animations/useStaggerEnter';
 
 export default function MovementsView() {
   const { movements, products, fetchMore, warehouses, currentWarehouseId } = useDatabaseStore();
@@ -99,6 +100,8 @@ if (endDate) {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedMovements = filteredMovements.slice(startIndex, endIndex);
+
+  const movementsTbodyRef = useStaggerEnter<HTMLTableSectionElement>([paginatedMovements]);
 
   return (
     <div className="space-y-6">
@@ -217,7 +220,7 @@ if (endDate) {
                 <th className="px-4 py-3 font-medium">Motivo</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody ref={movementsTbodyRef} className="divide-y divide-border">
               {paginatedMovements.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-4 py-8 text-center text-text-secondary">

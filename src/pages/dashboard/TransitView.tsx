@@ -15,6 +15,8 @@ import {
   UNIT_LABELS,
 } from '../../lib/unitConversion';
 import { validateNumber, getNumberFromString } from '../../lib/utils';
+import { useStaggerEnter } from '../../lib/animations/useStaggerEnter';
+import { useCountUp } from '../../lib/animations/useCountUp';
 
 export default function TransitView() {
   const { transitItems, products, cancelTransit, registerWasteFromTransit, registerManualConsumption, logAction, warehouses, currentWarehouseId, setCurrentWarehouse } = useDatabaseStore();
@@ -227,6 +229,12 @@ const handleWaste = async () => {
   const totalConsumed = transitItems.reduce((sum, t) => sum + t.consumed, 0);
   const pendingProducts = Object.keys(groupedByProduct).length;
 
+  const transitStatsRef = useStaggerEnter([totalInTransit]);
+  const inTransitCountRef = useCountUp(totalInTransit, 0.8, 3);
+  const consumedCountRef = useCountUp(totalConsumed, 0.8, 3);
+  const sentCountRef = useCountUp(totalSent, 0.8, 3);
+  const productsCountRef = useCountUp(pendingProducts, 0.8, 0);
+
   const getAntiquityColor = (sentDate: string) => {
     const days = (Date.now() - new Date(sentDate).getTime()) / (1000 * 60 * 60 * 24);
     if (days < 1) return { bg: 'bg-success/10', text: 'text-success', label: 'Hoy' };
@@ -265,14 +273,14 @@ const handleWaste = async () => {
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div ref={transitStatsRef} className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="rounded-xl border border-border bg-surface p-4 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
               <Package className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-text">{Number(totalInTransit).toFixed(3)}</p>
+              <p className="text-2xl font-bold text-text"><span ref={inTransitCountRef}>0.000</span></p>
               <p className="text-xs text-text-secondary">En Transito</p>
             </div>
           </div>
@@ -284,7 +292,7 @@ const handleWaste = async () => {
               <TrendingDown className="h-5 w-5 text-success" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-text">{Number(totalConsumed).toFixed(3)}</p>
+              <p className="text-2xl font-bold text-text"><span ref={consumedCountRef}>0.000</span></p>
               <p className="text-xs text-text-secondary">Consumido</p>
             </div>
           </div>
@@ -296,7 +304,7 @@ const handleWaste = async () => {
               <RefreshCw className="h-5 w-5 text-warning" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-text">{Number(totalSent).toFixed(3)}</p>
+              <p className="text-2xl font-bold text-text"><span ref={sentCountRef}>0.000</span></p>
               <p className="text-xs text-text-secondary">Total Enviado</p>
             </div>
           </div>
@@ -308,7 +316,7 @@ const handleWaste = async () => {
               <Clock className="h-5 w-5 text-danger" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-text">{pendingProducts}</p>
+              <p className="text-2xl font-bold text-text"><span ref={productsCountRef}>0</span></p>
               <p className="text-xs text-text-secondary">Productos</p>
             </div>
           </div>

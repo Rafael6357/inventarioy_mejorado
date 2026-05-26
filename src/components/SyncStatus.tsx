@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Cloud, CloudOff, RefreshCw, CheckCircle2, AlertCircle, WifiOff } from 'lucide-react';
 import { syncEngine } from '../lib/syncEngine';
 import { useDatabaseStore } from '../store/dbStore';
+import gsap from 'gsap';
 
 export default function SyncStatusComponent() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -10,6 +11,21 @@ export default function SyncStatusComponent() {
   const syncQueueCount = useDatabaseStore((s) => s.syncQueueCount);
   const syncStatus = useDatabaseStore((s) => s.syncStatus);
   const refreshSyncQueueCount = useDatabaseStore((s) => s.refreshSyncQueueCount);
+  const dotRef = useRef<HTMLSpanElement>(null);
+
+  const isSyncing = syncStatus === 'syncing' || syncEvent === 'start' || syncEvent === 'progress';
+  const hasPending = syncQueueCount > 0;
+
+  useEffect(() => {
+    const dot = dotRef.current;
+    if (!dot) return;
+    if (isSyncing || !isOnline) {
+      gsap.to(dot, { opacity: 0.35, duration: 0.8, repeat: -1, yoyo: true, ease: 'power1.inOut' });
+    } else {
+      gsap.killTweensOf(dot);
+      gsap.set(dot, { opacity: 1 });
+    }
+  }, [isSyncing, isOnline, hasPending]);
 
   useEffect(() => {
     const goOnline = () => { setIsOnline(true); refreshSyncQueueCount(); };
@@ -41,9 +57,6 @@ export default function SyncStatusComponent() {
 
   const handleClick = () => setShowTooltip((prev) => !prev);
 
-  const isSyncing = syncStatus === 'syncing' || syncEvent === 'start' || syncEvent === 'progress';
-  const hasPending = syncQueueCount > 0;
-
   const getIcon = () => {
     if (isSyncing) return <RefreshCw className="h-4 w-4 text-primary animate-spin" />;
     if (!isOnline) return <WifiOff className="h-4 w-4 text-danger" />;
@@ -52,8 +65,8 @@ export default function SyncStatusComponent() {
   };
 
   const getDotColor = () => {
-    if (isSyncing) return 'bg-primary animate-pulse shadow-[0_0_6px_rgba(255,193,7,0.6)]';
-    if (!isOnline) return 'bg-danger animate-pulse shadow-[0_0_6px_rgba(239,68,68,0.6)]';
+    if (isSyncing) return 'bg-primary shadow-[0_0_6px_rgba(255,193,7,0.6)]';
+    if (!isOnline) return 'bg-danger shadow-[0_0_6px_rgba(239,68,68,0.6)]';
     if (hasPending) return 'bg-warning shadow-[0_0_6px_rgba(245,158,11,0.6)]';
     return 'bg-success shadow-[0_0_6px_rgba(34,197,94,0.6)]';
   };
@@ -79,7 +92,7 @@ export default function SyncStatusComponent() {
           </span>
         )}
         {!hasPending && (
-          <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-bg ${getDotColor()}`} />
+          <span ref={dotRef} className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-bg ${getDotColor()}`} />
         )}
       </button>
 

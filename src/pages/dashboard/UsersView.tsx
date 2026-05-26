@@ -8,6 +8,8 @@ import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { validateNumber } from '../../lib/utils';
+import { useStaggerEnter } from '../../lib/animations/useStaggerEnter';
+import { useCountUp } from '../../lib/animations/useCountUp';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -58,6 +60,11 @@ export default function UsersView() {
   const [subscriptionDays, setSubscriptionDays] = useState<30 | 365>(30);
   const isMountedRef = useRef(true);
   const lastFetchController = useRef<AbortController | null>(null);
+  const staggerRef = useStaggerEnter([totalCount]);
+  const totalCountUpRef = useCountUp(totalCount);
+  const activeCountUpRef = useCountUp(profiles.filter(p => getEffectiveStatus(p) === 'active').length);
+  const trialingCountUpRef = useCountUp(profiles.filter(p => getEffectiveStatus(p) === 'trialing' && !(p.trial_ends_at && new Date(p.trial_ends_at) < new Date())).length);
+  const inactiveCountUpRef = useCountUp(profiles.filter(p => ['past_due', 'canceled'].includes(getEffectiveStatus(p))).length);
 
   const totalPages = Math.ceil(totalCount / limit);
 
@@ -236,7 +243,7 @@ export default function UsersView() {
     return 0;
   };
 
-  const getEffectiveStatus = (profile: UserProfile) => {
+  function getEffectiveStatus(profile: UserProfile) {
     if (profile.subscription_status === 'trialing' && profile.trial_ends_at && new Date(profile.trial_ends_at) < new Date()) {
       return 'past_due';
     }
@@ -459,7 +466,7 @@ export default function UsersView() {
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div ref={staggerRef} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-border bg-surface p-4 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-primary/10 p-2 text-primary">
@@ -467,7 +474,7 @@ export default function UsersView() {
             </div>
             <div>
               <p className="text-sm font-medium text-text-secondary">Total Usuarios</p>
-              <p className="text-2xl font-bold text-text">{stats.total}</p>
+              <p className="text-2xl font-bold text-text"><span ref={totalCountUpRef}>0</span></p>
             </div>
           </div>
         </div>
@@ -478,7 +485,7 @@ export default function UsersView() {
             </div>
             <div>
               <p className="text-sm font-medium text-text-secondary">Suscripciones Activas</p>
-              <p className="text-2xl font-bold text-text">{stats.active}</p>
+              <p className="text-2xl font-bold text-text"><span ref={activeCountUpRef}>0</span></p>
             </div>
           </div>
         </div>
@@ -489,7 +496,7 @@ export default function UsersView() {
             </div>
             <div>
               <p className="text-sm font-medium text-text-secondary">En Prueba (Trial)</p>
-              <p className="text-2xl font-bold text-text">{stats.trialing}</p>
+              <p className="text-2xl font-bold text-text"><span ref={trialingCountUpRef}>0</span></p>
             </div>
           </div>
         </div>
@@ -500,7 +507,7 @@ export default function UsersView() {
             </div>
             <div>
               <p className="text-sm font-medium text-text-secondary">Inactivos / Vencidos</p>
-              <p className="text-2xl font-bold text-text">{stats.inactive}</p>
+              <p className="text-2xl font-bold text-text"><span ref={inactiveCountUpRef}>0</span></p>
             </div>
           </div>
         </div>

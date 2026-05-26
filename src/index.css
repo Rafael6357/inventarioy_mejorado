@@ -199,26 +199,6 @@
   }
 }
 
-/* ============================================
-   TRANSICIONES DE PÁGINA - SUAVIZADO
-   ============================================ */
-
-/* Transición fade-in para cambio de módulos */
-.page-transition {
-  animation: fadeIn 0.25s ease-out;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 /* Transición fade-up para scroll (Landing) */
 .fade-up {
   opacity: 0;

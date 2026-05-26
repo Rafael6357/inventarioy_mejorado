@@ -14,6 +14,7 @@ import { useDatabaseStore } from '../store/dbStore';
 import { UNIT_LABELS } from '../lib/unitConversion';
 import { toast } from 'sonner';
 import { validateNumber, getNumberFromString } from '../lib/utils';
+import { useModalAnimation } from '../lib/animations/useModalAnimation';
 
 interface OnboardingWizardProps {
   isOpen: boolean;
@@ -27,6 +28,7 @@ export default function OnboardingWizard({ isOpen, onClose }: OnboardingWizardPr
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { addProduct } = useDatabaseStore();
+  const { backdropRef, cardRef } = useModalAnimation(isOpen);
 
   const [productData, setProductData] = useState({
     name: '',
@@ -131,8 +133,8 @@ export default function OnboardingWizard({ isOpen, onClose }: OnboardingWizardPr
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) handleComplete(); }}>
-      <div className="relative w-full max-w-2xl mx-4 bg-surface rounded-2xl shadow-2xl border border-border/50 overflow-hidden opacity-100 visible">
+    <div ref={backdropRef} className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) handleComplete(); }}>
+      <div ref={cardRef} className="relative w-full max-w-2xl mx-4 bg-surface rounded-2xl shadow-2xl border border-border/50 overflow-hidden">
         <button
           onClick={handleComplete}
           className="absolute top-4 right-4 text-text-secondary hover:text-text transition-colors"

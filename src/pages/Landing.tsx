@@ -1,10 +1,14 @@
 import { Package, ShoppingCart, ChefHat, Sparkles, ChevronDown, CheckCircle2, Loader2, Users, Instagram, Facebook, Phone, MapPin, DollarSign, Headphones, MessageCircle, Menu, X, LogIn, UserPlus, ClipboardList, TrendingUp, Store, BarChart3, Database, Activity, Star, Quote } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
 import InventarioYLogo from '../components/InventarioYLogo';
 import { supabase } from '../lib/supabase';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+
+gsap.registerPlugin(ScrollTrigger);
 
 export default function Landing() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
@@ -30,29 +34,28 @@ export default function Landing() {
     });
   }, []);
 
-  // Animaciones de scroll con Intersection Observer
+  // Animaciones con GSAP ScrollTrigger
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('visible');
-          }
+    const ctx = gsap.context(() => {
+      // Hero entrance: stagger in
+      const heroTl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+      heroTl.fromTo('.hero-fade', { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.5, stagger: 0.15 });
+      heroTl.from('.dashboard-mockup', { opacity: 0, y: 40, duration: 0.7, ease: 'expo.out' }, '-=0.15');
+
+      // Scroll reveals: each .fade-up animates once when scrolled into view
+      document.querySelectorAll('.fade-up').forEach((el) => {
+        ScrollTrigger.create({
+          trigger: el,
+          start: 'top 85%',
+          once: true,
+          onEnter: () => {
+            gsap.fromTo(el, { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' });
+          },
         });
-      },
-      { threshold: 0.1, rootMargin: '0px 0px -50px 0px' }
-    );
-
-    const fadeElements = document.querySelectorAll('.fade-up');
-    fadeElements.forEach((el) => observer.observe(el));
-
-    // Animación de entrada para el hero al cargar
-    const heroElements = document.querySelectorAll('.hero-fade');
-    heroElements.forEach((el, i) => {
-      setTimeout(() => el.classList.add('visible'), 200 + i * 150);
+      });
     });
 
-    return () => observer.disconnect();
+    return () => ctx.revert();
   }, []);
 
   return (
@@ -68,11 +71,6 @@ export default function Landing() {
         }
         .animate-float { animation: float 4s ease-in-out infinite; }
         .animate-pulse-glow { animation: pulse-glow 3s ease-in-out infinite; }
-        .delay-100 { transition-delay: 100ms; }
-        .delay-200 { transition-delay: 200ms; }
-        .delay-300 { transition-delay: 300ms; }
-        .fade-up.visible { opacity: 1; transform: translateY(0); }
-        .hero-fade.visible { opacity: 1; transform: translateY(0); }
       `}</style>
       <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-bg/80 backdrop-blur-xl supports-[backdrop-filter]:bg-bg/60 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
@@ -161,17 +159,17 @@ export default function Landing() {
           
           <div className="container relative mx-auto px-4 text-center">
               <div className="mx-auto max-w-3xl space-y-8">
-              <div className="hero-fade fade-up inline-flex items-center rounded-full border border-primary/50 bg-primary/10 px-3 py-1 text-sm font-medium text-primary shadow-[0_0_15px_rgba(255,193,7,0.2)]">
+              <div className="hero-fade inline-flex items-center rounded-full border border-primary/50 bg-primary/10 px-3 py-1 text-sm font-medium text-primary shadow-[0_0_15px_rgba(255,193,7,0.2)]">
                 <Sparkles className="mr-2 h-4 w-4 drop-shadow-[0_0_5px_rgba(255,193,7,0.8)]" />
                 30 Días de Prueba Gratis
               </div>
-              <h1 className="hero-fade fade-up text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
+              <h1 className="hero-fade text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
                 Gestiona tu inventario <span className="text-gradient">inteligente y fácil</span>
               </h1>
-              <p className="hero-fade fade-up mx-auto max-w-2xl text-lg text-text-secondary sm:text-xl">
+              <p className="hero-fade mx-auto max-w-2xl text-lg text-text-secondary sm:text-xl">
                 La solución integral para restaurantes, cafeterías y comercios en Cuba. Controla tu stock, ventas, recetas y personal en un solo lugar.
               </p>
-              <div className="hero-fade fade-up flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+              <div className="hero-fade flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
                 <Link to="/register">
                   <Button size="lg" className="w-full sm:w-auto text-base h-12 px-8">
                     Comenzar Gratis
@@ -185,7 +183,7 @@ export default function Landing() {
               </div>
 
               {/* Dashboard Mockup */}
-              <div className="hero-fade fade-up mx-auto mt-16 max-w-4xl animate-float">
+              <div className="hero-fade mx-auto mt-16 max-w-4xl animate-float">
                 <div className="relative rounded-2xl border border-border/50 bg-surface/80 backdrop-blur-sm shadow-2xl overflow-hidden animate-pulse-glow">
                   <div className="flex items-center gap-1.5 border-b border-border/50 px-4 py-3">
                     <div className="h-3 w-3 rounded-full bg-red-500/80" />

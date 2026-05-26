@@ -3,6 +3,7 @@ import { X, Lock, Eye, EyeOff } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { useDatabaseStore } from '../store/dbStore';
+import { useModalAnimation } from '../lib/animations/useModalAnimation';
 
 interface PinModalProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ export default function PinModal({ isOpen, moduleName, onSuccess, onCancel, isIn
   const [isVerifying, setIsVerifying] = useState(false);
   const [showPin, setShowPin] = useState(false);
   const { verifyPinForModule, verifyPinSimple } = useDatabaseStore();
+  const { backdropRef, cardRef } = useModalAnimation(isOpen);
 
   useEffect(() => {
     if (blocked && remainingTime > 0) {
@@ -89,8 +91,8 @@ export default function PinModal({ isOpen, moduleName, onSuccess, onCancel, isIn
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-2xl border border-border/50 bg-surface p-6 shadow-2xl">
+    <div ref={backdropRef} className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+      <div ref={cardRef} className="w-full max-w-sm rounded-2xl border border-border/50 bg-surface p-6 shadow-2xl">
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="rounded-full bg-primary/20 p-2">

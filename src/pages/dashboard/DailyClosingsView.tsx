@@ -5,6 +5,8 @@ import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
 import { exportToExcel } from '../../lib/utils';
+import { useStaggerEnter } from '../../lib/animations/useStaggerEnter';
+import { useCountUp } from '../../lib/animations/useCountUp';
 
 export default function DailyClosingsView() {
   const { dailyClosings, sales, employees, logAction, products, accessPins } = useDatabaseStore();
@@ -156,6 +158,15 @@ export default function DailyClosingsView() {
     return sum + calculateClosingTotals(c.closing_date.split('T')[0]).venta_rapida;
   }, 0);
 
+  const statsRef = useStaggerEnter([totalVentasHistorico]);
+  const ventasCountRef = useCountUp(totalVentasHistorico, 0.8, 2);
+  const descuentosCountRef = useCountUp(totalDescuentosHistorico, 0.8, 2);
+  const salonCountRef = useCountUp(totalSalonHistorico, 0.8, 2);
+  const domicilioCountRef = useCountUp(totalDomicilioHistorico, 0.8, 2);
+  const cuentaCasaCountRef = useCountUp(totalCuentaCasaHistorico, 0.8, 2);
+  const barCountRef = useCountUp(totalBarHistorico, 0.8, 2);
+  const ventaRapidaCountRef = useCountUp(totalVentaRapidaHistorico, 0.8, 2);
+
   const clearFilters = () => {
     setSearchTerm('');
     setStartDate('');
@@ -227,34 +238,34 @@ export default function DailyClosingsView() {
             {filteredClosings.length} cierres encontrados
           </p>
         </div>
-        <div className="flex gap-3 text-right flex-wrap">
+        <div ref={statsRef} className="flex gap-3 text-right flex-wrap">
           <div className="bg-bg/50 rounded-lg px-4 py-2 border border-border/50">
             <p className="text-xs text-text-secondary">Total Histórico</p>
-            <p className="font-mono font-bold text-primary">${totalVentasHistorico.toFixed(2)}</p>
+            <p className="font-mono font-bold text-primary">$<span ref={ventasCountRef}>0.00</span></p>
           </div>
           <div className="bg-bg/50 rounded-lg px-4 py-2 border border-border/50">
             <p className="text-xs text-text-secondary">Descuentos</p>
-            <p className="font-mono font-bold text-danger">${totalDescuentosHistorico.toFixed(2)}</p>
+            <p className="font-mono font-bold text-danger">$<span ref={descuentosCountRef}>0.00</span></p>
           </div>
           <div className="bg-bg/50 rounded-lg px-4 py-2 border border-border/50">
             <p className="text-xs text-text-secondary">Salón</p>
-            <p className="font-mono font-bold text-text">${totalSalonHistorico.toFixed(2)}</p>
+            <p className="font-mono font-bold text-text">$<span ref={salonCountRef}>0.00</span></p>
           </div>
           <div className="bg-bg/50 rounded-lg px-4 py-2 border border-border/50">
             <p className="text-xs text-text-secondary">Domicilio</p>
-            <p className="font-mono font-bold text-text">${totalDomicilioHistorico.toFixed(2)}</p>
+            <p className="font-mono font-bold text-text">$<span ref={domicilioCountRef}>0.00</span></p>
           </div>
           <div className="bg-bg/50 rounded-lg px-4 py-2 border border-border/50">
             <p className="text-xs text-text-secondary">Cuenta Casa</p>
-            <p className="font-mono font-bold text-text">${totalCuentaCasaHistorico.toFixed(2)}</p>
+            <p className="font-mono font-bold text-text">$<span ref={cuentaCasaCountRef}>0.00</span></p>
           </div>
           <div className="bg-bg/50 rounded-lg px-4 py-2 border border-border/50">
             <p className="text-xs text-text-secondary">Bar</p>
-            <p className="font-mono font-bold text-text">${totalBarHistorico.toFixed(2)}</p>
+            <p className="font-mono font-bold text-text">$<span ref={barCountRef}>0.00</span></p>
           </div>
           <div className="bg-bg/50 rounded-lg px-4 py-2 border border-border/50">
             <p className="text-xs text-text-secondary">Venta Rápida</p>
-            <p className="font-mono font-bold text-text">${totalVentaRapidaHistorico.toFixed(2)}</p>
+            <p className="font-mono font-bold text-text">$<span ref={ventaRapidaCountRef}>0.00</span></p>
           </div>
           <Button
             variant="outline"

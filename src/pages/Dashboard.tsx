@@ -64,6 +64,7 @@ export default function Dashboard() {
   const sidebarTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hasCheckedUncontacted = useRef(false);
   const fetchedUserId = useRef<string | null>(null);
+
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, isLoading: authLoading, initialize } = useAuthStore();
@@ -479,7 +480,7 @@ export default function Dashboard() {
               </button>
             </div>
           )}
-          <div key={location.pathname} className="page-transition">
+          <div className="w-full">
             <Routes>
               <Route path="/" element={<StockView />} />
               <Route path="/inventory" element={<InventoryView />} />
