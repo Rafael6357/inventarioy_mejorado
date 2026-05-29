@@ -65,7 +65,7 @@ export default function OfflineBanner() {
   const message = isOffline
     ? syncQueueCount > 0
       ? `${syncQueueCount} cambio${syncQueueCount !== 1 ? 's' : ''} sin sincronizar — guardando localmente...`
-      : 'Sin conexión — los cambios se guardarán localmente al reconectar.'
+      : 'Sin conexión, los cambios se guardarán en la nube como respaldo al reconectar'
     : isSyncing
       ? `Sincronizando ${syncQueueCount} cambio${syncQueueCount !== 1 ? 's' : ''}...`
       : `${syncQueueCount} cambio${syncQueueCount !== 1 ? 's' : ''} pendiente${syncQueueCount !== 1 ? 's' : ''} de sincronización.`;

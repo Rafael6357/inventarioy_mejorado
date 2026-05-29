@@ -26,11 +26,14 @@ export default function AnalysisView() {
   // Verificar si los datos aún están cargando para evitar errores
   const isDataLoaded = !isLoading && Array.isArray(products);
   
-  const activeProducts = isDataLoaded ? products.filter(p => p.is_active !== false) : [];
+  const activeProducts = useMemo(() => 
+    isDataLoaded ? products.filter(p => p.is_active !== false) : [],
+    [isDataLoaded, products]
+  );
   
   // Variables seguras para evitar errores cuando los datos no están cargados
-  const safeSales = Array.isArray(sales) ? sales : [];
-  const safeMovements = Array.isArray(movements) ? movements : [];
+  const safeSales = useMemo(() => Array.isArray(sales) ? sales : [], [sales]);
+  const safeMovements = useMemo(() => Array.isArray(movements) ? movements : [], [movements]);
 
   const [auditProduct, setAuditProduct] = useState<string>('');
   const [auditDateFrom, setAuditDateFrom] = useState<string>('');
@@ -270,8 +273,8 @@ export default function AnalysisView() {
   const revenueCountRef = useCountUp(totalSalesRevenue, 0.8, 2);
   const profitCountRef = useCountUp(grossProfit, 0.8, 2);
   const alertsCountRef = useCountUp(criticalProductsCount, 0.8, 0);
-  const auditTbodyRef = useStaggerEnter<HTMLTableSectionElement>([auditData]);
-  const turnoverTbodyRef = useStaggerEnter<HTMLTableSectionElement>([turnoverData]);
+  const auditTbodyRef = useStaggerEnter<HTMLTableSectionElement>([auditData?.movements?.length ?? 0]);
+  const turnoverTbodyRef = useStaggerEnter<HTMLTableSectionElement>([turnoverData.length]);
 
   return (
     <div className="space-y-6">

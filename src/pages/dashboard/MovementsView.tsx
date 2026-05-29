@@ -101,7 +101,7 @@ if (endDate) {
   const endIndex = startIndex + itemsPerPage;
   const paginatedMovements = filteredMovements.slice(startIndex, endIndex);
 
-  const movementsTbodyRef = useStaggerEnter<HTMLTableSectionElement>([paginatedMovements]);
+  const movementsTbodyRef = useStaggerEnter<HTMLTableSectionElement>([paginatedMovements.length, currentPage]);
 
   return (
     <div className="space-y-6">
