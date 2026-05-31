@@ -391,10 +391,14 @@ export default function UsersView() {
         .update({ last_contacted_at: now })
         .eq('id', profile.id);
       if (error) {
+        console.error('[Contactar] Supabase error:', error);
         toast.error('Error al registrar el contacto');
         setProfiles(prev => prev.map(p => p.id === profile.id ? { ...p, last_contacted_at: profile.last_contacted_at } : p));
+      } else {
+        fetchProfiles();
       }
-    } catch {
+    } catch (err) {
+      console.error('[Contactar] Excepción:', err);
       toast.error('Error al registrar el contacto');
       setProfiles(prev => prev.map(p => p.id === profile.id ? { ...p, last_contacted_at: profile.last_contacted_at } : p));
     }

@@ -53,6 +53,7 @@ import UsersView from './dashboard/UsersView';
 import DailyClosingsView from './dashboard/DailyClosingsView';
 import OnboardingWizard, { shouldShowOnboarding } from '../components/OnboardingWizard';
 import PhoneModal from '../components/PhoneModal';
+import { syncEngine } from '../lib/syncEngine';
 
 export default function Dashboard() {
   const [showOnboarding, setShowOnboarding] = useState(() => shouldShowOnboarding());
@@ -155,6 +156,7 @@ export default function Dashboard() {
       (async () => {
         try {
           await fetchAll();
+          syncEngine.processPending();
         } catch (err) {
           console.error('[Dashboard] Error en fetchAll:', err);
         }
@@ -255,6 +257,18 @@ export default function Dashboard() {
       setShowPhoneModal(true);
     }
   }, [user]);
+
+  useEffect(() => {
+    const unsub = syncEngine.onEvent((event, data) => {
+      if (event === 'synced') {
+        toast.success(`${data.count} cambio${data.count !== 1 ? 's' : ''} sincronizado${data.count !== 1 ? 's' : ''}`);
+      }
+      if (event === 'duplicate') {
+        toast.info('Un producto duplicado fue ignorado durante la sincronización');
+      }
+    });
+    return unsub;
+  }, []);
 
   const checkUncontactedUsers = useCallback(async () => {
     try {

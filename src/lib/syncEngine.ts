@@ -3,7 +3,7 @@ import type { SyncQueueItem } from './dexieDb';
 import { useDatabaseStore } from '../store/dbStore';
 import { supabase } from './supabase';
 
-type SyncEvent = 'start' | 'progress' | 'complete' | 'error' | 'idle';
+type SyncEvent = 'start' | 'progress' | 'complete' | 'error' | 'idle' | 'synced' | 'duplicate';
 
 type SyncListener = (event: SyncEvent, data?: any) => void;
 
@@ -76,6 +76,7 @@ class SyncEngine {
         }
       }
 
+      const syncedCount = this.processedItems;
       const remaining = await getPendingSyncItems();
       const store = useDatabaseStore.getState();
       if (remaining.length === 0) {
@@ -83,6 +84,9 @@ class SyncEngine {
           await store.fetchAll();
         } catch { }
         store.refreshSyncQueueCount();
+        if (syncedCount > 0) {
+          this.emit('synced', { count: syncedCount, total: this.totalItems });
+        }
       } else {
         store.refreshSyncQueueCount();
         setTimeout(() => this.processQueue(), 0);
@@ -455,9 +459,15 @@ class SyncEngine {
         }
         return true;
       } catch (err: any) {
-        if (err?.code === '42501' || err?.code === '23505') {
+        if (err?.code === '42501') {
           console.error(`Sync: error no retryable (${err.code}) en ${item.operation}`, err);
           return false;
+        }
+        if (err?.code === '23505') {
+          console.warn(`Sync: duplicado ignorado (${err.code}) en ${item.operation}`, err);
+          await removeSyncItem(item.id!);
+          this.emit('duplicate', { operation: item.operation, payload: item.payload });
+          return true;
         }
         const isOffline = !navigator.onLine
           || err?.message?.includes('Failed to fetch')
@@ -480,6 +490,13 @@ class SyncEngine {
   async enqueueAndProcess(item: Omit<SyncQueueItem, 'id' | 'created_at' | 'status' | 'retries'>) {
     await addToSyncQueue(item);
     if (navigator.onLine) {
+      this.processQueue();
+    }
+  }
+
+  async processPending() {
+    const count = await getSyncQueueCount();
+    if (count > 0 && navigator.onLine) {
       this.processQueue();
     }
   }
@@ -525,4 +542,5 @@ if (typeof window !== 'undefined') {
   window.addEventListener('online', () => {
     syncEngine.processQueue();
   });
+  setInterval(() => syncEngine.processQueue(), 30000);
 }
