@@ -166,8 +166,8 @@ export default function StockView() {
 
       const stockA = getStockForWarehouse(a.id);
       const stockB = getStockForWarehouse(b.id);
-      const physA = stockA ? stockA.quantity - stockA.in_transit : Number(a.quantity) - (Number(a.in_transit) || 0);
-      const physB = stockB ? stockB.quantity - stockB.in_transit : Number(b.quantity) - (Number(b.in_transit) || 0);
+      const physA = stockA ? stockA.quantity : Number(a.quantity);
+      const physB = stockB ? stockB.quantity : Number(b.quantity);
 
       switch (sortBy) {
         case 'name':
@@ -330,8 +330,16 @@ export default function StockView() {
       const warehouseStock = getStockForWarehouse(product.id);
       const inTransit = warehouseStock ? warehouseStock.in_transit : Number(product.in_transit || 0);
       const quantity = warehouseStock ? warehouseStock.quantity : Number(product.quantity);
-      const availableStock = quantity - inTransit;
-      return total + (availableStock * Number(product.cost));
+      const availableStock = quantity;
+      return total + (Math.max(0, availableStock) * Number(product.cost));
+    }, 0);
+  }, [filteredProducts, productWarehouse, currentWarehouseId]);
+
+  const totalTransitValue = useMemo(() => {
+    return filteredProducts.reduce((total, product) => {
+      const warehouseStock = getStockForWarehouse(product.id);
+      const inTransit = warehouseStock ? warehouseStock.in_transit : Number(product.in_transit || 0);
+      return total + (Math.max(0, inTransit) * Number(product.cost));
     }, 0);
   }, [filteredProducts, productWarehouse, currentWarehouseId]);
 
@@ -349,9 +357,13 @@ export default function StockView() {
           </p>
         </div>
         <div className="flex items-center gap-4">
-          <div className="text-right">
-            <p className="text-xs text-text-secondary uppercase tracking-wider">Valor Total</p>
+          <div className="text-right" title="Suma del stock en almacén (quantity × cost)">
+            <p className="text-xs text-text-secondary uppercase tracking-wider">Valor Almacén</p>
             <p className="text-xl font-bold text-primary font-mono">${totalInventoryValue.toFixed(2)}</p>
+          </div>
+          <div className="text-right" title="Suma del stock en tránsito (in_transit × cost)">
+            <p className="text-xs text-text-secondary uppercase tracking-wider">Valor Tránsito</p>
+            <p className="text-xl font-bold text-warning font-mono">${totalTransitValue.toFixed(2)}</p>
           </div>
           <div className="h-8 w-px bg-border/50 hidden sm:block"></div>
           <div className="flex items-center gap-2">

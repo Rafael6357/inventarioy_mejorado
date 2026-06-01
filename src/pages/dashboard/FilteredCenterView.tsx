@@ -57,7 +57,7 @@ export default function FilteredCenterView() {
     // 4. Stock Status Filter
     if (stockFilter !== 'ALL') {
       result = result.filter(p => {
-        const physicalStock = Number(p.quantity) - (Number(p.in_transit) || 0);
+        const physicalStock = Number(p.quantity);
         const rop = Number(p.rop) || 0;
         
         // Si ROP no está configurado (0), exclude from LOW/OVER/NORMAL filters
@@ -79,11 +79,11 @@ export default function FilteredCenterView() {
         valA = a.price;
         valB = b.price;
       } else if (sortBy === 'stock') {
-        valA = Number(a.quantity) - (Number(a.in_transit) || 0);
-        valB = Number(b.quantity) - (Number(b.in_transit) || 0);
+        valA = Number(a.quantity);
+        valB = Number(b.quantity);
       } else if (sortBy === 'value') {
-        const physA = Number(a.quantity) - (Number(a.in_transit) || 0);
-        const physB = Number(b.quantity) - (Number(b.in_transit) || 0);
+        const physA = Number(a.quantity);
+        const physB = Number(b.quantity);
         valA = physA * Number(a.cost);
         valB = physB * Number(b.cost);
       }
@@ -132,7 +132,7 @@ export default function FilteredCenterView() {
               { header: 'Valor Total', key: 'totalValue', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
             ];
             const data = filteredAndSortedProducts.map(p => {
-              const physicalStock = Number(p.quantity) - (Number(p.in_transit) || 0);
+              const physicalStock = Number(p.quantity);
               const margin = p.price && p.price > 0 ? ((p.price - p.cost) / p.price) * 100 : 0;
               const state = (Number(p.rop) || 0) === 0 ? 'Sin configurar' : (physicalStock <= p.rop ? 'Bajo' : (physicalStock > p.rop * 2 ? 'Exceso' : 'Normal'));
               return {
@@ -266,7 +266,7 @@ export default function FilteredCenterView() {
                 </tr>
               ) : (
                 filteredAndSortedProducts.map((product) => {
-                  const physicalStock = Number(product.quantity) - (Number(product.in_transit) || 0);
+                  const physicalStock = Number(product.quantity);
                   const isLow = (Number(product.rop) || 0) > 0 && physicalStock <= product.rop;
                   const isOver = (Number(product.rop) || 0) > 0 && physicalStock > product.rop * 2;
                   const noRopConfigured = (Number(product.rop) || 0) === 0;

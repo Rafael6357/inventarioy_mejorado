@@ -223,7 +223,7 @@ export default function InventoryView() {
     
     // SALIDA requiere validación de stock
     if (movement.type === 'SALIDA') {
-      const availableStock = Number(product.quantity) - (Number(product.in_transit) || 0);
+      const availableStock = Number(product.quantity);
       if (quantityInBase > availableStock) {
         toast.error(`La cantidad excede el stock disponible (${availableStock} ${baseUnit})`);
         return;
@@ -651,7 +651,7 @@ export default function InventoryView() {
                         .reduce((sum, t) => sum + t.remaining, 0)
                       : 0;
                     const availableStock = warehouseStock 
-                      ? Number(warehouseStock.quantity) - computedInTransit
+                      ? Number(warehouseStock.quantity)
                       : 0;
                     
                     return (
