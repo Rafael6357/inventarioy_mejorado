@@ -12,6 +12,31 @@ import { useStaggerEnter } from '../../lib/animations/useStaggerEnter';
 
 export default function StockView() {
   // Helper to get stock per warehouse
+  /**
+   * Calcula el stock disponible para un producto en un almacén específico.
+   *
+   * FÓRMULA (matemáticamente correcta, NO cambiar):
+   *   physicalStock = product_warehouse.quantity
+   *
+   * INTERPRETACIÓN:
+   *   - "Disponible" = stock que NUNCA salió del almacén (suma de entradas netas en almacén)
+   *   - "En Tránsito" = stock que ya salió del almacén
+   *   - Suma(Disponible + Tránsito) = total registrado (suma de todas las entradas)
+   *
+   * EJEMPLO:
+   *   Si entradas = 60 + 30 = 90, y hay SALIDA de 12 sin venta:
+   *     - Disponible = 78 (90 - 12 que salieron)
+   *     - Tránsito = 12 (las que salieron)
+   *     - Suma = 90 (total registrado) ✅
+   *   Si luego se vende esas 12 desde tránsito:
+   *     - Disponible = 78 (no cambia, la salida original ya lo había descontado)
+   *     - Tránsito = 0
+   *     - Suma = 78 (90 entradas - 12 vendidas)
+   *
+   * NOTA: Este modelo representa el stock histórico registrado. La venta
+   *       desde tránsito NO decrementa el almacén porque la salida original
+   *       ya lo hizo.
+   */
   const getStockForWarehouse = (productId: string) => {
     if (!currentWarehouseId || productWarehouse.length === 0) {
       return null;
@@ -112,7 +137,7 @@ export default function StockView() {
       const warehouseStock = getStockForWarehouse(product.id);
       const quantity = warehouseStock ? warehouseStock.quantity : Number(product.quantity);
       const inTransit = warehouseStock ? warehouseStock.in_transit : Number(product.in_transit || 0);
-      const physicalStock = quantity - inTransit;
+      const physicalStock = quantity;
       const effectiveRop = product.rop > 0 ? product.rop : autoCalculatedRop(product.id, physicalStock);
       
       if (statusFilter === 'LOW_STOCK') {
@@ -121,6 +146,8 @@ export default function StockView() {
         matchesStatus = physicalStock <= 0;
       } else if (statusFilter === 'OPTIMAL') {
         matchesStatus = physicalStock > effectiveRop;
+      } else if (statusFilter === 'WITH_STOCK') {
+        matchesStatus = physicalStock >= 1;
       }
 
       const matchesType = typeFilter === 'ALL' ||
@@ -359,7 +386,7 @@ export default function StockView() {
                   const warehouseStock = getStockForWarehouse(p.id);
                   const quantity = warehouseStock ? warehouseStock.quantity : Number(p.quantity);
                   const inTransit = warehouseStock ? warehouseStock.in_transit : Number(p.in_transit || 0);
-                  const physicalStock = quantity - inTransit;
+                  const physicalStock = quantity;
                   return {
                     ...p,
                     type: p.is_consumo_directo ? 'Consumo Directo' : p.is_gasto_variable ? 'Gasto Variable' : p.is_individual ? 'Venta Rápida' : 'Ingrediente',
@@ -416,6 +443,7 @@ export default function StockView() {
               <option value="OPTIMAL">Óptimo</option>
               <option value="LOW_STOCK">Stock Bajo</option>
               <option value="OUT_OF_STOCK">Sin Stock</option>
+              <option value="WITH_STOCK">Con stock disponible</option>
             </select>
 
             <select
@@ -498,7 +526,7 @@ export default function StockView() {
                   const warehouseStock = getStockForWarehouse(product.id);
                   const quantity = warehouseStock ? warehouseStock.quantity : Number(product.quantity);
                   const inTransit = warehouseStock ? warehouseStock.in_transit : Number(product.in_transit || 0);
-                  const physicalStock = quantity - inTransit;
+                  const physicalStock = quantity;
                   const isOutOfStock = physicalStock <= 0;
                   const effectiveRop = product.rop > 0 ? product.rop : autoCalculatedRop(product.id, physicalStock);
                   const isLowStock = physicalStock <= effectiveRop && !isOutOfStock;
@@ -542,12 +570,12 @@ export default function StockView() {
                           </span>
                         )}
                       </td>
-                      <td className={`px-4 py-3 text-right font-mono ${isLowStock ? 'text-red-600 font-bold' : ''}`}>
+                      <td className={`px-4 py-3 text-right font-mono ${isLowStock ? 'text-red-600 font-bold' : ''}`} title={`Stock que NUNCA salió del almacén. Disponible + Tránsito = total registrado (suma de entradas). Ejemplo: 60+30=90 entradas, 12 en tránsito → Disponible=78, Tránsito=12, Suma=90.`}>
                         {Number(physicalStock).toFixed(4)}
                       </td>
                       <td className="px-4 py-3 text-right font-mono">
                         {inTransit > 0 ? (
-                          <span className="text-warning" title="En transito a produccion">{Number(inTransit).toFixed(4)}</span>
+                          <span className="text-warning" title="Stock que ya salió del almacén. La venta desde tránsito descuenta aquí pero NO descuenta el Disponible (la SALIDA original ya lo hizo).">{Number(inTransit).toFixed(4)}</span>
                         ) : (
                           <span className="text-text-secondary">-</span>
                         )}

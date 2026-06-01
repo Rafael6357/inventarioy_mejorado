@@ -488,6 +488,55 @@ export default function SalesView() {
     setCart(current => current.filter(item => item.product_id !== product_id));
   };
 
+  const getMaxQuantity = (item: typeof cart[0]): number => {
+    if (item.is_recipe) return 9999;
+    const product = products.find(p => p.id === item.product_id);
+    if (!product) return 1;
+    return Math.max(1, Math.floor(Number(product.quantity) - Number(product.in_transit || 0)));
+  };
+
+  const handleQuantityChange = (product_id: string, value: string) => {
+    if (value === '') {
+      setCart(current => current.map(item =>
+        item.product_id === product_id ? { ...item, quantity: 1 } : item
+      ));
+      return;
+    }
+    const num = parseInt(value, 10);
+    if (isNaN(num) || num < 1) {
+      setCart(current => current.map(item =>
+        item.product_id === product_id ? { ...item, quantity: 1 } : item
+      ));
+      return;
+    }
+    const item = cart.find(c => c.product_id === product_id);
+    if (!item) return;
+    const maxQty = getMaxQuantity(item);
+    const finalQty = Math.min(num, maxQty);
+    setCart(current => current.map(c =>
+      c.product_id === product_id ? { ...c, quantity: finalQty } : c
+    ));
+  };
+
+  const handleQuantityBlur = (product_id: string, value: string) => {
+    const num = parseInt(value, 10);
+    if (value === '' || isNaN(num) || num < 1) {
+      setCart(current => current.map(item =>
+        item.product_id === product_id ? { ...item, quantity: 1 } : item
+      ));
+      return;
+    }
+    const item = cart.find(c => c.product_id === product_id);
+    if (!item) return;
+    const maxQty = getMaxQuantity(item);
+    if (num > maxQty) {
+      toast.warning(`Stock máximo disponible: ${maxQty}`);
+      setCart(current => current.map(c =>
+        c.product_id === product_id ? { ...c, quantity: maxQty } : c
+      ));
+    }
+  };
+
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const total = Math.max(0, subtotal - Math.min(discount, subtotal));
 
@@ -977,7 +1026,16 @@ setShowTicket(true);
                     >
                       <Minus className="h-4 w-4" />
                     </button>
-                    <span className="w-8 text-center font-mono text-sm">{item.quantity}</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max={getMaxQuantity(item)}
+                      step="1"
+                      value={item.quantity}
+                      onChange={(e) => handleQuantityChange(item.product_id, e.target.value)}
+                      onBlur={(e) => handleQuantityBlur(item.product_id, e.target.value)}
+                      className="w-16 text-center font-mono text-sm border border-border rounded px-1 py-0.5 bg-bg text-text focus:outline-none focus:ring-1 focus:ring-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
                     <button 
                       onClick={() => updateQuantity(item.product_id, 1)}
                       className="rounded-md bg-surface-hover p-1 text-text hover:bg-border transition-colors"
