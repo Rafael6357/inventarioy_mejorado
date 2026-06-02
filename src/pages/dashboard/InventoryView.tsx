@@ -221,9 +221,12 @@ export default function InventoryView() {
       return;
     }
     
-    // SALIDA requiere validación de stock
+    // SALIDA requiere validación de stock (usar product_warehouse.quantity como source of truth)
     if (movement.type === 'SALIDA') {
-      const availableStock = Number(product.quantity);
+      const pw = productWarehouse.find(
+        pw => pw.product_id === movement.product_id && pw.warehouse_id === movement.warehouse_id
+      );
+      const availableStock = pw ? Number(pw.quantity) : Number(product.quantity);
       if (quantityInBase > availableStock) {
         toast.error(`La cantidad excede el stock disponible (${availableStock} ${baseUnit})`);
         return;
