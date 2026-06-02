@@ -5,6 +5,7 @@ import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
 import { exportToExcel } from '../../lib/utils';
+import { formatNumber } from '../../lib/formatNumber';
 import { useStaggerEnter } from '../../lib/animations/useStaggerEnter';
 
 export default function MovementsView() {
@@ -272,7 +273,7 @@ if (endDate) {
                       <td className={`px-4 py-3 text-right font-mono font-medium ${
                         isEntrada || (isAjuste && Number(movement.quantity) > 0) ? 'text-success' : 'text-danger'
                       }`}>
-                        {isEntrada || (isAjuste && Number(movement.quantity) > 0) ? '+' : '-'}{Math.abs(Number(movement.quantity)).toFixed(4)} {movement.unit}
+                        {isEntrada || (isAjuste && Number(movement.quantity) > 0) ? '+' : '-'}{formatNumber(Math.abs(Number(movement.quantity)), 4)} {movement.unit}
                       </td>
                       <td className="px-4 py-3 text-right font-mono text-text-secondary">
                         ${movement.cost.toFixed(2)}

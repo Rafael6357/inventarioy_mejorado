@@ -1,3 +1,5 @@
+import { formatNumber } from './formatNumber';
+
 const UNIT_CONVERSIONS = {
   weight: {
     g: 1,
@@ -125,10 +127,10 @@ export function saveLastUsedUnit(productId: string, unit: UnitAbbrev): void {
 
 export function getDisplayValue(value: number, unit: UnitAbbrev): string {
   if (value >= 1000) {
-    return value.toFixed(2);
+    return formatNumber(value, 2);
   }
   if (value < 1) {
-    return value.toFixed(4);
+    return formatNumber(value, 4);
   }
-  return value.toFixed(2);
+  return formatNumber(value, 2);
 }

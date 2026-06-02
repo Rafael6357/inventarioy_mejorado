@@ -5,6 +5,7 @@ import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { exportToExcel } from '../../lib/utils';
+import { formatNumber } from '../../lib/formatNumber';
 import { useStaggerEnter } from '../../lib/animations/useStaggerEnter';
 import { useCountUp } from '../../lib/animations/useCountUp';
 
@@ -485,7 +486,7 @@ export default function AnalysisView() {
                         <td className={`px-4 py-3 text-right font-mono font-medium ${
                           m.type === 'ENTRADA' ? 'text-success' : 'text-danger'
                         }`}>
-                          {m.type === 'ENTRADA' ? '+' : '-'}{Number(m.quantity).toFixed(4)}
+                          {m.type === 'ENTRADA' ? '+' : '-'}{formatNumber(Number(m.quantity), 4)}
                         </td>
                         <td className="px-4 py-3 text-text-secondary">{m.reason || '-'}</td>
                       </tr>

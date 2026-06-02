@@ -1019,17 +1019,15 @@ addProduct: async (product) => {
         const currentQty = pw ? Number(pw.quantity) : 0;
         let newQty = currentQty;
         if (movement.type === 'ENTRADA') newQty = currentQty + Number(movement.quantity);
-        else if (['MERMA', 'TRANSFER'].includes(movement.type)) newQty = Math.max(0, currentQty - Number(movement.quantity));
+        else if (['SALIDA', 'MERMA', 'TRANSFER'].includes(movement.type)) newQty = Math.max(0, currentQty - Number(movement.quantity));
         else if (movement.type === 'AJUSTE') newQty = Math.max(0, currentQty + Number(movement.quantity));
 
-        if (movement.type !== 'SALIDA') {
-          set((state) => ({
-            productWarehouse: state.productWarehouse.map(pw =>
-              pw.product_id === movement.product_id && pw.warehouse_id === movement.warehouse_id
-                ? { ...pw, quantity: newQty } : pw
-            ),
-          }));
-        }
+        set((state) => ({
+          productWarehouse: state.productWarehouse.map(pw =>
+            pw.product_id === movement.product_id && pw.warehouse_id === movement.warehouse_id
+              ? { ...pw, quantity: newQty } : pw
+          ),
+        }));
 
         if (movement.type === 'SALIDA') {
           const transitId = crypto.randomUUID();
@@ -1044,7 +1042,7 @@ addProduct: async (product) => {
             transitItems: [transitItem, ...state.transitItems],
             products: state.products.map(p =>
               p.id === movement.product_id
-                ? { ...p, in_transit: Number(p.in_transit || 0) + Number(movement.quantity) }
+                ? { ...p, quantity: Math.max(0, Number(p.quantity || 0) - Number(movement.quantity)), in_transit: Number(p.in_transit || 0) + Number(movement.quantity) }
                 : p
             ),
           }));
@@ -1053,7 +1051,10 @@ addProduct: async (product) => {
         let newQuantity = Number(product.quantity);
         let newInTransit = Number(product.in_transit) || 0;
         if (movement.type === 'ENTRADA') newQuantity += Number(movement.quantity);
-        else if (movement.type === 'SALIDA') newInTransit += Number(movement.quantity);
+        else if (movement.type === 'SALIDA') {
+          newQuantity = Math.max(0, newQuantity - Number(movement.quantity));
+          newInTransit += Number(movement.quantity);
+        }
         else if (movement.type === 'MERMA') newQuantity -= Number(movement.quantity);
         else if (movement.type === 'AJUSTE') newQuantity += Number(movement.quantity);
         else if (movement.type === 'TRANSFER') newQuantity -= Number(movement.quantity);
@@ -1115,6 +1116,8 @@ addProduct: async (product) => {
           await get().updateProductWarehouseQuantity(movement.product_id, movement.warehouse_id, currentQty + Number(movement.quantity), true);
           console.log('✅ SALIDA/ENTRADA: Quantity actualizado');
         } else if (movement.type === 'SALIDA') {
+          const newQty = Math.max(0, currentQty - Number(movement.quantity));
+          await get().updateProductWarehouseQuantity(movement.product_id, movement.warehouse_id, newQty, true);
           try {
             const { data: newTransitItem, error: transitError } = await withTimeout(
               supabase
@@ -1173,10 +1176,11 @@ addProduct: async (product) => {
         
         await get().updateProduct(movement.product_id, { quantity: newQuantity, cost: newCost });
       } else if (movement.type === 'SALIDA') {
-        console.log('🔄 SALIDA (sin warehouse): Actualizando in_transit...');
+        console.log('🔄 SALIDA (sin warehouse): Actualizando quantity e in_transit...');
+        newQuantity = Math.max(0, Number(product.quantity) - Number(movement.quantity));
         newInTransit = newInTransit + Number(movement.quantity);
-        await get().updateProduct(movement.product_id, { in_transit: newInTransit });
-        console.log('✅ SALIDA (sin warehouse): in_transit actualizado');
+        await get().updateProduct(movement.product_id, { quantity: newQuantity, in_transit: newInTransit });
+        console.log('✅ SALIDA (sin warehouse): quantity e in_transit actualizados');
         
         console.log('🔄 SALIDA (sin warehouse): Creando transit_item...');
         const { data: newTransitItem, error: transitError } = await withTimeout(

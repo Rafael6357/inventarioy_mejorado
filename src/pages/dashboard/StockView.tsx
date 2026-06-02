@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { validateNumber, getNumberFromString, exportToExcel } from '../../lib/utils';
 import { normalizeUnit, getCompatibleUnits, convertUnit } from '../../lib/unitConversion';
+import { formatNumber } from '../../lib/formatNumber';
 import { useStaggerEnter } from '../../lib/animations/useStaggerEnter';
 
 export default function StockView() {
@@ -359,11 +360,11 @@ export default function StockView() {
         <div className="flex items-center gap-4">
           <div className="text-right" title="Suma del stock en almacén (quantity × cost)">
             <p className="text-xs text-text-secondary uppercase tracking-wider">Valor Almacén</p>
-            <p className="text-xl font-bold text-primary font-mono">${totalInventoryValue.toFixed(2)}</p>
+            <p className="text-xl font-bold text-primary font-mono">${formatNumber(totalInventoryValue, 2)}</p>
           </div>
           <div className="text-right" title="Suma del stock en tránsito (in_transit × cost)">
             <p className="text-xs text-text-secondary uppercase tracking-wider">Valor Tránsito</p>
-            <p className="text-xl font-bold text-warning font-mono">${totalTransitValue.toFixed(2)}</p>
+            <p className="text-xl font-bold text-warning font-mono">${formatNumber(totalTransitValue, 2)}</p>
           </div>
           <div className="h-8 w-px bg-border/50 hidden sm:block"></div>
           <div className="flex items-center gap-2">
@@ -387,10 +388,10 @@ export default function StockView() {
                   { header: 'Producto', key: 'name' },
                   { header: 'Categoría', key: 'category' },
                   { header: 'Tipo', key: 'type' },
-                  { header: 'Disponible', key: 'available', format: (v: number) => v?.toFixed(3).replace('.', ',') || '0' },
-                  { header: 'En Tránsito', key: 'in_transit', format: (v: number) => v?.toFixed(3).replace('.', ',') || '0' },
-                  { header: 'Costo Unit.', key: 'cost', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
-                  { header: 'Total', key: 'total', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
+                  { header: 'Disponible', key: 'available', format: (v: number) => formatNumber(v, 2) || '0' },
+                  { header: 'En Tránsito', key: 'in_transit', format: (v: number) => formatNumber(v, 2) || '0' },
+                  { header: 'Costo Unit.', key: 'cost', format: (v: number) => formatNumber(v, 2) || '0' },
+                  { header: 'Total', key: 'total', format: (v: number) => formatNumber(v, 2) || '0' },
                   { header: 'Unidad', key: 'unit' },
                   { header: 'ROP', key: 'rop', format: (v: number) => v?.toString() || '0' },
                 ];
@@ -583,20 +584,20 @@ export default function StockView() {
                         )}
                       </td>
                       <td className={`px-4 py-3 text-right font-mono ${isLowStock ? 'text-red-600 font-bold' : ''}`} title={`Stock que NUNCA salió del almacén. Disponible + Tránsito = total registrado (suma de entradas). Ejemplo: 60+30=90 entradas, 12 en tránsito → Disponible=78, Tránsito=12, Suma=90.`}>
-                        {Number(physicalStock).toFixed(4)}
+                        {formatNumber(physicalStock, 4)}
                       </td>
                       <td className="px-4 py-3 text-right font-mono">
                         {inTransit > 0 ? (
-                          <span className="text-warning" title="Stock que ya salió del almacén. La venta desde tránsito descuenta aquí pero NO descuenta el Disponible (la SALIDA original ya lo hizo).">{Number(inTransit).toFixed(4)}</span>
+                          <span className="text-warning" title="Stock que ya salió del almacén. La venta desde tránsito descuenta aquí pero NO descuenta el Disponible (la SALIDA original ya lo hizo).">{formatNumber(inTransit, 4)}</span>
                         ) : (
                           <span className="text-text-secondary">-</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-right font-mono">
-                        ${Number(product.cost).toFixed(2)}
+                        ${formatNumber(Number(product.cost), 2)}
                       </td>
                       <td className="px-4 py-3 text-right font-mono font-medium text-primary">
-                        ${(physicalStock * Number(product.cost)).toFixed(2)}
+                        ${formatNumber(physicalStock * Number(product.cost), 2)}
                       </td>
                       <td className="px-4 py-3 text-text-secondary">
                         {product.unit}
@@ -846,20 +847,20 @@ export default function StockView() {
                 <div className="rounded-xl bg-bg/50 border border-border p-4 space-y-3">
                   <div className="flex justify-between text-sm">
                     <span className="text-text-secondary">Stock Sistema:</span>
-                    <span className="font-mono font-medium text-text">{Number(adjustmentModal.product.quantity).toFixed(4)} {adjustmentModal.product.unit}</span>
+                    <span className="font-mono font-medium text-text">{formatNumber(Number(adjustmentModal.product.quantity), 4)} {adjustmentModal.product.unit}</span>
                   </div>
                   
                   <div className="flex justify-between text-sm">
                     <span className="text-text-secondary">Stock Físico:</span>
                     <span className={`font-mono font-bold ${difference >= 0 ? 'text-success' : 'text-danger'}`}>
-                      {adjustmentModal.physicalStock.toFixed(4)} {adjustmentModal.unit}
+                      {formatNumber(adjustmentModal.physicalStock, 4)} {adjustmentModal.unit}
                     </span>
                   </div>
                   
                   <div className="flex justify-between text-sm border-t border-border pt-2">
                     <span className="text-text-secondary">Diferencia:</span>
                     <span className={`font-mono font-bold ${difference >= 0 ? 'text-success' : 'text-danger'}`}>
-                      {difference >= 0 ? '+' : ''}{difference.toFixed(4)} {adjustmentModal.unit}
+                      {difference >= 0 ? '+' : ''}{formatNumber(difference, 4)} {adjustmentModal.unit}
                     </span>
                   </div>
                 </div>
