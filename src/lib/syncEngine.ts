@@ -138,11 +138,39 @@ class SyncEngine {
               if (existingPW) {
                 let newQty = Number(existingPW.quantity);
                 if (item.payload.type === 'ENTRADA') newQty += qty;
-                else if (['MERMA', 'TRANSFER'].includes(item.payload.type)) newQty = Math.max(0, newQty - qty);
+                else if (item.payload.type === 'SALIDA') newQty = Math.max(0, newQty - qty);
+                else if (item.payload.type === 'MERMA') newQty = Math.max(0, newQty - qty);
                 else if (item.payload.type === 'AJUSTE') newQty = Math.max(0, newQty + qty);
                 await supabase.from('product_warehouse').update({ quantity: newQty, updated_at: new Date().toISOString() }).eq('id', existingPW.id);
+
+                // Costo promedio ponderado en ENTRADA con warehouse
+                if (item.payload.type === 'ENTRADA') {
+                  const { data: prod } = await supabase.from('products')
+                    .select('cost')
+                    .eq('id', item.payload.product_id)
+                    .single();
+                  if (prod) {
+                    const unitCost = Number(item.payload.cost) || Number(prod.cost);
+                    const currentTotalValue = Number(existingPW.quantity) * Number(prod.cost);
+                    const newTotalValue = qty * unitCost;
+                    const totalQty = Number(existingPW.quantity) + qty;
+                    if (totalQty > 0) {
+                      const newCost = (currentTotalValue + newTotalValue) / totalQty;
+                      await supabase.from('products').update({ cost: newCost, updated_at: new Date().toISOString() }).eq('id', item.payload.product_id);
+                    }
+                  }
+                }
               } else if (item.payload.type === 'ENTRADA') {
                 await supabase.from('product_warehouse').insert({ product_id: item.payload.product_id, warehouse_id: item.payload.warehouse_id, quantity: qty, in_transit: 0 });
+                // Costo promedio ponderado (primera vez en este warehouse, currentQty = 0)
+                const { data: prod } = await supabase.from('products')
+                  .select('cost')
+                  .eq('id', item.payload.product_id)
+                  .single();
+                if (prod) {
+                  const unitCost = Number(item.payload.cost) || Number(prod.cost);
+                  await supabase.from('products').update({ cost: unitCost, updated_at: new Date().toISOString() }).eq('id', item.payload.product_id);
+                }
               }
             } else {
               const { data: product } = await supabase.from('products')
@@ -157,7 +185,6 @@ class SyncEngine {
                 else if (item.payload.type === 'SALIDA') newInTransit += qty;
                 else if (item.payload.type === 'MERMA') newQuantity = Math.max(0, newQuantity - qty);
                 else if (item.payload.type === 'AJUSTE') newQuantity = Math.max(0, newQuantity + qty);
-                else if (item.payload.type === 'TRANSFER') newQuantity = Math.max(0, newQuantity - qty);
 
                 const updates: any = { quantity: Math.max(0, newQuantity), updated_at: new Date().toISOString() };
                 if (item.payload.type === 'SALIDA') updates.in_transit = newInTransit;
@@ -229,18 +256,28 @@ class SyncEngine {
                 .order('sent_date', { ascending: true });
               if (!transitRows) continue;
               let remainingQty = ci.qtyNeeded;
+              let consumedSoFar = 0;
               for (const row of transitRows) {
                 if (remainingQty <= 0) break;
                 const toConsume = Math.min(row.remaining, remainingQty);
                 const nr = row.remaining - toConsume;
                 const nc = (row.consumed || 0) + toConsume;
                 remainingQty -= toConsume;
+                consumedSoFar += toConsume;
                 const { error: te } = await supabase.from('transit_items').update({ remaining: nr, consumed: nc }).eq('id', row.id);
                 if (te) throw te;
               }
-              const { data: prod } = await supabase.from('products').select('quantity').eq('id', ci.productId).single();
+              const { data: updatedTransit } = await supabase
+                .from('transit_items')
+                .select('remaining')
+                .eq('product_id', ci.productId)
+                .gt('remaining', 0);
+              const newInTransit = (updatedTransit || []).reduce((s: number, t: any) => s + Number(t.remaining || 0), 0);
+              const { data: prod } = await supabase.from('products').select('in_transit').eq('id', ci.productId).single();
               if (prod) {
-                await supabase.from('products').update({ quantity: Math.max(0, Number(prod.quantity) - ci.qtyNeeded) }).eq('id', ci.productId);
+                await supabase.from('products').update({ 
+                  in_transit: newInTransit 
+                }).eq('id', ci.productId);
               }
               await supabase.from('movements').insert({
                 user_id: saleInsert.user_id, product_id: ci.productId, type: 'SALIDA', quantity: ci.qtyNeeded, date: new Date().toISOString(),
@@ -252,14 +289,26 @@ class SyncEngine {
           }
           case 'cancelTransit': {
             const { transitItemId, quantity, reason, userId, productId } = item.payload;
-            const { data: ti } = await supabase.from('transit_items').select('remaining').eq('id', transitItemId).single();
+            const { data: ti } = await supabase.from('transit_items').select('remaining, warehouse_id').eq('id', transitItemId).single();
             const newRemaining = ti ? Math.max(0, ti.remaining - quantity) : 0;
             const { error: ue } = await supabase.from('transit_items').update({ remaining: newRemaining }).eq('id', transitItemId);
             if (ue) throw ue;
-            const { data: prod } = await supabase.from('products').select('in_transit').eq('id', productId).single();
+            const { data: prod } = await supabase.from('products').select('in_transit, quantity').eq('id', productId).single();
             const newInTransit = prod ? Math.max(0, Number(prod.in_transit || 0) - quantity) : 0;
-            const { error: pe } = await supabase.from('products').update({ in_transit: newInTransit }).eq('id', productId);
+            const newQuantity = prod ? Number(prod.quantity || 0) + quantity : quantity;
+            const { error: pe } = await supabase.from('products').update({ in_transit: newInTransit, quantity: newQuantity }).eq('id', productId);
             if (pe) throw pe;
+            if (ti?.warehouse_id) {
+              const { data: existingPW } = await supabase
+                .from('product_warehouse')
+                .select('id, quantity')
+                .eq('product_id', productId)
+                .eq('warehouse_id', ti.warehouse_id)
+                .maybeSingle();
+              if (existingPW) {
+                await supabase.from('product_warehouse').update({ quantity: Number(existingPW.quantity) + quantity, updated_at: new Date().toISOString() }).eq('id', existingPW.id);
+              }
+            }
             await supabase.from('movements').insert({
               user_id: userId, product_id: productId, type: 'ENTRADA', quantity, date: new Date().toISOString(), reason: `Devolución de tránsito: ${reason}`, status: 'NORMAL',
             }).maybeSingle();
@@ -272,10 +321,9 @@ class SyncEngine {
             const newRemaining = ti ? Math.max(0, ti.remaining - quantity) : 0;
             const { error: ue } = await supabase.from('transit_items').update({ remaining: newRemaining }).eq('id', transitItemId);
             if (ue) throw ue;
-            const { data: prod } = await supabase.from('products').select('in_transit, quantity').eq('id', productId).single();
+            const { data: prod } = await supabase.from('products').select('in_transit').eq('id', productId).single();
             const newInTransit = prod ? Math.max(0, Number(prod.in_transit || 0) - quantity) : 0;
-            const newQuantity = prod ? Math.max(0, Number(prod.quantity || 0) - quantity) : 0;
-            const { error: pe } = await supabase.from('products').update({ in_transit: newInTransit, quantity: newQuantity }).eq('id', productId);
+            const { error: pe } = await supabase.from('products').update({ in_transit: newInTransit }).eq('id', productId);
             if (pe) throw pe;
             await supabase.from('movements').insert({
               user_id: userId, product_id: productId, type: 'MERMA', quantity, date: new Date().toISOString(), reason: `Merma en tránsito: ${reason}`, status: 'NORMAL',
@@ -290,10 +338,9 @@ class SyncEngine {
             const newConsumed = ti ? (ti.consumed || 0) + quantity : quantity;
             const { error: ue } = await supabase.from('transit_items').update({ remaining: newRemaining, consumed: newConsumed }).eq('id', transitItemId);
             if (ue) throw ue;
-            const { data: prod } = await supabase.from('products').select('in_transit, quantity').eq('id', productId).single();
+            const { data: prod } = await supabase.from('products').select('in_transit').eq('id', productId).single();
             const newInTransit = prod ? Math.max(0, Number(prod.in_transit || 0) - quantity) : 0;
-            const newQty = prod ? Math.max(0, Number(prod.quantity || 0) - quantity) : 0;
-            const { error: pe } = await supabase.from('products').update({ in_transit: newInTransit, quantity: newQty }).eq('id', productId);
+            const { error: pe } = await supabase.from('products').update({ in_transit: newInTransit }).eq('id', productId);
             if (pe) throw pe;
             const isGastoVariable = false;
             await supabase.from('movements').insert({
@@ -403,54 +450,6 @@ class SyncEngine {
               .eq('id', accountId);
             if (error) throw error;
             await store.logAction('accounts', 'TOGGLE_TIPO', { accountId, is_account_house }).catch(() => {});
-            break;
-          }
-          case 'addWarehouse': {
-            const { id, name, is_main, userId, created_at } = item.payload;
-            if (is_main) {
-              await supabase.from('warehouses').update({ is_main: false }).eq('user_id', userId).neq('is_main', true);
-            }
-            const { data: warehouse, error: we } = await supabase.from('warehouses')
-              .insert({ id, user_id: userId, name, is_main, created_at }).select().single();
-            if (we) throw we;
-            const { data: products } = await supabase.from('products').select('id, quantity').eq('user_id', userId).eq('is_active', true);
-            if (products) {
-              for (const p of products) {
-                await supabase.from('product_warehouse').insert({
-                  product_id: p.id, warehouse_id: warehouse.id, quantity: is_main ? Number(p.quantity) : 0, in_transit: 0,
-                });
-              }
-            }
-            await store.logAction('warehouse', 'CREAR', { name: item.payload.name }).catch(() => {});
-            break;
-          }
-          case 'updateWarehouse': {
-            const { error } = await supabase.from('warehouses').update({ name: item.payload.name }).eq('id', item.payload.id);
-            if (error) throw error;
-            await store.logAction('warehouse', 'ACTUALIZAR', { id: item.payload.id, name: item.payload.name }).catch(() => {});
-            break;
-          }
-          case 'deleteWarehouse': {
-            await supabase.from('movements').update({ warehouse_id: null }).eq('warehouse_id', item.payload.id);
-            for (const stock of (item.payload.stockToMigrate || [])) {
-              const { data: existingPw } = await supabase.from('product_warehouse')
-                .select('id, quantity')
-                .eq('product_id', stock.product_id)
-                .eq('warehouse_id', stock.mainWarehouseId)
-                .maybeSingle();
-              if (existingPw) {
-                await supabase.from('product_warehouse')
-                  .update({ quantity: Number(existingPw.quantity) + stock.quantity })
-                  .eq('id', existingPw.id);
-              } else {
-                await supabase.from('product_warehouse')
-                  .insert({ product_id: stock.product_id, warehouse_id: stock.mainWarehouseId, quantity: stock.quantity, in_transit: 0 });
-              }
-            }
-            await supabase.from('product_warehouse').delete().eq('warehouse_id', item.payload.id);
-            const { error } = await supabase.from('warehouses').delete().eq('id', item.payload.id);
-            if (error) throw error;
-            await store.logAction('warehouse', 'ELIMINAR', { id: item.payload.id, name: item.payload.name }).catch(() => {});
             break;
           }
           default:

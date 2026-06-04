@@ -34,7 +34,6 @@ import SubscriptionBanner from '../components/SubscriptionBanner';
 import SyncStatus from '../components/SyncStatus';
 import OfflineBanner from '../components/OfflineBanner';
 import PinModal from '../components/PinModal';
-import WarehouseSelector from '../components/WarehouseSelector';
 import StockView from './dashboard/StockView';
 import InventoryView from './dashboard/InventoryView';
 import TransitView from './dashboard/TransitView';
@@ -377,7 +376,6 @@ export default function Dashboard() {
         <div className="flex h-16 items-center justify-between px-4 border-b border-border/50">
           <div className="flex items-center gap-3">
             <InventarioYLogo size="lg" />
-            <WarehouseSelector />
           </div>
           <button
             onClick={() => {

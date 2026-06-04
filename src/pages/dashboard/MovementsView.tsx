@@ -21,9 +21,12 @@ export default function MovementsView() {
 
   const filteredMovements = useMemo(() => {
     // Paso 1: Ordenar del más antiguo al más reciente para calcular el balance acumulativo
-    const sortedMovements = [...movements].sort((a, b) => 
-      new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
+    // Tiebreaker: created_at (orden de creación/inserción) para movimientos con mismo date
+    const sortedMovements = [...movements].sort((a, b) => {
+      const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
+      if (dateDiff !== 0) return dateDiff;
+      return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+    });
 
     const productBalances: Record<string, number> = {};
 
@@ -32,13 +35,15 @@ export default function MovementsView() {
       const prevBalance = productBalances[balanceKey] || 0;
       let currentBalance = prevBalance;
       
-      if (m.type === 'ENTRADA') {
+      if (m.type === 'ENTRADA' || m.type === 'AJUSTE') {
         currentBalance += m.quantity;
       } else {
         currentBalance -= m.quantity;
       }
-      
-      productBalances[balanceKey] = currentBalance;
+
+      const clampedBalance = Math.max(0, currentBalance);
+      productBalances[balanceKey] = clampedBalance;
+      currentBalance = clampedBalance;
       
       return {
         ...m,
@@ -52,7 +57,7 @@ export default function MovementsView() {
         const isSaleMovement = m.reason?.startsWith('Venta #') || m.reason === 'Venta de producto/ingrediente';
         if (isSaleMovement) return false;
 
-        const isInventoryMovement = m.type === 'ENTRADA' || m.type === 'SALIDA' || m.type === 'MERMA' || m.type === 'AJUSTE' || m.type === 'TRANSFER';
+        const isInventoryMovement = m.type === 'ENTRADA' || m.type === 'SALIDA' || m.type === 'MERMA' || m.type === 'AJUSTE';
         const matchesSearch = getProductName(m.product_id).toLowerCase().includes(searchTerm.toLowerCase());
         
         let matchesType = true;
@@ -90,12 +95,6 @@ if (endDate) {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, typeFilter, startDate, endDate]);
-
-  useEffect(() => {
-    if (typeFilter === 'TRANSFER' && currentWarehouseId) {
-      useDatabaseStore.getState().setCurrentWarehouse('');
-    }
-  }, [typeFilter]);
 
   const totalPages = Math.ceil(filteredMovements.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -182,7 +181,6 @@ if (endDate) {
                 <option value="ALL">Todos los tipos</option>
                 <option value="ENTRADA">Entradas</option>
                 <option value="SALIDA">Salidas</option>
-                <option value="TRANSFER">Transferencias</option>
                 <option value="MERMA">Mermas</option>
                 <option value="AJUSTE">Ajustes de Inventario</option>
                 <option value="CONSUMO_DIRECTO">Consumo Directo</option>

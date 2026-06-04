@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   Wifi, WifiOff, RefreshCw, CheckCircle2, AlertCircle, Clock,
   Package, ArrowRightLeft, ShoppingCart, Plus, Edit3, Trash2,
-  DollarSign, ChefHat, Warehouse, XCircle
+  DollarSign, ChefHat, XCircle
 } from 'lucide-react';
 import { getPendingSyncItems, getSyncQueueCount, type SyncQueueItem } from '../lib/dexieDb';
 import { syncEngine } from '../lib/syncEngine';
@@ -27,9 +27,6 @@ const operationLabels: Record<string, string> = {
   addRecipe: 'Agregar receta',
   updateRecipe: 'Actualizar receta',
   deleteRecipe: 'Eliminar receta',
-  addWarehouse: 'Agregar almacén',
-  updateWarehouse: 'Actualizar almacén',
-  deleteWarehouse: 'Eliminar almacén',
 };
 
 const operationIcons: Record<string, React.ReactNode> = {
@@ -47,9 +44,6 @@ const operationIcons: Record<string, React.ReactNode> = {
   addRecipe: <ChefHat className="h-4 w-4" />,
   updateRecipe: <ChefHat className="h-4 w-4" />,
   deleteRecipe: <ChefHat className="h-4 w-4" />,
-  addWarehouse: <Warehouse className="h-4 w-4" />,
-  updateWarehouse: <Warehouse className="h-4 w-4" />,
-  deleteWarehouse: <Warehouse className="h-4 w-4" />,
 };
 
 function formatDate(iso: string) {

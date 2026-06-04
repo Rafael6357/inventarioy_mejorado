@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { X, Package, ArrowRightLeft, ShoppingCart, AlertCircle, Clock, Edit3, Trash2, DollarSign, ChefHat, Warehouse, XCircle, RefreshCw } from 'lucide-react';
+import { X, Package, ArrowRightLeft, ShoppingCart, AlertCircle, Clock, Edit3, Trash2, DollarSign, ChefHat, XCircle, RefreshCw } from 'lucide-react';
 import { getPendingSyncItems, removeSyncItem, getCachedProducts, type SyncQueueItem } from '../lib/dexieDb';
 import { syncEngine } from '../lib/syncEngine';
 import { useDatabaseStore } from '../store/dbStore';
@@ -21,9 +21,6 @@ const operationMeta: Record<string, { label: string; icon: React.ReactNode }> = 
   addRecipe: { label: 'Agregar receta', icon: <ChefHat className="h-4 w-4" /> },
   updateRecipe: { label: 'Actualizar receta', icon: <ChefHat className="h-4 w-4" /> },
   deleteRecipe: { label: 'Eliminar receta', icon: <ChefHat className="h-4 w-4" /> },
-  addWarehouse: { label: 'Agregar almacén', icon: <Warehouse className="h-4 w-4" /> },
-  updateWarehouse: { label: 'Actualizar almacén', icon: <Warehouse className="h-4 w-4" /> },
-  deleteWarehouse: { label: 'Eliminar almacén', icon: <Warehouse className="h-4 w-4" /> },
 };
 
 function formatDate(iso: string) {

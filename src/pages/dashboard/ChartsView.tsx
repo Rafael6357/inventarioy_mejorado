@@ -54,10 +54,11 @@ export default function ChartsView() {
       .slice(0, 5); // Top 5
   }, [sales, products, recipes]);
 
-  // 3. Movements Distribution - suma de cantidades movidas (no frecuencia)
+  // 3. Movements Distribution - ENTRADA/AJUSTE positivo, SALIDA/MERMA negativo (inflow vs outflow)
   const movementsDistribution = useMemo(() => {
     const dist = movements.reduce((acc, mov) => {
-      acc[mov.type] = (acc[mov.type] || 0) + mov.quantity;
+      const signed = mov.type === 'SALIDA' || mov.type === 'MERMA' ? -Number(mov.quantity) : Number(mov.quantity);
+      acc[mov.type] = (acc[mov.type] || 0) + signed;
       return acc;
     }, {} as Record<string, number>);
 

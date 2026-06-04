@@ -7,7 +7,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Faltan las variables de entorno de Supabase. Asegúrate de que VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY están definidas.');
 }
 
-const DEFAULT_TIMEOUT = 15000;
+const DEFAULT_TIMEOUT = 30000;
 
 const customFetch: typeof fetch = async (url, options = {}) => {
   const urlString = typeof url === 'string' ? url : url.url;
@@ -53,8 +53,10 @@ const customFetch: typeof fetch = async (url, options = {}) => {
                            error.message.includes('NetworkError') ||
                            error.message.includes('net::ERR_');
 
+    const isTimeoutError = error.name === 'AbortError';
+
     // Requests de auth con error de red en conexión flaky
-    if (isAuthRequest && isNetworkError) {
+    if (isAuthRequest && (isNetworkError || isTimeoutError)) {
       return new Response(JSON.stringify({ error: 'offline' }), {
         status: 503,
         statusText: 'Service Unavailable',
@@ -62,8 +64,24 @@ const customFetch: typeof fetch = async (url, options = {}) => {
       });
     }
 
-    if (error.name === 'AbortError') {
-      throw new TypeError('Request timeout');
+    // Cualquier error de red en data requests: responder 503 recuperable
+    // para que el calling code pueda hacer fallback offline en vez de lanzar toast de error
+    if (isNetworkError) {
+      return new Response(JSON.stringify({ error: 'network_error' }), {
+        status: 503,
+        statusText: 'Service Unavailable',
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Timeout en data requests: tratarlo como error transitorio (503)
+    // en vez de throw, para que Supabase SDK pueda reintentar sin descartar la sesión
+    if (isTimeoutError) {
+      return new Response(JSON.stringify({ error: 'timeout' }), {
+        status: 503,
+        statusText: 'Service Unavailable',
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
     throw error;
   }

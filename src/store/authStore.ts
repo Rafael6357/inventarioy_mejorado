@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { clearLocalData } from '../lib/dexieDb';
+import { useDatabaseStore } from './dbStore';
 
 const checkRealInternetConnection = async (): Promise<boolean> => {
   try {
@@ -452,15 +453,54 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     console.log('Logout llamado...');
     try {
       // Código SQLite eliminado
-      
+
       localStorage.removeItem('saved_credentials');
       localStorage.removeItem('saved_email');
-      
+
       _isInitializing = false;
       _authListenerSubscription = null;
       set({ user: null, isAuthenticated: false, isLoading: false });
       console.log('Estado limpiado');
-      
+
+      // Resetear Zustand store de base de datos para evitar que datos del usuario anterior
+      // queden en memoria y se filtren al siguiente login
+      useDatabaseStore.setState({
+        products: [],
+        movements: [],
+        sales: [],
+        recipes: [],
+        employees: [],
+        employeeDocuments: [],
+        categories: [],
+        transitItems: [],
+        dailyClosings: [],
+        hrDocuments: [],
+        departments: [],
+        payrollConfig: null,
+        payrollEntries: [],
+        accessPins: [],
+        actionLogs: [],
+        warehouses: [],
+        productWarehouse: [],
+        currentWarehouseId: null,
+        pendingAccounts: [],
+        employeesPage: 1,
+        employeesTotal: 0,
+        departmentsPage: 1,
+        departmentsTotal: 0,
+        payrollPage: 1,
+        payrollTotal: 0,
+        employeeSearchTerm: '',
+        departmentSearchTerm: '',
+        payrollMonthFilter: 0,
+        payrollYearFilter: 0,
+        syncQueueCount: 0,
+        syncStatus: 'idle',
+        syncProgress: null,
+        isLoading: true,
+      });
+      console.log('Zustand dbStore reseteado');
+
       await supabase.auth.signOut();
       console.log('SignOut exitoso');
 

@@ -116,7 +116,7 @@ export default function AnalysisView() {
       .filter(m => m.type === 'MERMA')
       .reduce((sum, m) => sum + Number(m.quantity), 0);
 
-    const stockFinal = Number(product.quantity);
+    const stockFinal = entradas - salidas - merma;
 
     const chartData = filteredMovements.map(m => ({
       fecha: new Date(m.date).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' }),

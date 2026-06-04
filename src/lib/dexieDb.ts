@@ -14,8 +14,7 @@ export type SyncOperation =
   | 'markPendingAccountPaid'
   | 'addItemsToPendingAccount' | 'updatePendingAccountItems' | 'togglePendingAccountType'
   | 'createDailyClosing'
-  | 'addRecipe' | 'updateRecipe' | 'deleteRecipe'
-  | 'addWarehouse' | 'updateWarehouse' | 'deleteWarehouse';
+  | 'addRecipe' | 'updateRecipe' | 'deleteRecipe';
 
 export interface SyncQueueItem {
   id?: number;
@@ -162,6 +161,10 @@ export async function getCachedDailyClosings(userId: string): Promise<DailyClosi
 
 export async function getCachedAccessPins(userId: string): Promise<AccessPin[]> {
   return db.accessPins.where('user_id').equals(userId).toArray();
+}
+
+export async function getCachedProductWarehouse(userId: string): Promise<ProductWarehouse[]> {
+  return db.productWarehouse.where('user_id').equals(userId).toArray();
 }
 
 export function addToSyncQueue(item: Omit<SyncQueueItem, 'id' | 'created_at' | 'status' | 'retries'>) {

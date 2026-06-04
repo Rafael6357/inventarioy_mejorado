@@ -570,6 +570,7 @@ export default function SalesView() {
   const confirmSale = async () => {
     if (!user) return;
     if (isProcessingSale) return;
+    setIsProcessingSale(true);
 
     // Validar método de pago si no es cuenta casa
     if (!isAccountHouse) {

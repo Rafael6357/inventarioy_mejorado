@@ -4,7 +4,7 @@ import { useAuthStore } from '../../store/authStore';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
-import { PackagePlus, ArrowRightLeft, RefreshCw, ChevronLeft, ChevronRight, ArrowLeftRight, X } from 'lucide-react';
+import { PackagePlus, ArrowRightLeft, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   convertUnit,
@@ -34,7 +34,7 @@ const DEFAULT_CATEGORIES = [
 
 export default function InventoryView() {
   const { user } = useAuthStore();
-  const { products, addProduct, addMovement, logAction, warehouses, currentWarehouseId, productWarehouse, updateProductWarehouseQuantity, set, transitItems } = useDatabaseStore();
+  const { products, addProduct, addMovement, logAction, warehouses, currentWarehouseId, productWarehouse, updateProductWarehouseQuantity, set, transitItems, movements } = useDatabaseStore();
   
   const activeProducts = products.filter(p => p.is_active !== false);
 
@@ -91,14 +91,6 @@ export default function InventoryView() {
   });
   const [isSubmittingMovement, setIsSubmittingMovement] = useState(false);
   const [isSubmittingProduct, setIsSubmittingProduct] = useState(false);
-  const [showTransferModal, setShowTransferModal] = useState(false);
-  const [transferData, setTransferData] = useState({
-    product_id: '',
-    to_warehouse_id: '',
-    quantity: '',
-    unit: 'und',
-  });
-  const [isSubmittingTransfer, setIsSubmittingTransfer] = useState(false);
 
   // Sincronizar warehouse_id del formulario con el almacén global seleccionado
   useEffect(() => {
@@ -106,16 +98,6 @@ export default function InventoryView() {
       setMovement(prev => ({ ...prev, warehouse_id: currentWarehouseId }));
     }
   }, [currentWarehouseId]);
-
-  // Validación para el botón de transferir
-  const isTransferValid = (() => {
-    if (!transferData.product_id || !transferData.to_warehouse_id || !transferData.quantity) return false;
-    const product = products.find(p => p.id === transferData.product_id);
-    const sourcePw = productWarehouse.find(pw => pw.product_id === transferData.product_id && pw.warehouse_id === currentWarehouseId);
-    const sourceQty = sourcePw?.quantity ?? product?.quantity ?? 0;
-    const transferQty = parseFloat(transferData.quantity) || 0;
-    return transferQty > 0 && transferQty <= sourceQty;
-  })();
 
   const handleAddProduct = async (e: React.FormEvent) => {
     if (isSubmittingProduct) return; // Evitar múltiples clics
@@ -137,14 +119,6 @@ export default function InventoryView() {
         setIsSubmittingProduct(false);
         return;
       }
-    }
-    
-    // Validar que solo se pueda crear productos con el almacén principal seleccionado
-    const currentWarehouse = warehouses.find(w => w.id === currentWarehouseId);
-    if (currentWarehouse && !currentWarehouse.is_main) {
-      toast.error('Solo puedes crear productos cuando el almacén principal está seleccionado');
-      setIsSubmittingProduct(false);
-      return;
     }
     
     try {
@@ -211,8 +185,6 @@ export default function InventoryView() {
       return;
     }
 
-    
-    
     const baseUnit = normalizeUnit(product.unit);
     const quantityInBase = convertUnit(movement.quantity, movement.displayUnit, baseUnit);
     
@@ -233,6 +205,43 @@ export default function InventoryView() {
       }
     }
 
+    // Detectar movimiento retroactivo: comparar fecha del formulario con último movimiento del mismo producto
+    const newDateMs = new Date(movement.date).getTime();
+    const lastMovementForProduct = movements
+      .filter(m => m.product_id === movement.product_id)
+      .reduce<typeof movements[number] | null>((latest, m) => {
+        if (!latest) return m;
+        const latestMs = new Date(latest.date).getTime();
+        const mMs = new Date(m.date).getTime();
+        return mMs > latestMs ? m : latest;
+      }, null);
+
+    if (lastMovementForProduct && newDateMs < new Date(lastMovementForProduct.date).getTime()) {
+      const proceed = await new Promise<boolean>((resolve) => {
+        toast.warning(
+          'Estás registrando un movimiento con hora anterior al último registrado. ¿Continuar?',
+          {
+            duration: 15000,
+            action: {
+              label: 'Continuar',
+              onClick: () => resolve(true),
+            },
+            cancel: {
+              label: 'Cancelar',
+              onClick: () => resolve(false),
+            },
+            onDismiss: () => resolve(false),
+            onAutoClose: () => resolve(false),
+          }
+        );
+      });
+      if (!proceed) return;
+    }
+
+    await submitMovement(product, baseUnit, quantityInBase);
+  };
+
+  const submitMovement = async (product: typeof products[number], baseUnit: string, quantityInBase: number) => {
     setIsSubmittingMovement(true);
     try {
       const isConsumoDirecto = product.is_consumo_directo === true;
@@ -289,103 +298,6 @@ export default function InventoryView() {
     }
   };
 
-  const handleTransfer = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isSubmittingTransfer || !currentWarehouseId || !transferData.product_id || !transferData.to_warehouse_id || !transferData.quantity) {
-      return;
-    }
-
-    setIsSubmittingTransfer(true);
-
-    try {
-      const qtyValidation = validateNumber(transferData.quantity, { required: true, min: 0.01, fieldName: 'Cantidad' });
-      if (!qtyValidation.isValid) {
-        toast.error(qtyValidation.error);
-        setIsSubmittingTransfer(false);
-        return;
-      }
-
-      const quantity = parseFloat(transferData.quantity);
-      const product = products.find(p => p.id === transferData.product_id);
-      if (!product) {
-        throw new Error('Producto no encontrado');
-      }
-
-      const sourceWarehouse = warehouses.find(w => w.id === currentWarehouseId);
-      const destWarehouse = warehouses.find(w => w.id === transferData.to_warehouse_id);
-
-      // Get current quantity from product_warehouse or fallback to product.quantity
-      const pwSource = productWarehouse.find(pw => pw.product_id === product.id && pw.warehouse_id === currentWarehouseId);
-      const sourceQty = pwSource?.quantity ?? product.quantity ?? 0;
-
-      if (quantity > sourceQty) {
-        throw new Error(`Cantidad excede el stock disponible (${sourceQty})`);
-      }
-
-      // Get destination current quantity
-      const pwDest = productWarehouse.find(pw => pw.product_id === product.id && pw.warehouse_id === transferData.to_warehouse_id);
-      const destQty = pwDest?.quantity ?? 0;
-
-      // Update both warehouses (skip auto-heal to avoid overwriting transfer)
-      await updateProductWarehouseQuantity(product.id, currentWarehouseId, sourceQty - quantity, true);
-      await updateProductWarehouseQuantity(product.id, transferData.to_warehouse_id, destQty + quantity, true);
-      
-      // Update local products state to reflect the transfer
-      useDatabaseStore.setState((state) => ({
-        products: state.products.map(p => 
-          p.id === product.id ? { ...p, quantity: sourceQty - quantity } : p
-        ),
-        productWarehouse: state.productWarehouse.map(pw => {
-          if (pw.product_id === product.id && pw.warehouse_id === currentWarehouseId) {
-            return { ...pw, quantity: sourceQty - quantity };
-          }
-          if (pw.product_id === product.id && pw.warehouse_id === transferData.to_warehouse_id) {
-            return { ...pw, quantity: destQty + quantity };
-          }
-          return pw;
-        })
-      }));
-
-      // Create TRANSFER movement for origin warehouse (salida)
-      await addMovement({
-        product_id: product.id,
-        type: 'TRANSFER',
-        quantity: quantity,
-        unit: transferData.unit || 'und',
-        cost: Number(product.cost) || 0,
-        reason: `Transferencia a ${destWarehouse?.name}`,
-        status: 'NORMAL',
-        date: new Date().toISOString(),
-        warehouse_id: currentWarehouseId,
-      });
-
-      // Create TRANSFER movement for destination warehouse (entrada)
-      await addMovement({
-        product_id: product.id,
-        type: 'TRANSFER',
-        quantity: quantity,
-        unit: transferData.unit || 'und',
-        cost: Number(product.cost) || 0,
-        reason: `Transferencia desde ${sourceWarehouse?.name}`,
-        status: 'NORMAL',
-        date: new Date().toISOString(),
-        warehouse_id: transferData.to_warehouse_id,
-      });
-
-      // Log the transfer
-      await logAction('TRANSFER', `Transferencia: ${product.name} (${quantity} ${transferData.unit}) de ${sourceWarehouse?.name} a ${destWarehouse?.name}`);
-
-      toast.success(`Transferencia realizada: ${quantity} ${transferData.unit} de ${sourceWarehouse?.name} a ${destWarehouse?.name}`);
-      setShowTransferModal(false);
-      setTransferData({ product_id: '', to_warehouse_id: '', quantity: '', unit: 'und' });
-    } catch (error: any) {
-      console.error('Error en transferencia:', error);
-      toast.error(error.message || 'Error al realizar transferencia');
-    } finally {
-      setIsSubmittingTransfer(false);
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -395,17 +307,6 @@ export default function InventoryView() {
             Alta de productos y registro de movimientos
           </p>
         </div>
-        {warehouses.length > 1 && currentWarehouseId && (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setShowTransferModal(true)}
-            className="gap-2"
-          >
-            <ArrowLeftRight className="h-4 w-4" />
-            Transferir
-          </Button>
-        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -745,122 +646,6 @@ export default function InventoryView() {
           </form>
         </div>
       </div>
-
-      {showTransferModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-xl bg-surface p-6 shadow-xl border border-border">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-text flex items-center gap-2">
-                <ArrowLeftRight className="h-5 w-5 text-primary" />
-                Transferir entre Almacenes
-              </h3>
-              <button onClick={() => setShowTransferModal(false)} className="text-text-secondary hover:text-text">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleTransfer} className="space-y-4">
-              <div className="space-y-2">
-                <Label>Almacén Origen</Label>
-                <Input value={warehouses.find(w => w.id === currentWarehouseId)?.name || ''} disabled className="bg-bg" />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="transfer_product">Producto *</Label>
-                <select
-                  id="transfer_product"
-                  required
-                  className="flex h-10 w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  value={transferData.product_id}
-                  onChange={(e) => setTransferData({...transferData, product_id: e.target.value})}
-                >
-                  <option value="">Seleccionar producto...</option>
-                  {activeProducts.map(p => {
-                    const pw = productWarehouse.find(pw => pw.product_id === p.id && pw.warehouse_id === currentWarehouseId);
-                    const qty = pw?.quantity ?? p.quantity ?? 0;
-                    return (
-                      <option key={p.id} value={p.id}>
-                        {p.name} (Stock: {qty})
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="transfer_dest">Almacén Destino *</Label>
-                <select
-                  id="transfer_dest"
-                  required
-                  className="flex h-10 w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  value={transferData.to_warehouse_id}
-                  onChange={(e) => setTransferData({...transferData, to_warehouse_id: e.target.value})}
-                >
-                  <option value="">Seleccionar almacén...</option>
-                  {warehouses.filter(w => w.id !== currentWarehouseId).map(w => (
-                    <option key={w.id} value={w.id}>{w.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="transfer_qty">Cantidad *</Label>
-                <Input
-                  id="transfer_qty"
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  required
-                  placeholder="Cantidad a transferir"
-                  value={transferData.quantity}
-                  onChange={(e) => setTransferData({...transferData, quantity: e.target.value})}
-                />
-              </div>
-
-              {/* Preview del stock después de la transferencia */}
-              {transferData.product_id && transferData.to_warehouse_id && transferData.quantity && (
-                <div className="p-3 bg-bg/50 rounded-lg border border-border/50">
-                  <p className="text-sm font-medium text-text mb-2">Previsualización:</p>
-                  {(() => {
-                    const product = products.find(p => p.id === transferData.product_id);
-                    const sourcePw = productWarehouse.find(pw => pw.product_id === transferData.product_id && pw.warehouse_id === currentWarehouseId);
-                    const destPw = productWarehouse.find(pw => pw.product_id === transferData.product_id && pw.warehouse_id === transferData.to_warehouse_id);
-                    const sourceQty = sourcePw?.quantity ?? product?.quantity ?? 0;
-                    const destQty = destPw?.quantity ?? 0;
-                    const transferQty = parseFloat(transferData.quantity) || 0;
-                    const sourceAfter = sourceQty - transferQty;
-                    const destAfter = destQty + transferQty;
-                    const sourceWarehouse = warehouses.find(w => w.id === currentWarehouseId);
-                    const destWarehouse = warehouses.find(w => w.id === transferData.to_warehouse_id);
-                    const isValid = transferQty > 0 && transferQty <= sourceQty;
-                    
-                    return (
-                      <div className="space-y-1 text-sm">
-                        <p className={isValid ? 'text-text-secondary' : 'text-danger font-medium'}>
-                          {sourceWarehouse?.name}: {sourceQty} → {sourceAfter} ({isValid ? `-${transferQty}` : 'Sin stock'})
-                        </p>
-                        <p className="text-text-secondary">
-                          {destWarehouse?.name}: {destQty} → {destAfter} (+{transferQty})
-                        </p>
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
-
-              <div className="flex gap-2 pt-2">
-                <Button type="button" variant="outline" onClick={() => setShowTransferModal(false)} className="flex-1">
-                  Cancelar
-                </Button>
-                <Button type="submit" className="flex-1 gap-2" disabled={isSubmittingTransfer || !isTransferValid}>
-                  {isSubmittingTransfer && <RefreshCw className="h-4 w-4 animate-spin" />}
-                  Transferir
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
