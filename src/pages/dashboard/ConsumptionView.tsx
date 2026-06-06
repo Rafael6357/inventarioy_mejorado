@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
 import { Calendar, TrendingUp, Package, UtensilsCrossed, X } from 'lucide-react';
 import { Input } from '../../components/ui/input';
@@ -8,9 +8,10 @@ import { usePersistentFilters } from '../../lib/hooks/usePersistentFilters';
 export default function ConsumptionView() {
   const { products, recipes, sales, movements } = useDatabaseStore();
   const today = new Date().toISOString().split('T')[0];
+  const defaults = useMemo(() => ({ startDate: today, endDate: today }), [today]);
   const { filters, setFilters, resetFilters } = usePersistentFilters<{ startDate: string; endDate: string }>(
     'consumption',
-    { startDate: today, endDate: today }
+    defaults
   );
   const { startDate, endDate } = filters;
   const setStartDate = (v: string) => setFilters({ startDate: v });

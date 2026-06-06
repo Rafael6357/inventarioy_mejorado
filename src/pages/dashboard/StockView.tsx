@@ -6,7 +6,7 @@ import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { validateNumber, getNumberFromString, exportToExcel } from '../../lib/utils';
+import { validateNumber, exportToExcel } from '../../lib/utils';
 import { normalizeUnit, getCompatibleUnits, convertUnit } from '../../lib/unitConversion';
 import { formatNumber } from '../../lib/formatNumber';
 import { useStaggerEnter } from '../../lib/animations/useStaggerEnter';

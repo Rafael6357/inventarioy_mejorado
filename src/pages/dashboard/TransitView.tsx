@@ -15,7 +15,7 @@ import {
   UnitAbbrev,
   UNIT_LABELS,
 } from '../../lib/unitConversion';
-import { validateNumber, getNumberFromString } from '../../lib/utils';
+import { validateNumber } from '../../lib/utils';
 import { formatQuantity } from '../../lib/formatNumber';
 import { useStaggerEnter } from '../../lib/animations/useStaggerEnter';
 import { useCountUp } from '../../lib/animations/useCountUp';

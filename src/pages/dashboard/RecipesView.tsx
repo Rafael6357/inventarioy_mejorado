@@ -7,7 +7,7 @@ import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
 import { NumberInput } from '../../components/ui/NumberInput';
 import { toast } from 'sonner';
-import { validateNumber, getNumberFromString, exportToExcel } from '../../lib/utils';
+import { validateNumber, exportToExcel } from '../../lib/utils';
 import {
   convertUnit,
   getCompatibleUnits,
@@ -440,12 +440,11 @@ export default function RecipesView() {
                       <div className="rounded-md bg-surface p-2 text-center">
                         {editingRecipeId === recipe.id ? (
                           <div className="flex items-center gap-1">
-                            <Input
-                              type="number"
+                            <NumberInput
                               min="0.01"
                               step="0.01"
                               value={editingPrice}
-                              onChange={(e) => setEditingPrice(Number(e.target.value))}
+                              onValueChange={(v) => setEditingPrice(v)}
                               className="h-8 w-16 text-center font-mono text-primary text-sm"
                             />
                             <button onClick={() => saveEditPrice(recipe.id)} className="text-success hover:text-green-400">

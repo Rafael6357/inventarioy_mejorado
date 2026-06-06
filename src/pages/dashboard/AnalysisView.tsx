@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
 import { TrendingUp, DollarSign, Package, AlertTriangle, ArrowUpRight, ArrowDownRight, Activity, Download, Search, Calendar, RotateCcw, X } from 'lucide-react';
 import { Input } from '../../components/ui/input';

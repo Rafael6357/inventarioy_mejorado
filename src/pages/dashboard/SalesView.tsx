@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
 import { useAuthStore } from '../../store/authStore';
-import { Plus, Minus, Trash2, ShoppingCart, CreditCard, Search, X, DollarSign, User, PlusCircle, Users, Loader2, Printer } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingCart, CreditCard, Search, X, DollarSign, User, PlusCircle, Users, Loader2, Printer, AlertCircle } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
@@ -1839,6 +1839,23 @@ setShowTicket(true);
                   <span className="text-text-secondary">Total registrado:</span>
                   <span className="font-mono text-text">${((Number(user?.usdEnabled ? chargeBreakdown.usd : 0) || 0) * (Number(user?.usdRate) || 0) + (Number(user?.eurEnabled ? chargeBreakdown.eur : 0) || 0) * (Number(user?.eurRate) || 0) + (Number(chargeBreakdown.efectivo) || 0) + (Number(user?.cupTransferEnabled ? chargeBreakdown.transferencia : 0) || 0)).toFixed(2)}</span>
                 </div>
+                {(() => {
+                  const totalPaid = (Number(user?.usdEnabled ? chargeBreakdown.usd : 0) || 0) * (Number(user?.usdRate) || 0)
+                    + (Number(user?.eurEnabled ? chargeBreakdown.eur : 0) || 0) * (Number(user?.eurRate) || 0)
+                    + (Number(chargeBreakdown.efectivo) || 0)
+                    + (Number(user?.cupTransferEnabled ? chargeBreakdown.transferencia : 0) || 0);
+                  const accountTotal = selectedAccountForCharge?.total_amount || 0;
+                  const excedente = totalPaid - accountTotal;
+                  if (excedente > 0.01) {
+                    return (
+                      <p className="text-xs text-warning mt-2 flex items-start gap-1.5">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                        <span>Excedente de <span className="font-mono font-semibold">${excedente.toFixed(2)}</span>: se registrará como cambio/devuelta, no como venta.</span>
+                      </p>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
             </div>
 

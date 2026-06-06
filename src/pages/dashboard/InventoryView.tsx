@@ -16,7 +16,7 @@ import {
   UnitAbbrev,
   UNIT_LABELS,
 } from '../../lib/unitConversion';
-import { validateNumber, getNumberFromString } from '../../lib/utils';
+import { validateNumber } from '../../lib/utils';
 import { useRealTimeClock } from '../../lib/hooks/useRealTimeClock';
 
 const DEFAULT_CATEGORIES = [

@@ -2501,7 +2501,7 @@ deletePendingAccount: async (accountId: string) => {
       const result = await get().addSale({
         employee_id: employeeId,
         items: saleItems,
-        total_amount: isAccountHouse ? 0 : Math.max(totalPaidCup, account.total_amount),
+        total_amount: isAccountHouse ? 0 : account.total_amount,
         date,
         sale_type: saleType,
         is_account_house: isAccountHouse,
@@ -2559,7 +2559,7 @@ deletePendingAccount: async (accountId: string) => {
     const result = await get().addSale({
       employee_id: employeeId,
       items: saleItems,
-      total_amount: isAccountHouse ? 0 : Math.max(totalPaidCup, account.total_amount),
+      total_amount: isAccountHouse ? 0 : account.total_amount,
       date: date,
       sale_type: saleType,
       is_account_house: isAccountHouse,
