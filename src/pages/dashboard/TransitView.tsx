@@ -3,6 +3,7 @@ import { useDatabaseStore } from '../../store/dbStore';
 import { useAuthStore } from '../../store/authStore';
 import { Package, Search, Plus, Check, Loader2, AlertCircle, ArrowRight, ArrowLeft, Box, ChevronLeft, ChevronRight, TrendingDown, RefreshCw, Clock, AlertTriangle, RotateCcw, X, ChevronDown } from 'lucide-react';
 import { Input } from '../../components/ui/input';
+import { NumberInput } from '../../components/ui/NumberInput';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
 import {
@@ -15,12 +16,20 @@ import {
   UNIT_LABELS,
 } from '../../lib/unitConversion';
 import { validateNumber, getNumberFromString } from '../../lib/utils';
+import { formatQuantity } from '../../lib/formatNumber';
 import { useStaggerEnter } from '../../lib/animations/useStaggerEnter';
 import { useCountUp } from '../../lib/animations/useCountUp';
+import { usePersistentFilters } from '../../lib/hooks/usePersistentFilters';
 
 export default function TransitView() {
   const { transitItems, products, cancelTransit, registerWasteFromTransit, registerManualConsumption, logAction, warehouses, currentWarehouseId, setCurrentWarehouse } = useDatabaseStore();
-  const [searchTerm, setSearchTerm] = useState('');
+  const { filters, setFilters, resetFilters } = usePersistentFilters<{ searchTerm: string; currentPage: number }>(
+    'transit',
+    { searchTerm: '', currentPage: 1 }
+  );
+  const { searchTerm, currentPage } = filters;
+  const setSearchTerm = (v: string) => setFilters({ searchTerm: v });
+  const setCurrentPage = (v: number | ((p: number) => number)) => setFilters(prev => ({ ...prev, currentPage: typeof v === 'function' ? v(prev.currentPage) : v }));
   const [cancelModal, setCancelModal] = useState<{
     item: any;
     quantity: number;
@@ -212,8 +221,7 @@ const handleWaste = async () => {
     (a, b) => new Date(b.oldestDate).getTime() - new Date(a.oldestDate).getTime()
   );
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
+  const itemsPerPage = 10;
 
   useEffect(() => {
     setCurrentPage(1);
@@ -339,6 +347,15 @@ const handleWaste = async () => {
           <span className="text-sm text-text-secondary">
             {groupedArray.length} producto{groupedArray.length !== 1 ? 's' : ''} en transito
           </span>
+          {(searchTerm || currentPage > 1) && (
+            <button
+              onClick={resetFilters}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-bg px-3 py-2 text-xs text-text-secondary hover:text-text hover:border-primary transition-colors"
+              title="Limpiar filtros"
+            >
+              <X className="h-3 w-3" /> Limpiar
+            </button>
+          )}
         </div>
 
         {groupedArray.length === 0 ? (
@@ -376,14 +393,14 @@ const handleWaste = async () => {
                       </p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-lg font-bold text-primary">{Number(group.totalRemaining).toFixed(3)} <span className="text-xs font-normal">{group.product.unit}</span></p>
+                      <p className="text-lg font-bold text-primary">{formatQuantity(group.totalRemaining, group.product.unit)} <span className="text-xs font-normal">{group.product.unit}</span></p>
                       <p className="text-xs text-text-secondary">Restante</p>
                     </div>
                   </div>
 
                   <div className="mb-2">
                     <div className="mb-1 flex justify-between text-xs text-text-secondary">
-                      <span>Consumo: {Number(group.totalConsumed).toFixed(3)} / {Number(group.totalQuantity).toFixed(3)} {group.product.unit}</span>
+                      <span>Consumo: {formatQuantity(group.totalConsumed, group.product.unit)} / {formatQuantity(group.totalQuantity, group.product.unit)} {group.product.unit}</span>
                       <span>{pct.toFixed(0)}%</span>
                     </div>
                     <div className="h-2 w-full overflow-hidden rounded-full bg-surface-hover">
@@ -403,8 +420,9 @@ const handleWaste = async () => {
                         {group.items.map((item) => {
                           const itemPct = item.quantity > 0 ? (item.consumed / item.quantity) * 100 : 0;
                           const itemAntiquity = getAntiquityColor(item.sent_date);
+                          const baseUnit = group.product.unit;
                           return (
-                            <div key={item.id} className="flex items-center justify-between gap-3 text-xs">
+                            <div key={item.id} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between text-xs">
                               <div className="flex items-center gap-2 min-w-0">
                                 <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-xs font-medium ${itemAntiquity.bg} ${itemAntiquity.text}`}>
                                   <Clock className="h-2.5 w-2.5" />
@@ -412,19 +430,30 @@ const handleWaste = async () => {
                                 </span>
                                 <span className="text-text-secondary truncate">{item.reason || 'En produccion'}</span>
                               </div>
-                              <div className="flex items-center gap-3 shrink-0">
+                              <div className="flex items-center gap-3 shrink-0 flex-wrap">
                                 <div className="w-20 h-1.5 overflow-hidden rounded-full bg-surface-hover">
                                   <div
                                     className={`h-full rounded-full ${getProgressColor(item.consumed, item.quantity)}`}
                                     style={{ width: `${Math.max(itemPct, 5)}%` }}
                                   />
                                 </div>
-                                <span className="font-mono text-text">
-<span className="text-success">{Number(item.consumed).toFixed(3)}</span>
-                                  <span className="text-primary">{Number(item.quantity).toFixed(3)}</span>
-                                  <span className="text-warning">{Number(item.remaining).toFixed(3)}</span>
-                                  <span className="text-text-secondary ml-1">{group.product.unit}</span>
-                                </span>
+                                <div className="flex items-center gap-2 font-mono text-xs">
+                                  <span title="Consumido: cantidad ya utilizada del lote" className="inline-flex items-center gap-1 rounded-md bg-success/10 px-1.5 py-0.5">
+                                    <span className="text-text-secondary">C</span>
+                                    <span className="text-success font-semibold">{formatQuantity(item.consumed, baseUnit)}</span>
+                                  </span>
+                                  <span className="text-text-secondary">/</span>
+                                  <span title="Enviado: cantidad total despachada al lote" className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-1.5 py-0.5">
+                                    <span className="text-text-secondary">E</span>
+                                    <span className="text-primary font-semibold">{formatQuantity(item.quantity, baseUnit)}</span>
+                                  </span>
+                                  <span className="text-text-secondary">/</span>
+                                  <span title="Restante: cantidad aún disponible para consumir o devolver" className="inline-flex items-center gap-1 rounded-md bg-warning/10 px-1.5 py-0.5">
+                                    <span className="text-text-secondary">R</span>
+                                    <span className="text-warning font-semibold">{formatQuantity(item.remaining, baseUnit)}</span>
+                                  </span>
+                                  <span className="text-text-secondary ml-1">{baseUnit}</span>
+                                </div>
                                 {item.remaining > 0 && (
                                   <div className="flex items-center gap-1">
                                     {getProduct(item.product_id)?.is_consumo_directo && (
@@ -576,14 +605,12 @@ const handleWaste = async () => {
                   <div className="flex gap-2 mb-3">
                     <div className="flex-1">
                       <label className="text-xs font-medium text-text-secondary">Cantidad *</label>
-                      <Input
-                        type="number"
+                      <NumberInput
                         min="0.0001"
                         max={maxInCurrentUnit}
                         step="0.01"
                         value={cancelModal.quantity}
-                        onChange={(e) => setCancelModal(prev => ({ ...prev, quantity: Number(e.target.value) }))}
-                        className="no-spin"
+                        onValueChange={(v) => setCancelModal(prev => ({ ...prev, quantity: v }))}
                       />
                     </div>
                     <div className="w-32">
@@ -693,14 +720,12 @@ const handleWaste = async () => {
                   <div className="flex gap-2 mb-3">
                     <div className="flex-1">
                       <label className="text-xs font-medium text-text-secondary">Cantidad *</label>
-                      <Input
-                        type="number"
+                      <NumberInput
                         min="0.0001"
                         max={maxInCurrentUnit}
                         step="0.01"
                         value={wasteModal.quantity}
-                        onChange={(e) => setWasteModal(prev => ({ ...prev, quantity: Number(e.target.value) }))}
-                        className="no-spin"
+                        onValueChange={(v) => setWasteModal(prev => ({ ...prev, quantity: v }))}
                       />
                     </div>
                     <div className="w-32">
@@ -810,14 +835,12 @@ const handleWaste = async () => {
                   <div className="flex gap-2 mb-3">
                     <div className="flex-1">
                       <label className="text-xs font-medium text-text-secondary">Cantidad consumida *</label>
-                      <Input
-                        type="number"
+                      <NumberInput
                         min="0.0001"
                         max={maxInCurrentUnit}
                         step="0.01"
                         value={consumptionModal.quantity}
-                        onChange={(e) => setConsumptionModal(prev => ({ ...prev, quantity: Number(e.target.value) }))}
-                        className="no-spin"
+                        onValueChange={(v) => setConsumptionModal(prev => ({ ...prev, quantity: v }))}
                       />
                     </div>
                     <div className="w-32">

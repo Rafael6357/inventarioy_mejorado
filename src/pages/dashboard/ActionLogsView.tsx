@@ -1,8 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Search, Calendar, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Calendar, FileText, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { useDatabaseStore, ROLE_LABELS } from '../../store/dbStore';
+import { usePersistentFilters } from '../../lib/hooks/usePersistentFilters';
 
 interface ActionLog {
   id: string;
@@ -103,11 +104,22 @@ const ACTION_TRANSLATIONS: Record<string, string> = {
 
 export default function ActionLogsView() {
   const { actionLogs, accessPins, getActionLogs, fetchMore } = useDatabaseStore();
-  const [searchTerm, setSearchTerm] = useState('');
+  const { filters, setFilters, resetFilters } = usePersistentFilters<{
+    searchTerm: string;
+    roleFilter: string;
+    startDate: string;
+    endDate: string;
+    currentPage: number;
+  }>('actionLogs', { searchTerm: '', roleFilter: '', startDate: '', endDate: '', currentPage: 1 });
+  const { searchTerm, roleFilter, startDate, endDate, currentPage } = filters;
+  const setSearchTerm = (v: string) => setFilters({ searchTerm: v });
+  const setRoleFilter = (v: string) => setFilters({ roleFilter: v });
+  const setStartDate = (v: string) => setFilters({ startDate: v });
+  const setEndDate = (v: string) => setFilters({ endDate: v });
+  const setCurrentPage = (v: number | ((p: number) => number)) => setFilters(prev => ({ ...prev, currentPage: typeof v === 'function' ? v(prev.currentPage) : v }));
   const [hasMoreLogs, setHasMoreLogs] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(15);
+  const itemsPerPage = 15;
 
   useEffect(() => {
     try {
@@ -116,15 +128,9 @@ export default function ActionLogsView() {
       console.error('[ActionLogsView] Error loading logs:', err);
     }
   }, []);
-  const [roleFilter, setRoleFilter] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
 
   const clearFilters = () => {
-    setSearchTerm('');
-    setRoleFilter('');
-    setStartDate('');
-    setEndDate('');
+    resetFilters();
   };
 
   const uniqueRoles = useMemo(() => {

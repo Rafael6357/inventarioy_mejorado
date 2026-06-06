@@ -1,21 +1,30 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
-import { Search, Filter, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, Calendar, ChevronLeft, ChevronRight, TrendingDown, Settings2, Printer } from 'lucide-react';
+import { Search, Filter, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, Calendar, ChevronLeft, ChevronRight, TrendingDown, Settings2, Printer, X } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
 import { exportToExcel } from '../../lib/utils';
 import { formatNumber } from '../../lib/formatNumber';
 import { useStaggerEnter } from '../../lib/animations/useStaggerEnter';
+import { usePersistentFilters } from '../../lib/hooks/usePersistentFilters';
 
 export default function MovementsView() {
   const { movements, products, fetchMore, warehouses, currentWarehouseId } = useDatabaseStore();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [typeFilter, setTypeFilter] = useState<string>('ALL');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(15);
+  const { filters, setFilters, resetFilters } = usePersistentFilters<{
+    searchTerm: string;
+    typeFilter: string;
+    startDate: string;
+    endDate: string;
+    currentPage: number;
+  }>('movements', { searchTerm: '', typeFilter: 'ALL', startDate: '', endDate: '', currentPage: 1 });
+  const { searchTerm, typeFilter, startDate, endDate, currentPage } = filters;
+  const setSearchTerm = (v: string) => setFilters({ searchTerm: v });
+  const setTypeFilter = (v: string) => setFilters({ typeFilter: v });
+  const setStartDate = (v: string) => setFilters({ startDate: v });
+  const setEndDate = (v: string) => setFilters({ endDate: v });
+  const setCurrentPage = (v: number | ((p: number) => number)) => setFilters(prev => ({ ...prev, currentPage: typeof v === 'function' ? v(prev.currentPage) : v }));
+  const itemsPerPage = 15;
 
   const getProductName = (id: string) => products.find(p => p.id === id)?.name || 'Producto Eliminado';
 
@@ -201,6 +210,16 @@ if (endDate) {
                   ))}
                 </select>
               </div>
+            )}
+
+            {(searchTerm || typeFilter !== 'ALL' || startDate || endDate) && (
+              <button
+                onClick={resetFilters}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-bg px-3 py-2 text-xs text-text-secondary hover:text-text hover:border-primary transition-colors"
+                title="Limpiar filtros"
+              >
+                <X className="h-3 w-3" /> Limpiar
+              </button>
             )}
           </div>
         </div>

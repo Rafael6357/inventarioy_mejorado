@@ -10,6 +10,7 @@ import { validateNumber, getNumberFromString, exportToExcel } from '../../lib/ut
 import { normalizeUnit, getCompatibleUnits, convertUnit } from '../../lib/unitConversion';
 import { formatNumber } from '../../lib/formatNumber';
 import { useStaggerEnter } from '../../lib/animations/useStaggerEnter';
+import { usePersistentFilters } from '../../lib/hooks/usePersistentFilters';
 
 export default function StockView() {
   // Helper to get stock per warehouse
@@ -49,12 +50,23 @@ export default function StockView() {
     return pw ? { quantity: pw.quantity, in_transit: computedInTransit } : null;
   };
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
-  const [typeFilter, setTypeFilter] = useState<string>('ALL');
-  const [sortBy, setSortBy] = useState<string>('name');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const { filters, setFilters, resetFilters } = usePersistentFilters<{
+    searchTerm: string;
+    categoryFilter: string;
+    statusFilter: string;
+    typeFilter: string;
+    sortBy: string;
+    sortOrder: 'asc' | 'desc';
+    currentPage: number;
+  }>('stock', { searchTerm: '', categoryFilter: 'ALL', statusFilter: 'ALL', typeFilter: 'ALL', sortBy: 'name', sortOrder: 'asc', currentPage: 1 });
+  const { searchTerm, categoryFilter, statusFilter, typeFilter, sortBy, sortOrder, currentPage } = filters;
+  const setSearchTerm = (v: string) => setFilters({ searchTerm: v });
+  const setCategoryFilter = (v: string) => setFilters({ categoryFilter: v });
+  const setStatusFilter = (v: string) => setFilters({ statusFilter: v });
+  const setTypeFilter = (v: string) => setFilters({ typeFilter: v });
+  const setSortBy = (v: string) => setFilters({ sortBy: v });
+  const setSortOrder = (v: 'asc' | 'desc') => setFilters({ sortOrder: v });
+  const setCurrentPage = (v: number | ((p: number) => number)) => setFilters(prev => ({ ...prev, currentPage: typeof v === 'function' ? v(prev.currentPage) : v }));
   const [productToDelete, setProductToDelete] = useState<{id: string, name: string} | null>(null);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [editParams, setEditParams] = useState({
@@ -471,6 +483,16 @@ export default function StockView() {
               <option value="INGREDIENTE">Ingrediente</option>
             </select>
           </div>
+
+          {(searchTerm || categoryFilter !== 'ALL' || statusFilter !== 'ALL' || typeFilter !== 'ALL') && (
+            <button
+              onClick={resetFilters}
+              className="inline-flex items-center gap-1.5 self-start rounded-lg border border-border bg-bg px-3 py-2 text-xs text-text-secondary hover:text-text hover:border-primary transition-colors"
+              title="Limpiar filtros"
+            >
+              <X className="h-3 w-3" /> Limpiar
+            </button>
+          )}
         </div>
 
         <div className="relative">

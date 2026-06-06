@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
-import { TrendingUp, DollarSign, Package, AlertTriangle, ArrowUpRight, ArrowDownRight, Activity, Download, Search, Calendar, RotateCcw } from 'lucide-react';
+import { TrendingUp, DollarSign, Package, AlertTriangle, ArrowUpRight, ArrowDownRight, Activity, Download, Search, Calendar, RotateCcw, X } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
@@ -8,6 +8,7 @@ import { exportToExcel } from '../../lib/utils';
 import { formatNumber } from '../../lib/formatNumber';
 import { useStaggerEnter } from '../../lib/animations/useStaggerEnter';
 import { useCountUp } from '../../lib/animations/useCountUp';
+import { usePersistentFilters } from '../../lib/hooks/usePersistentFilters';
 
 function parseSaleItems(items: any): any[] {
   if (Array.isArray(items)) return items;
@@ -36,12 +37,19 @@ export default function AnalysisView() {
   const safeSales = useMemo(() => Array.isArray(sales) ? sales : [], [sales]);
   const safeMovements = useMemo(() => Array.isArray(movements) ? movements : [], [movements]);
 
-  const [auditProduct, setAuditProduct] = useState<string>('');
-  const [auditDateFrom, setAuditDateFrom] = useState<string>('');
-  const [auditDateTo, setAuditDateTo] = useState<string>('');
-
-  const [turnoverDateFrom, setTurnoverDateFrom] = useState<string>('');
-  const [turnoverDateTo, setTurnoverDateTo] = useState<string>('');
+  const { filters, setFilters, resetFilters } = usePersistentFilters<{
+    auditProduct: string;
+    auditDateFrom: string;
+    auditDateTo: string;
+    turnoverDateFrom: string;
+    turnoverDateTo: string;
+  }>('analysis', { auditProduct: '', auditDateFrom: '', auditDateTo: '', turnoverDateFrom: '', turnoverDateTo: '' });
+  const { auditProduct, auditDateFrom, auditDateTo, turnoverDateFrom, turnoverDateTo } = filters;
+  const setAuditProduct = (v: string) => setFilters({ auditProduct: v });
+  const setAuditDateFrom = (v: string) => setFilters({ auditDateFrom: v });
+  const setAuditDateTo = (v: string) => setFilters({ auditDateTo: v });
+  const setTurnoverDateFrom = (v: string) => setFilters({ turnoverDateFrom: v });
+  const setTurnoverDateTo = (v: string) => setFilters({ turnoverDateTo: v });
 
   const today = new Date();
   const setTurnoverHoy = () => {
@@ -413,6 +421,11 @@ export default function AnalysisView() {
           <Button size="sm" variant="outline" onClick={setHoy}>Hoy</Button>
           <Button size="sm" variant="outline" onClick={setAyer}>Ayer</Button>
           <Button size="sm" variant="outline" onClick={setUltimos15}>Últimos 15 días</Button>
+          {(auditProduct || auditDateFrom || auditDateTo) && (
+            <Button size="sm" variant="ghost" onClick={resetFilters} className="gap-1.5 text-xs">
+              <X className="h-3 w-3" /> Limpiar
+            </Button>
+          )}
         </div>
 
         {!auditData && auditProduct && (

@@ -1,21 +1,20 @@
 import React, { useState, useMemo } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
-import { Calendar, TrendingUp, Package, UtensilsCrossed } from 'lucide-react';
+import { Calendar, TrendingUp, Package, UtensilsCrossed, X } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { formatNumber } from '../../lib/formatNumber';
+import { usePersistentFilters } from '../../lib/hooks/usePersistentFilters';
 
 export default function ConsumptionView() {
   const { products, recipes, sales, movements } = useDatabaseStore();
-  
-  // Date range defaults to today
-  const [startDate, setStartDate] = useState(() => {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
-  });
-  const [endDate, setEndDate] = useState(() => {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
-  });
+  const today = new Date().toISOString().split('T')[0];
+  const { filters, setFilters, resetFilters } = usePersistentFilters<{ startDate: string; endDate: string }>(
+    'consumption',
+    { startDate: today, endDate: today }
+  );
+  const { startDate, endDate } = filters;
+  const setStartDate = (v: string) => setFilters({ startDate: v });
+  const setEndDate = (v: string) => setFilters({ endDate: v });
 
   // Calculate consumption for the date range
   const consumptionData = useMemo(() => {
@@ -227,6 +226,15 @@ export default function ConsumptionView() {
             onChange={(e) => setEndDate(e.target.value)}
             className="border-none bg-transparent focus:ring-0 w-28 no-spin"
           />
+          {(startDate !== today || endDate !== today) && (
+            <button
+              onClick={resetFilters}
+              className="inline-flex items-center gap-1.5 ml-auto rounded-lg border border-border bg-bg px-3 py-1.5 text-xs text-text-secondary hover:text-text hover:border-primary transition-colors"
+              title="Limpiar filtros"
+            >
+              <X className="h-3 w-3" /> Limpiar
+            </button>
+          )}
         </div>
       </div>
 

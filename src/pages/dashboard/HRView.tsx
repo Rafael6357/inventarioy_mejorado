@@ -2,13 +2,14 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
 import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../lib/supabase';
-import { Users, UserPlus, Trash2, Mail, Phone, Briefcase, DollarSign, FileText, Upload, Download, X, FolderOpen, BookOpen, ShieldCheck, Paperclip, Eye, ChevronDown, Building2, Calculator, Settings, RefreshCw, Save, Edit, FileSpreadsheet, Camera } from 'lucide-react';
+import { Users, UserPlus, Trash2, Mail, Phone, Briefcase, DollarSign, FileText, Upload, Download, X, FolderOpen, BookOpen, ShieldCheck, Paperclip, Eye, ChevronDown, Building2, Calculator, Settings, RefreshCw, Save, Edit, FileSpreadsheet, Camera, RotateCcw } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
 import { validateNumber, getNumberFromString, exportToExcel } from '../../lib/utils';
 import { useStaggerEnter } from '../../lib/animations/useStaggerEnter';
+import { usePersistentFilters } from '../../lib/hooks/usePersistentFilters';
 
 const DOC_TYPE_LABELS: Record<string, string> = {
   MANUAL: 'Manual',
@@ -240,14 +241,25 @@ export default function HRView() {
     getEmployeesCount, getDepartmentsCount, getPayrollEntriesCount
   } = useDatabaseStore();
 
-  const [activeTab, setActiveTab] = useState<'personal' | 'departamentos' | 'nomina' | 'configuracion' | 'documentos'>('personal');
+  const { filters, setFilters, resetFilters } = usePersistentFilters<{
+    activeTab: 'personal' | 'departamentos' | 'nomina' | 'configuracion' | 'documentos';
+    employeeSearchTerm: string;
+    departmentsPage: number;
+    employeesPage: number;
+    payrollPage: number;
+  }>('hr', { activeTab: 'personal', employeeSearchTerm: '', departmentsPage: 1, employeesPage: 1, payrollPage: 1 });
+  const { activeTab, employeeSearchTerm, departmentsPage, employeesPage, payrollPage } = filters;
+  const setActiveTab = (v: 'personal' | 'departamentos' | 'nomina' | 'configuracion' | 'documentos') => setFilters({ activeTab: v });
+  const setEmployeeSearchTerm = (v: string) => setFilters({ employeeSearchTerm: v });
+  const setDepartmentsPage = (v: number | ((p: number) => number)) => setFilters(prev => ({ ...prev, departmentsPage: typeof v === 'function' ? v(prev.departmentsPage) : v }));
+  const setEmployeesPage = (v: number | ((p: number) => number)) => setFilters(prev => ({ ...prev, employeesPage: typeof v === 'function' ? v(prev.employeesPage) : v }));
+  const setPayrollPage = (v: number | ((p: number) => number)) => setFilters(prev => ({ ...prev, payrollPage: typeof v === 'function' ? v(prev.payrollPage) : v }));
   const [expandedEmployee, setExpandedEmployee] = useState<string | null>(null);
   const [uploadDocType, setUploadDocType] = useState<'MANUAL' | 'REGLAMENTO' | 'PNO'>('MANUAL');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedEmployeeDoc, setSelectedEmployeeDoc] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
   const [newEmployee, setNewEmployee] = useState({
     name: '', role: '', salary: 0, phone: '', email: '', nit_id: '', category: '', hire_date: '', photo_url: '',
   });
@@ -265,11 +277,8 @@ export default function HRView() {
   const [editingEarnedSalary, setEditingEarnedSalary] = useState<number>(0);
   const [editingVacations, setEditingVacations] = useState<number>(0);
 
-  const [departmentsPage, setDepartmentsPage] = useState(1);
   const [departmentsTotal, setDepartmentsTotal] = useState(0);
-  const [employeesPage, setEmployeesPage] = useState(1);
   const [employeesTotal, setEmployeesTotal] = useState(0);
-  const [payrollPage, setPayrollPage] = useState(1);
   const [payrollTotal, setPayrollTotal] = useState(0);
 
   const [configBaseExenta, setConfigBaseExenta] = useState(0);
@@ -638,13 +647,22 @@ export default function HRView() {
               </span>
             </div>
 
-            <div className="mb-4">
+            <div className="mb-4 flex items-center gap-2">
               <Input
                 placeholder="Buscar empleado por nombre..."
                 value={employeeSearchTerm}
                 onChange={(e) => setEmployeeSearchTerm(e.target.value)}
                 className="h-9"
               />
+              {employeeSearchTerm && (
+                <button
+                  onClick={() => setEmployeeSearchTerm('')}
+                  className="inline-flex items-center gap-1.5 shrink-0 rounded-lg border border-border bg-bg px-3 py-1.5 text-xs text-text-secondary hover:text-text hover:border-primary transition-colors"
+                  title="Limpiar filtros"
+                >
+                  <X className="h-3 w-3" /> Limpiar
+                </button>
+              )}
             </div>
 
             <div className="space-y-3">

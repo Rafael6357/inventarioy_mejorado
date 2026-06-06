@@ -5,6 +5,7 @@ import { ChefHat, Plus, Minus, Trash2, Search, UtensilsCrossed, AlertCircle, Pen
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
+import { NumberInput } from '../../components/ui/NumberInput';
 import { toast } from 'sonner';
 import { validateNumber, getNumberFromString, exportToExcel } from '../../lib/utils';
 import {
@@ -16,6 +17,7 @@ import {
   UnitAbbrev,
   UNIT_LABELS,
 } from '../../lib/unitConversion';
+import { usePersistentFilters } from '../../lib/hooks/usePersistentFilters';
 
 export default function RecipesView() {
   const { user } = useAuthStore();
@@ -29,7 +31,9 @@ export default function RecipesView() {
   
   const activeProducts = products.filter(p => p.is_active !== false);
 
-  const [searchTerm, setSearchTerm] = useState('');
+  const { filters, setFilters, resetFilters } = usePersistentFilters<{ searchTerm: string }>('recipes', { searchTerm: '' });
+  const { searchTerm } = filters;
+  const setSearchTerm = (v: string) => setFilters({ searchTerm: v });
   const [editingRecipeId, setEditingRecipeId] = useState<string | null>(null);
   const [editingPrice, setEditingPrice] = useState(0);
   
@@ -98,7 +102,7 @@ export default function RecipesView() {
       if (current.some(ing => ing.product_id === productId)) return current;
       return [...current, {
         product_id: productId,
-        quantity: 1,
+        quantity: 0,
         unit: baseUnit,
         displayUnit: defaultUnit
       }];
@@ -106,8 +110,8 @@ export default function RecipesView() {
   };
 
   const updateIngredientQuantity = (productId: string, quantity: number) => {
-    setIngredients(current => current.map(ing => 
-      ing.product_id === productId ? { ...ing, quantity: Math.max(0.01, quantity) } : ing
+    setIngredients(current => current.map(ing =>
+      ing.product_id === productId ? { ...ing, quantity: Math.max(0, quantity) } : ing
     ));
   };
 
@@ -120,6 +124,13 @@ export default function RecipesView() {
     if (!user) return;
     if (ingredients.length === 0) {
       toast.error('La receta debe tener al menos un ingrediente.');
+      return;
+    }
+
+    const invalidIngredient = ingredients.find(i => i.quantity <= 0);
+    if (invalidIngredient) {
+      const product = products.find(p => p.id === invalidIngredient.product_id);
+      toast.error(`La cantidad de "${product?.name || 'un ingrediente'}" debe ser mayor a 0.`);
       return;
     }
 
@@ -232,14 +243,13 @@ export default function RecipesView() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="sellingPrice">Precio de Venta ($) *</Label>
-<Input 
-                  id="sellingPrice" 
-                  type="number" 
-                  min="0.01" 
-                  step="0.01" 
-                  required 
-                  value={selling_price || ''} 
-                    onChange={e => setSellingPrice(Number(e.target.value))} 
+                <NumberInput
+                  id="sellingPrice"
+                  min={0.01}
+                  step="0.01"
+                  required
+                  value={selling_price}
+                  onValueChange={(v) => setSellingPrice(v)}
                 />
                 </div>
               </div>
@@ -280,13 +290,12 @@ export default function RecipesView() {
                             <p className="text-xs text-text-secondary">Costo: ${(product.cost * quantityInBase).toFixed(2)}</p>
                           </div>
                           <div className="flex items-center gap-2 self-end sm:self-auto">
-                            <Input 
-                              type="number" 
-                              min="0.0001" 
-                              step="any" 
+                            <NumberInput
+                              min={0}
+                              step="any"
                               className="h-8 w-20 text-right text-sm"
                               value={ing.quantity}
-                              onChange={e => updateIngredientQuantity(ing.product_id, Number(e.target.value))}
+                              onValueChange={(v) => updateIngredientQuantity(ing.product_id, v)}
                             />
                             <select
                               value={ing.displayUnit}
@@ -363,14 +372,25 @@ export default function RecipesView() {
             <h2 className="text-lg font-semibold text-text">Recetario</h2>
           </div>
 
-          <div className="mb-4 relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary" />
-            <Input
-              placeholder="Buscar receta..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9"
-            />
+          <div className="mb-4 flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary" />
+              <Input
+                placeholder="Buscar receta..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            {searchTerm && (
+              <button
+                onClick={resetFilters}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-bg px-3 py-2 text-xs text-text-secondary hover:text-text hover:border-primary transition-colors"
+                title="Limpiar filtros"
+              >
+                <X className="h-3 w-3" /> Limpiar
+              </button>
+            )}
           </div>
 
           <div className="space-y-4">

@@ -345,24 +345,42 @@ const checkRealInternetConnection = async (): Promise<boolean> => {
 };
 
 const withTimeout = async <T>(
-  promise: Promise<T>, 
+  promise: Promise<T>,
   timeoutMs: number = DEFAULT_TIMEOUT
 ): Promise<T> => {
   try {
     const result = await Promise.race([
       promise,
-      new Promise<T>((_, reject) => 
+      new Promise<T>((_, reject) =>
         setTimeout(() => reject(new Error(`TIMEOUT`)), timeoutMs)
       )
     ]);
     return result;
   } catch (err: any) {
     if (err.message === 'TIMEOUT') {
-      throw new Error('La conexión está lenta. Intenta de nuevo.');
+      throw new Error('TIMEOUT');
     }
     throw err;
   }
 };
+
+const NETWORK_ERROR_MESSAGES = [
+  'Failed to fetch',
+  'NetworkError',
+  'Network request failed',
+  'REFUSED_STREAM',
+  'TIMEOUT',
+  'network',
+  'ERR_HTTP2',
+];
+
+function isNetworkError(err: any): boolean {
+  const msg = err?.message || '';
+  if (NETWORK_ERROR_MESSAGES.some((m) => msg.includes(m))) return true;
+  if (err?.status === 503) return true;
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return true;
+  return false;
+}
 
 const RETRYABLE_ERRORS = [
   'Failed to fetch',
@@ -856,7 +874,7 @@ addProduct: async (product) => {
       updated_at: now,
     } as Product;
 
-    if (!navigator.onLine) {
+    const saveProductOffline = async (silent?: boolean) => {
       set((state) => ({ products: [productData, ...state.products] }));
       const mainWarehouse = get().warehouses.find(w => w.is_main) || get().warehouses[0];
       let pwEntry: any = null;
@@ -887,29 +905,38 @@ addProduct: async (product) => {
 
       await addToSyncQueue({ operation: 'addProduct', table: 'products', payload });
       get().refreshSyncQueueCount();
-      toast.success('Producto guardado localmente (sin conexión)');
+      if (!silent) {
+        toast.success('Producto guardado localmente — se sincronizará al reconectar');
+      }
+    };
+
+    if (!navigator.onLine) {
+      await saveProductOffline();
       return;
     }
 
     try {
-      const { data, error } = await withTimeout(
+      const { data, error } = await queryWithRetry(() =>
         supabase
           .from('products')
           .insert(productData)
           .select()
-          .single(),
-        10000
+          .single()
       );
 
       if (error) {
         console.error('Error adding product:', error);
+        if (isNetworkError(error)) {
+          await saveProductOffline();
+          return;
+        }
         throw new Error(error.message || 'Error al crear el producto');
       }
 
       if (Number(product.quantity) > 0) {
         const mainWarehouse = get().warehouses.find(w => w.is_main) || get().warehouses[0];
         
-        const { error: movementError } = await withTimeout(
+        const { error: movementError } = await queryWithRetry(() =>
           supabase
             .from('movements')
             .insert({
@@ -923,8 +950,7 @@ addProduct: async (product) => {
               reason: 'Stock inicial (Registro de producto)',
               status: 'NORMAL',
               warehouse_id: mainWarehouse?.id || null,
-            }),
-          10000
+            })
         );
 
         if (movementError && import.meta.env.DEV) {
@@ -936,14 +962,13 @@ addProduct: async (product) => {
       const mainWarehouse = warehouses.find(w => w.is_main) || warehouses[0];
       for (const warehouse of warehouses) {
         const initialQty = (warehouse.id === mainWarehouse?.id) ? Number(product.quantity) || 0 : 0;
-        await withTimeout(
+        await queryWithRetry(() =>
           supabase.from('product_warehouse').upsert({
             product_id: data.id,
             warehouse_id: warehouse.id,
             quantity: initialQty,
             in_transit: 0
-          }, { onConflict: 'product_id,warehouse_id' }),
-          10000
+          }, { onConflict: 'product_id,warehouse_id' })
         );
       }
 
@@ -975,15 +1000,20 @@ addProduct: async (product) => {
       return;
     }
 
-    const { error } = await withTimeout(
+    const { error } = await queryWithRetry(() =>
       supabase
         .from('products')
         .update(capitalizedUpdates)
-        .eq('id', id),
-      10000
+        .eq('id', id)
     );
 
     if (error) {
+      if (isNetworkError(error)) {
+        await addToSyncQueue({ operation: 'updateProduct', table: 'products', payload: { id, updates: capitalizedUpdates } });
+        get().refreshSyncQueueCount();
+        toast.success('Producto actualizado localmente — se sincronizará al reconectar');
+        return;
+      }
       throw new Error('No se pudo actualizar el producto');
     }
 
@@ -1003,15 +1033,20 @@ addProduct: async (product) => {
       return;
     }
 
-    const { error } = await withTimeout(
+    const { error } = await queryWithRetry(() =>
       supabase
         .from('products')
         .update({ is_active: false, updated_at: new Date().toISOString() })
-        .eq('id', id),
-      10000
+        .eq('id', id)
     );
 
     if (error) {
+      if (isNetworkError(error)) {
+        await addToSyncQueue({ operation: 'deleteProduct', table: 'products', payload: { id } });
+        get().refreshSyncQueueCount();
+        toast.success('Producto eliminado — se sincronizará al reconectar');
+        return;
+      }
       throw new Error('No se pudo eliminar el producto');
     }
 
@@ -1137,13 +1172,12 @@ addProduct: async (product) => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Sesión expirada. Por favor, inicia sesión nuevamente.');
 
-      const { data: newMovement, error: movementError } = await withTimeout(
+      const { data: newMovement, error: movementError } = await queryWithRetry(() =>
         supabase
           .from('movements')
           .insert({ ...movement, user_id: user.id, date: movementDate })
           .select()
-          .single(),
-        10000
+          .single()
       );
 
       if (movementError) {
@@ -1186,7 +1220,7 @@ addProduct: async (product) => {
           const newQty = currentQty - Number(movement.quantity);
           await get().updateProductWarehouseQuantity(movement.product_id, movement.warehouse_id, newQty, true);
           try {
-            const { data: newTransitItem, error: transitError } = await withTimeout(
+            const { data: newTransitItem, error: transitError } = await queryWithRetry(() =>
               supabase
                 .from('transit_items')
                 .insert({
@@ -1200,8 +1234,7 @@ addProduct: async (product) => {
                   warehouse_id: movement.warehouse_id,
                 })
                 .select()
-                .single(),
-              10000
+                .single()
             );
 
             if (transitError) {
@@ -1260,7 +1293,7 @@ addProduct: async (product) => {
         console.log('✅ SALIDA (sin warehouse): quantity e in_transit actualizados');
         
         console.log('🔄 SALIDA (sin warehouse): Creando transit_item...');
-        const { data: newTransitItem, error: transitError } = await withTimeout(
+        const { data: newTransitItem, error: transitError } = await queryWithRetry(() =>
           supabase
             .from('transit_items')
             .insert({
@@ -1273,8 +1306,7 @@ addProduct: async (product) => {
               sent_date: movementDate,
             })
             .select()
-            .single(),
-          10000
+            .single()
         );
 
         if (transitError) {
@@ -1314,7 +1346,7 @@ addProduct: async (product) => {
 
   justifyMovement: async (id, justification) => {
     try {
-      const { error } = await withTimeout(
+      const { error } = await queryWithRetry(() =>
         supabase
           .from('movements')
           .update({ 
@@ -1322,8 +1354,7 @@ addProduct: async (product) => {
             justification, 
             justification_date: new Date().toISOString() 
           })
-          .eq('id', id),
-        10000
+          .eq('id', id)
       );
 
       if (error) {
@@ -1569,7 +1600,7 @@ addProduct: async (product) => {
     }
 
     try {
-      const { data: newSale, error: saleError } = await withTimeout(
+      const { data: newSale, error: saleError } = await queryWithRetry(() =>
         supabase
           .from('sales')
           .insert({ 
@@ -1588,8 +1619,7 @@ addProduct: async (product) => {
             eur: sale.eur || 0,
           })
           .select()
-          .single(),
-        10000
+          .single()
       );
 
       if (saleError) {
@@ -1608,9 +1638,8 @@ addProduct: async (product) => {
         recipe_snapshot: item.recipe_snapshot,
       }));
 
-      const { error: itemsError } = await withTimeout(
-        supabase.from('sale_items').insert(saleItems),
-        10000
+      const { error: itemsError } = await queryWithRetry(() =>
+        supabase.from('sale_items').insert(saleItems)
       );
 
       if (itemsError) {
@@ -1717,7 +1746,7 @@ addProduct: async (product) => {
       const newTotalInTransit = updatedItems.reduce((sum, u) => sum + u.newRemaining, 0);
       let newMovement = null;
 
-      const { data: movementData, error: movementError } = await withTimeout(
+      const { data: movementData, error: movementError } = await queryWithRetry(() =>
         supabase
           .from('movements')
           .insert({
@@ -1732,8 +1761,7 @@ addProduct: async (product) => {
             status: 'NORMAL'
           })
           .select()
-          .single(),
-        10000
+          .single()
       );
 
       newMovement = movementData;
@@ -1743,15 +1771,14 @@ addProduct: async (product) => {
         throw new Error('No se pudo registrar el movimiento de venta');
       }
 
-      const { error: productError } = await withTimeout(
+      const { error: productError } = await queryWithRetry(() =>
         supabase
           .from('products')
           .update({ 
             in_transit: newTotalInTransit,
             updated_at: new Date().toISOString()
           })
-          .eq('id', productId),
-        10000
+          .eq('id', productId)
       );
 
       if (productError) {
@@ -2140,7 +2167,7 @@ addProduct: async (product) => {
     }
 
     try {
-      const { data, error } = await withTimeout(
+      const { data, error } = await queryWithRetry(() =>
         supabase
           .from('pending_accounts')
           .insert({
@@ -2152,8 +2179,7 @@ addProduct: async (product) => {
             created_at_local: new Date().toISOString(),
           })
           .select()
-          .single(),
-        10000
+          .single()
       );
 
       if (error) {
@@ -2823,7 +2849,7 @@ deletePendingAccount: async (accountId: string) => {
     }
 
     try {
-      const { data: newRecipe, error } = await withTimeout(
+      const { data: newRecipe, error } = await queryWithRetry(() =>
         supabase
           .from('recipes')
           .insert({ 
@@ -2832,8 +2858,7 @@ deletePendingAccount: async (accountId: string) => {
             selling_price: recipe.selling_price 
           })
           .select()
-          .single(),
-        10000
+          .single()
       );
 
       if (error) {
@@ -2848,9 +2873,8 @@ deletePendingAccount: async (accountId: string) => {
           unit: ing.unit,
         }));
 
-        await withTimeout(
-          supabase.from('recipe_ingredients').insert(ingredients),
-          10000
+        await queryWithRetry(() =>
+          supabase.from('recipe_ingredients').insert(ingredients)
         );
       }
 
@@ -2877,15 +2901,14 @@ deletePendingAccount: async (accountId: string) => {
       return;
     }
 
-    const { error } = await withTimeout(
+    const { error } = await queryWithRetry(() =>
       supabase
         .from('recipes')
         .update({ 
           name: updates.name ? capitalize(updates.name) : undefined, 
           selling_price: updates.selling_price 
         })
-        .eq('id', id),
-      10000
+        .eq('id', id)
     );
 
     if (error) {
@@ -2893,9 +2916,8 @@ deletePendingAccount: async (accountId: string) => {
     }
 
     if (updates.ingredients) {
-      await withTimeout(
-        supabase.from('recipe_ingredients').delete().eq('recipe_id', id),
-        10000
+      await queryWithRetry(() =>
+        supabase.from('recipe_ingredients').delete().eq('recipe_id', id)
       );
       
       if (updates.ingredients.length > 0) {
@@ -2905,9 +2927,8 @@ deletePendingAccount: async (accountId: string) => {
           quantity: ing.quantity,
           unit: ing.unit,
         }));
-        await withTimeout(
-          supabase.from('recipe_ingredients').insert(ingredients),
-          10000
+        await queryWithRetry(() =>
+          supabase.from('recipe_ingredients').insert(ingredients)
         );
       }
     }
@@ -2926,13 +2947,11 @@ deletePendingAccount: async (accountId: string) => {
       return;
     }
 
-    await withTimeout(
-      supabase.from('recipe_ingredients').delete().eq('recipe_id', id),
-      10000
+    await queryWithRetry(() =>
+      supabase.from('recipe_ingredients').delete().eq('recipe_id', id)
     );
-    const { error } = await withTimeout(
-      supabase.from('recipes').delete().eq('id', id),
-      10000
+    const { error } = await queryWithRetry(() =>
+      supabase.from('recipes').delete().eq('id', id)
     );
 
     if (error) {
@@ -2947,13 +2966,12 @@ deletePendingAccount: async (accountId: string) => {
     if (!user) throw new Error('No hay usuario autenticado');
 
     try {
-      const { data, error } = await withTimeout(
+      const { data, error } = await queryWithRetry(() =>
         supabase
           .from('employees')
           .insert({ ...employee, name: capitalize(employee.name), user_id: user.id })
           .select()
-          .single(),
-        10000
+          .single()
       );
 
       if (error) {
@@ -2973,9 +2991,8 @@ deletePendingAccount: async (accountId: string) => {
       ...updates,
       ...(updates.name !== undefined && { name: capitalize(updates.name) }),
     };
-    const { error } = await withTimeout(
-      supabase.from('employees').update(capitalizedUpdates).eq('id', id),
-      10000
+    const { error } = await queryWithRetry(() =>
+      supabase.from('employees').update(capitalizedUpdates).eq('id', id)
     );
 
     if (error) {
@@ -2988,9 +3005,8 @@ deletePendingAccount: async (accountId: string) => {
   },
 
   deleteEmployee: async (id) => {
-    const { error } = await withTimeout(
-      supabase.from('employees').delete().eq('id', id),
-      10000
+    const { error } = await queryWithRetry(() =>
+      supabase.from('employees').delete().eq('id', id)
     );
 
     if (error) {
@@ -3477,13 +3493,12 @@ deletePendingAccount: async (accountId: string) => {
     if (!user) throw new Error('No hay usuario autenticado');
 
     try {
-      const { data, error } = await withTimeout(
+      const { data, error } = await queryWithRetry(() =>
         supabase
           .from('categories')
           .insert({ user_id: user.id, name: capitalize(name) })
           .select()
-          .single(),
-        10000
+          .single()
       );
 
       if (error) {
@@ -3498,9 +3513,8 @@ deletePendingAccount: async (accountId: string) => {
   },
 
   deleteCategory: async (id) => {
-    const { error } = await withTimeout(
-      supabase.from('categories').delete().eq('id', id),
-      10000
+    const { error } = await queryWithRetry(() =>
+      supabase.from('categories').delete().eq('id', id)
     );
 
     if (error) {
@@ -3541,13 +3555,12 @@ deletePendingAccount: async (accountId: string) => {
     }
 
     try {
-      const { data, error } = await withTimeout(
+      const { data, error } = await queryWithRetry(() =>
         supabase
           .from('daily_closings')
           .insert({ ...closing, user_id: user.id })
           .select()
-          .single(),
-        10000
+          .single()
       );
 
       if (error) {

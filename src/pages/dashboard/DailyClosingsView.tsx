@@ -7,17 +7,28 @@ import { toast } from 'sonner';
 import { exportToExcel } from '../../lib/utils';
 import { useStaggerEnter } from '../../lib/animations/useStaggerEnter';
 import { useCountUp } from '../../lib/animations/useCountUp';
+import { usePersistentFilters } from '../../lib/hooks/usePersistentFilters';
 
 export default function DailyClosingsView() {
   const { dailyClosings, sales, employees, logAction, products, accessPins } = useDatabaseStore();
-  const [searchTerm, setSearchTerm] = useState('');
+  const { filters, setFilters, resetFilters } = usePersistentFilters<{
+    searchTerm: string;
+    startDate: string;
+    endDate: string;
+    sortOrder: 'desc' | 'asc';
+    employeeFilter: string;
+    currentPage: number;
+    itemsPerPage: number;
+  }>('dailyClosings', { searchTerm: '', startDate: '', endDate: '', sortOrder: 'desc', employeeFilter: '', currentPage: 1, itemsPerPage: 10 });
+  const { searchTerm, startDate, endDate, sortOrder, employeeFilter, currentPage, itemsPerPage } = filters;
+  const setSearchTerm = (v: string) => setFilters({ searchTerm: v });
+  const setStartDate = (v: string) => setFilters({ startDate: v });
+  const setEndDate = (v: string) => setFilters({ endDate: v });
+  const setSortOrder = (v: 'desc' | 'asc') => setFilters({ sortOrder: v });
+  const setEmployeeFilter = (v: string) => setFilters({ employeeFilter: v });
+  const setCurrentPage = (v: number | ((p: number) => number)) => setFilters(prev => ({ ...prev, currentPage: typeof v === 'function' ? v(prev.currentPage) : v }));
+  const setItemsPerPage = (v: number) => setFilters({ itemsPerPage: v });
   const [selectedClosing, setSelectedClosing] = useState<any>(null);
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
-  const [employeeFilter, setEmployeeFilter] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [showPreview, setShowPreview] = useState(false);
   const [verifiedRole, setVerifiedRole] = useState<string | null>(null);
   const [expandedClosing, setExpandedClosing] = useState<string | null>(null);
@@ -168,11 +179,7 @@ export default function DailyClosingsView() {
   const ventaRapidaCountRef = useCountUp(totalVentaRapidaHistorico, 0.8, 2);
 
   const clearFilters = () => {
-    setSearchTerm('');
-    setStartDate('');
-    setEndDate('');
-    setEmployeeFilter('');
-    setSortOrder('desc');
+    resetFilters();
   };
 
   const getSalesItemsGrouped = (closingDate: string) => {

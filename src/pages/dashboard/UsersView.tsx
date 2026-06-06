@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
-import { Users, Phone, Search, Download, CheckCircle2, XCircle, Clock, User, Building2, ChevronLeft, ChevronRight, CreditCard, DollarSign, ShieldCheck, AlertCircle, ArrowUpDown } from 'lucide-react';
+import { Users, Phone, Search, Download, CheckCircle2, XCircle, Clock, User, Building2, ChevronLeft, ChevronRight, CreditCard, DollarSign, ShieldCheck, AlertCircle, ArrowUpDown, X } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
@@ -10,6 +10,7 @@ import * as XLSX from 'xlsx';
 import { validateNumber } from '../../lib/utils';
 import { useStaggerEnter } from '../../lib/animations/useStaggerEnter';
 import { useCountUp } from '../../lib/animations/useCountUp';
+import { usePersistentFilters } from '../../lib/hooks/usePersistentFilters';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -45,13 +46,21 @@ export default function UsersView() {
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [payments, setPayments] = useState<Record<string, Payment[]>>({});
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const { filters, setFilters, resetFilters } = usePersistentFilters<{
+    searchTerm: string;
+    statusFilter: string;
+    dateOrder: 'desc' | 'asc';
+    page: number;
+    limit: number;
+  }>('users', { searchTerm: '', statusFilter: 'all', dateOrder: 'desc', page: 1, limit: ITEMS_PER_PAGE });
+  const { searchTerm, statusFilter, dateOrder, page, limit } = filters;
+  const setSearchTerm = (v: string) => setFilters({ searchTerm: v });
+  const setStatusFilter = (v: string) => setFilters({ statusFilter: v });
+  const setDateOrder = (v: 'desc' | 'asc') => setFilters({ dateOrder: v });
+  const setPage = (v: number | ((p: number) => number)) => setFilters(prev => ({ ...prev, page: typeof v === 'function' ? v(prev.page) : v }));
+  const setLimit = (v: number) => setFilters({ limit: v });
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [dateOrder, setDateOrder] = useState<'desc' | 'asc'>('desc');
-  const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
-  const [limit, setLimit] = useState(ITEMS_PER_PAGE);
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [loadingPayments, setLoadingPayments] = useState(false);
@@ -527,6 +536,16 @@ export default function UsersView() {
             className="pl-9"
           />
         </div>
+
+        {(searchTerm || statusFilter !== 'all') && (
+          <button
+            onClick={() => { resetFilters(); }}
+            className="inline-flex items-center gap-1.5 self-start rounded-lg border border-border bg-bg px-3 py-2 text-xs text-text-secondary hover:text-text hover:border-primary transition-colors"
+            title="Limpiar filtros"
+          >
+            <X className="h-3 w-3" /> Limpiar
+          </button>
+        )}
 
         <div className="flex items-center gap-2 flex-wrap">
           <button

@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
 import { useAuthStore } from '../../store/authStore';
 import { Input } from '../../components/ui/input';
+import { NumberInput } from '../../components/ui/NumberInput';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
 import { PackagePlus, ArrowRightLeft, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -16,6 +17,7 @@ import {
   UNIT_LABELS,
 } from '../../lib/unitConversion';
 import { validateNumber, getNumberFromString } from '../../lib/utils';
+import { useRealTimeClock } from '../../lib/hooks/useRealTimeClock';
 
 const DEFAULT_CATEGORIES = [
   "Bebidas y Refrescos",
@@ -89,6 +91,7 @@ export default function InventoryView() {
     status: 'NORMAL' as 'NORMAL' | 'ANOMALIA' | 'JUSTIFICADO',
     warehouse_id: currentWarehouseId || '',
   });
+  const movementClock = useRealTimeClock(movement.date);
   const [isSubmittingMovement, setIsSubmittingMovement] = useState(false);
   const [isSubmittingProduct, setIsSubmittingProduct] = useState(false);
 
@@ -98,6 +101,13 @@ export default function InventoryView() {
       setMovement(prev => ({ ...prev, warehouse_id: currentWarehouseId }));
     }
   }, [currentWarehouseId]);
+
+  // Sincronizar el reloj en tiempo real con el state del movimiento
+  useEffect(() => {
+    if (movementClock.value !== movement.date && !movementClock.isManuallyEdited) {
+      setMovement(prev => ({ ...prev, date: movementClock.value }));
+    }
+  }, [movementClock.value, movementClock.isManuallyEdited]);
 
   const handleAddProduct = async (e: React.FormEvent) => {
     if (isSubmittingProduct) return; // Evitar múltiples clics
@@ -282,13 +292,14 @@ export default function InventoryView() {
         quantity: 0,
         unit: 'u',
         displayUnit: 'u',
-        date: new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 19),
+        date: movementClock.value,
         cost: 0,
         reason: '',
         note: '',
         status: 'NORMAL',
         warehouse_id: currentWarehouseId || '',
       });
+      movementClock.reset();
       toast.success('Movimiento registrado exitosamente');
     } catch (error: any) {
       console.error('Error al registrar movimiento:', error);
@@ -375,7 +386,7 @@ export default function InventoryView() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="quantity">Cantidad Inicial *</Label>
-                <Input id="quantity" type="number" min="0" step="0.01" required value={newProduct.quantity} onChange={e => setNewProduct({...newProduct, quantity: Number(e.target.value)})} />
+                <NumberInput id="quantity" min="0" step="0.01" required value={newProduct.quantity} onValueChange={v => setNewProduct({...newProduct, quantity: v})} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="unit">Unidad *</Label>
@@ -392,21 +403,17 @@ export default function InventoryView() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="cost">Costo Unitario *</Label>
-              <Input 
-                id="cost" 
-                type="number" 
-                min="0.01" 
-                step="0.01" 
-                required 
-                value={newProduct.cost} 
-                onChange={e => {
-                  const val = Number(e.target.value);
-                  if (val >= 0) setNewProduct({...newProduct, cost: val});
-                }} 
-              />
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="cost">Costo Unitario *</Label>
+                <NumberInput
+                  id="cost"
+                  min="0.01"
+                  step="0.01"
+                  required
+                  value={newProduct.cost}
+                  onValueChange={v => setNewProduct({...newProduct, cost: v})}
+                />
+              </div>
 
             <div className="space-y-2">
               <Label htmlFor="description">Descripción (Opcional)</Label>
@@ -435,7 +442,7 @@ export default function InventoryView() {
               {newProduct.is_individual && (
                 <div className="space-y-2 sm:w-1/2">
                   <Label htmlFor="price">Precio de Venta *</Label>
-                  <Input id="price" type="number" min="0.01" step="0.01" required value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: Number(e.target.value)})} />
+                  <NumberInput id="price" min="0.01" step="0.01" required value={newProduct.price} onValueChange={v => setNewProduct({...newProduct, price: v})} />
                 </div>
               )}
 
@@ -571,15 +578,13 @@ export default function InventoryView() {
             <div className="grid gap-4 grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="mov_qty">Cantidad *</Label>
-                <Input 
-                  id="mov_qty" 
-                  type="number" 
-                  min="0.0001" 
+                <NumberInput
+                  id="mov_qty"
+                  min="0.0001"
                   step="any"
-                  required 
-                  value={movement.quantity} 
-                  onChange={e => setMovement({...movement, quantity: Number(e.target.value)})} 
-                  className="no-spin"
+                  required
+                  value={movement.quantity}
+                  onValueChange={v => setMovement({...movement, quantity: v})}
                   placeholder="Ej: 5"
                 />
               </div>
@@ -603,14 +608,24 @@ export default function InventoryView() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="mov_date">Fecha *</Label>
-                <Input id="mov_date" type="datetime-local" required value={movement.date.slice(0, 16)} onChange={e => { const val = e.target.value; setMovement({...movement, date: val.length <= 16 ? val + ':00' : val}); }} />
+                <Input
+                  id="mov_date"
+                  type="datetime-local"
+                  required
+                  value={movementClock.value.slice(0, 16)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    movementClock.onChange(val.length <= 16 ? val + ':00' : val);
+                    setMovement({...movement, date: val.length <= 16 ? val + ':00' : val});
+                  }}
+                />
               </div>
             </div>
 
             {movement.type === 'ENTRADA' && (
               <div className="space-y-2">
                 <Label htmlFor="mov_cost">Costo Unitario *</Label>
-                <Input id="mov_cost" type="number" min="0" step="0.01" required value={movement.cost} onChange={e => setMovement({...movement, cost: Number(e.target.value)})} />
+                <NumberInput id="mov_cost" min="0" step="0.01" required value={movement.cost} onValueChange={v => setMovement({...movement, cost: v})} />
               </div>
             )}
 
