@@ -10,15 +10,27 @@ export interface NumberInputProps
   max?: number;
   step?: string | number;
   allowEmpty?: boolean;
+  onClamp?: (rawValue: number, clampedValue: number) => void;
 }
 
 const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
-  ({ value, onValueChange, min, max, step, allowEmpty = true, className, onWheel, ...props }, ref) => {
+  ({ value, onValueChange, min, max, step, allowEmpty = true, className, onClamp, ...props }, ref) => {
     const [display, setDisplay] = React.useState<string>(() => {
       if (value === 0 || value === null || value === undefined) return "";
       return String(value);
     });
     const isFocusedRef = React.useRef(false);
+
+    React.useEffect(() => {
+      const input = ref && typeof ref === 'object' ? ref.current : null;
+      if (!input) return;
+      const handleWheelNative = (e: WheelEvent) => {
+        e.preventDefault();
+        input.blur();
+      };
+      input.addEventListener('wheel', handleWheelNative, { passive: false });
+      return () => input.removeEventListener('wheel', handleWheelNative);
+    }, [ref]);
 
     React.useEffect(() => {
       if (!isFocusedRef.current) {
@@ -49,6 +61,9 @@ const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
       let clamped = parsed;
       if (min !== undefined && clamped < min) clamped = min;
       if (max !== undefined && clamped > max) clamped = max;
+      if (clamped !== parsed) {
+        onClamp?.(parsed, clamped);
+      }
       onValueChange(clamped);
     };
 
@@ -70,11 +85,6 @@ const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
       props.onBlur?.(e);
     };
 
-    const handleWheel = (e: React.WheelEvent<HTMLInputElement>) => {
-      (e.target as HTMLInputElement).blur();
-      onWheel?.(e);
-    };
-
     return (
       <Input
         ref={ref}
@@ -84,7 +94,6 @@ const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
         onChange={handleChange}
         onFocus={handleFocus}
         onBlur={handleBlur}
-        onWheel={handleWheel}
         step={step ?? "any"}
         className={cn("no-spin", className)}
         {...props}

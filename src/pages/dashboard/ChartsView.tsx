@@ -1,18 +1,21 @@
 import React, { useMemo } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
 import { 
-  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend
+  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
 } from 'recharts';
-import { BarChart3, TrendingUp, Activity } from 'lucide-react';
+import { BarChart3, TrendingUp } from 'lucide-react';
 
 const COLORS = ['#d4af37', '#b8962f', '#a68527', '#947220', '#83601a', '#724e15'];
 
 export default function ChartsView() {
-  const { sales, products, recipes, movements } = useDatabaseStore();
+  const { sales, products, recipes } = useDatabaseStore();
 
   // 1. Sales Over Time (Line Chart)
   const salesOverTime = useMemo(() => {
-    const grouped = sales.reduce((acc, sale) => {
+    const sorted = [...sales].sort((a, b) =>
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+    const grouped = sorted.reduce((acc, sale) => {
       const date = new Date(sale.date).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' });
       acc[date] = (acc[date] || 0) + sale.total_amount;
       return acc;
@@ -20,7 +23,7 @@ export default function ChartsView() {
 
     return Object.entries(grouped)
       .map(([date, total]) => ({ date, total }))
-      .slice(-14); // Last 14 days with sales
+      .slice(-14);
   }, [sales]);
 
   // 2. Top Selling Products (Bar Chart) - incluye productos individuales y recetas
@@ -53,17 +56,6 @@ export default function ChartsView() {
       .sort((a, b) => b.quantity - a.quantity)
       .slice(0, 5); // Top 5
   }, [sales, products, recipes]);
-
-  // 3. Movements Distribution - ENTRADA/AJUSTE positivo, SALIDA/MERMA negativo (inflow vs outflow)
-  const movementsDistribution = useMemo(() => {
-    const dist = movements.reduce((acc, mov) => {
-      const signed = mov.type === 'SALIDA' || mov.type === 'MERMA' ? -Number(mov.quantity) : Number(mov.quantity);
-      acc[mov.type] = (acc[mov.type] || 0) + signed;
-      return acc;
-    }, {} as Record<string, number>);
-
-    return Object.entries(dist).map(([name, value]) => ({ name, value }));
-  }, [movements]);
 
   return (
     <div className="space-y-6">
@@ -143,46 +135,6 @@ export default function ChartsView() {
           </div>
         </div>
 
-        {/* Movements Distribution Chart */}
-        <div className="rounded-xl border border-border bg-surface p-6 shadow-sm">
-          <div className="mb-6 flex items-center gap-3 border-b border-border pb-4">
-            <div className="rounded-lg bg-primary/10 p-2 text-primary">
-              <Activity className="h-5 w-5" />
-            </div>
-            <h2 className="text-lg font-semibold text-text">Distribución de Movimientos</h2>
-          </div>
-          
-          <div className="h-[250px] w-full">
-            {movementsDistribution.length === 0 ? (
-              <div className="flex h-full items-center justify-center text-text-secondary">
-                No hay movimientos registrados
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={movementsDistribution} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                  <XAxis dataKey="name" stroke="#888" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#888" fontSize={12} tickLine={false} axisLine={false} />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#1a1a1a', borderColor: '#333', borderRadius: '8px' }}
-                    cursor={{ fill: '#333', opacity: 0.4 }}
-                    formatter={(value: number) => [value, 'Unidades']}
-                  />
-                  <Bar dataKey="value" fill="#d4af37" radius={[4, 4, 0, 0]} barSize={40}>
-                    {movementsDistribution.map((entry, index) => {
-                      let color = COLORS[index % COLORS.length];
-                      if (entry.name === 'ENTRADA') color = '#10b981';
-                      if (entry.name === 'SALIDA') color = '#6366f1';
-                      if (entry.name === 'MERMA') color = '#ef4444';
-                      if (entry.name === 'AJUSTE') color = '#f59e0b';
-                      return <Cell key={`cell-${entry.name}`} fill={color} />;
-                    })}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </div>
       </div>
     </div>
   );

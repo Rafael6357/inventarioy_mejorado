@@ -5,7 +5,7 @@ import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { exportToExcel } from '../../lib/utils';
-import { formatNumber } from '../../lib/formatNumber';
+import { formatNumber, formatQuantity } from '../../lib/formatNumber';
 import { useStaggerEnter } from '../../lib/animations/useStaggerEnter';
 import { useCountUp } from '../../lib/animations/useCountUp';
 import { usePersistentFilters } from '../../lib/hooks/usePersistentFilters';
@@ -36,6 +36,7 @@ export default function AnalysisView() {
   // Variables seguras para evitar errores cuando los datos no están cargados
   const safeSales = useMemo(() => Array.isArray(sales) ? sales : [], [sales]);
   const safeMovements = useMemo(() => Array.isArray(movements) ? movements : [], [movements]);
+  const cashSales = useMemo(() => safeSales.filter(s => !s.is_account_house), [safeSales]);
 
   const { filters, setFilters, resetFilters } = usePersistentFilters<{
     auditProduct: string;
@@ -124,22 +125,20 @@ export default function AnalysisView() {
       .filter(m => m.type === 'MERMA')
       .reduce((sum, m) => sum + Number(m.quantity), 0);
 
-    const stockFinal = entradas - salidas - merma;
+    const ajustes = filteredMovements
+      .filter(m => m.type === 'AJUSTE')
+      .reduce((sum, m) => sum + Number(m.quantity), 0);
 
-    const chartData = filteredMovements.map(m => ({
-      fecha: new Date(m.date).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' }),
-      cantidad: m.type === 'ENTRADA' ? Number(m.quantity) : -Number(m.quantity),
-      tipo: m.type
-    }));
+    const stockFinal = entradas - salidas - merma + ajustes;
 
     return {
       product,
       entradas,
       salidas,
       merma,
+      ajustes,
       stockFinal,
       movements: filteredMovements,
-      chartData
     };
   }, [auditProduct, auditDateFrom, auditDateTo, movements, products]);
 
@@ -163,19 +162,19 @@ export default function AnalysisView() {
   };
 
   const totalInventoryValue = useMemo(() => {
-    return activeProducts.reduce((sum, p) => sum + (p.quantity * p.cost), 0);
+    return activeProducts.reduce((sum, p) => sum + (Math.max(0, p.quantity) * p.cost) + (Math.max(0, p.in_transit || 0) * p.cost), 0);
   }, [activeProducts]);
 
   const totalSalesRevenue = useMemo(() => {
-    return safeSales.reduce((sum, s) => sum + (s?.total_amount || 0), 0);
-  }, [safeSales]);
+    return cashSales.reduce((sum, s) => sum + (s?.total_amount || 0), 0);
+  }, [cashSales]);
 
   const totalCostOfGoodsSold = useMemo(() => {
-    return safeSales.reduce((sum, s) => {
+    return cashSales.reduce((sum, s) => {
       const items = parseSaleItems(s?.items);
       return sum + items.reduce((itemSum: number, item: any) => itemSum + ((item?.quantity || 0) * (item?.unit_cost || 0)), 0);
     }, 0);
-  }, [safeSales]);
+  }, [cashSales]);
 
   const grossProfit = totalSalesRevenue - totalCostOfGoodsSold;
   const grossMargin = totalSalesRevenue > 0 ? (grossProfit / totalSalesRevenue) * 100 : 0;
@@ -237,7 +236,7 @@ export default function AnalysisView() {
       const dailySalesRate = totalOutput > 0 ? totalOutput / daysInPeriod : 0;
       const daysCoverage = dailySalesRate > 0 ? currentStock / dailySalesRate : Infinity;
       const turnoverRate = currentStock > 0 ? totalOutput / currentStock : 0;
-      const annualTurnover = daysInPeriod > 0 ? turnoverRate * (365 / daysInPeriod) : 0;
+      const annualTurnover = daysInPeriod >= 30 ? turnoverRate * (365 / daysInPeriod) : null;
       const cogs = totalOutput * Number(product.cost);
       const suggestedRop = Math.round(dailySalesRate * 7);
       
@@ -318,7 +317,7 @@ export default function AnalysisView() {
             </div>
           </div>
           <p className="mt-4 text-2xl font-bold text-text font-mono">$<span ref={inventoryCountRef}>0.00</span></p>
-          <p className="mt-1 text-xs text-text-secondary">Capital inmovilizado</p>
+          <p className="mt-1 text-xs text-text-secondary">Capital inmovilizado (incl. tránsito)</p>
         </div>
 
         <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:border-success/30 hover:shadow-[0_0_20px_-5px_rgba(34,197,94,0.15)]">
@@ -451,6 +450,12 @@ export default function AnalysisView() {
                   <p className="font-mono font-bold text-warning mt-1">-{auditData.merma}</p>
                 </div>
               )}
+              {auditData.ajustes !== 0 && (
+                <div className="rounded-lg bg-bg/50 border border-border/30 p-3 text-center">
+                  <p className="text-xs text-text-secondary">Ajustes</p>
+                  <p className="font-mono font-bold text-text mt-1">{auditData.ajustes > 0 ? `+${auditData.ajustes}` : auditData.ajustes}</p>
+                </div>
+              )}
               <div className={`rounded-lg border p-3 text-center ${auditData.stockFinal >= 0 ? 'bg-primary/10 border-primary/30' : 'bg-danger/10 border-danger/30'}`}>
                 <p className="text-xs text-text-secondary">Almacén</p>
                 <p className={`font-mono font-bold mt-1 ${auditData.stockFinal >= 0 ? 'text-primary' : 'text-danger'}`}>
@@ -459,7 +464,7 @@ export default function AnalysisView() {
               </div>
             </div>
 
-            {auditData.chartData.length === 0 && (
+            {auditData.movements.length === 0 && (
               <p className="mt-4 text-sm text-text-secondary text-center py-4">
                 No hay movimientos en este período para este producto.
               </p>
@@ -629,15 +634,15 @@ export default function AnalysisView() {
                           <div className="font-medium">{item.product.name}</div>
                           <div className="text-xs text-text-secondary">{item.product.category}</div>
                         </td>
-                        <td className="px-4 py-3 text-right font-mono">{item.totalOutput.toFixed(2)}</td>
-                        <td className="px-4 py-3 text-right font-mono">{item.currentStock.toFixed(2)} {item.product.unit}</td>
+                        <td className="px-4 py-3 text-right font-mono" title={`Ventas Directas: ${formatQuantity(item.ventasDirectas, item.product.unit)} | Recetas: ${formatQuantity(item.ventasEnRecetas, item.product.unit)} | Consumo Directo: ${formatQuantity(item.consumoDirecto, item.product.unit)} | Salidas Tránsito: ${formatQuantity(item.totalOutput - item.ventasDirectas - item.ventasEnRecetas - item.consumoDirecto, item.product.unit)}`}>{formatQuantity(item.totalOutput, item.product.unit)}</td>
+                        <td className="px-4 py-3 text-right font-mono">{formatQuantity(item.currentStock, item.product.unit)} {item.product.unit}</td>
                         <td className={`px-4 py-3 text-right font-mono font-medium ${
                           item.classification === 'Crítico' ? 'text-danger' :
                           item.classification === 'Exceso' ? 'text-success' : 'text-warning'
                         }`}>
                           {item.daysCoverage > 999 ? '∞' : item.daysCoverage.toFixed(1)} días
                         </td>
-                        <td className="px-4 py-3 text-right font-mono">{item.annualTurnover.toFixed(1)}x</td>
+                        <td className="px-4 py-3 text-right font-mono">{item.annualTurnover !== null ? `${item.annualTurnover.toFixed(1)}x` : '—'}</td>
                         <td className="px-4 py-3 text-right font-mono">{item.suggestedRop}</td>
                         <td className="px-4 py-3">
                           <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${

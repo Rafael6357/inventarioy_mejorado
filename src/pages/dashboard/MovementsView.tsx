@@ -1,6 +1,6 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
-import { Search, Filter, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, Calendar, ChevronLeft, ChevronRight, TrendingDown, Settings2, Printer, X } from 'lucide-react';
+import { Search, Filter, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, Calendar, ChevronLeft, ChevronRight, TrendingDown, Settings2, Printer, X, Loader2 } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
@@ -103,7 +103,22 @@ if (endDate) {
 
   useEffect(() => {
     setCurrentPage(1);
+    setShowLoadMore(true);
   }, [searchTerm, typeFilter, startDate, endDate]);
+
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [showLoadMore, setShowLoadMore] = useState(true);
+
+  const loadMore = async () => {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    const previousCount = useDatabaseStore.getState().movements.length;
+    await fetchMore(50);
+    setLoadingMore(false);
+    if (useDatabaseStore.getState().movements.length === previousCount) {
+      setShowLoadMore(false);
+    }
+  };
 
   const totalPages = Math.ceil(filteredMovements.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -337,6 +352,25 @@ if (endDate) {
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
+            </div>
+          )}
+
+          {showLoadMore && (
+            <div className="flex justify-center py-4 border-t border-border">
+              <Button
+                variant="outline"
+                onClick={loadMore}
+                disabled={loadingMore}
+              >
+                {loadingMore ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Cargando...
+                  </>
+                ) : (
+                  <>Cargar 50 más ({useDatabaseStore.getState().movements.length} cargados)</>
+                )}
+              </Button>
             </div>
           )}
         </div>

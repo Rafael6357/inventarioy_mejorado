@@ -133,13 +133,13 @@ export default function FilteredCenterView() {
             ];
             const data = filteredAndSortedProducts.map(p => {
               const physicalStock = Number(p.quantity);
-              const margin = p.price && p.price > 0 ? ((p.price - p.cost) / p.price) * 100 : 0;
+              const margin = p.is_individual && p.price && p.price > 0 ? ((p.price - p.cost) / p.price) * 100 : 0;
               const state = (Number(p.rop) || 0) === 0 ? 'Sin configurar' : (physicalStock <= p.rop ? 'Bajo' : (physicalStock > p.rop * 2 ? 'Exceso' : 'Normal'));
               return {
                 ...p,
                 stock: physicalStock,
                 state: state,
-                price: Number(p.price) || 0,
+                price: p.is_individual ? (Number(p.price) || 0) : 0,
                 margin: margin,
                 totalValue: physicalStock * Number(p.cost),
               };
@@ -312,15 +312,15 @@ export default function FilteredCenterView() {
                         )}
                       </td>
                       <td className="px-4 py-3 font-mono text-text-secondary">
-                        ${product.price.toFixed(2)}
+                        {product.is_individual ? `$${product.price.toFixed(2)}` : <span className="text-text-secondary">—</span>}
                       </td>
                       <td className="px-4 py-3 font-mono">
-                        {product.price && product.price > 0 ? (
-                          <span className={calculateMargin(Number(product.cost), Number(product.price)) < 30 ? 'text-warning' : 'text-green-600'}>
+                        {product.is_individual && product.price && product.price > 0 ? (
+                          <span className={calculateMargin(Number(product.cost), Number(product.price)) < 30 ? 'text-warning' : 'text-success'}>
                             {calculateMargin(Number(product.cost), Number(product.price)).toFixed(2)}%
                           </span>
                         ) : (
-                          <span className="text-text-secondary">-</span>
+                          <span className="text-text-secondary">—</span>
                         )}
                       </td>
                       <td className="px-4 py-3 font-mono font-medium text-text">

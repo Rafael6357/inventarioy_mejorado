@@ -4,9 +4,46 @@ import { useAuthStore } from '../../store/authStore';
 import { Plus, Minus, Trash2, ShoppingCart, CreditCard, Search, X, DollarSign, User, PlusCircle, Users, Loader2, Printer, AlertCircle } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
+import { NumberInput } from '../../components/ui/NumberInput';
 import { toast } from 'sonner';
 import { validateNumber, getNumberFromString, exportToExcel } from '../../lib/utils';
+import { isDateClosed } from '../../lib/dateUtils';
 import TicketView from './TicketView';
+
+type PaymentField = 'efectivo' | 'transferencia' | 'usd' | 'eur';
+type PaymentValues = Record<PaymentField, number>;
+
+function calculateFieldMax(
+  field: PaymentField,
+  values: PaymentValues,
+  totalCUP: number,
+  usdRate: number,
+  eurRate: number,
+  cupTransferEnabled: boolean,
+  usdEnabled: boolean,
+  eurEnabled: boolean
+): number {
+  if (totalCUP <= 0) return 0;
+  const othersCUP =
+    (Number(field !== 'efectivo' ? values.efectivo : 0) || 0) +
+    (Number(field !== 'transferencia' && cupTransferEnabled ? values.transferencia : 0) || 0) +
+    (Number(field !== 'usd' && usdEnabled ? values.usd : 0) || 0) * (usdRate || 0) +
+    (Number(field !== 'eur' && eurEnabled ? values.eur : 0) || 0) * (eurRate || 0);
+  const remainingCUP = Math.max(0, totalCUP - othersCUP);
+  const rate =
+    field === 'efectivo' ? 1 :
+    field === 'transferencia' ? (cupTransferEnabled ? 1 : 0) :
+    field === 'usd' ? (usdEnabled ? usdRate : 0) :
+    (eurEnabled ? eurRate : 0);
+  if (rate <= 0) return 0;
+  return Math.round((remainingCUP / rate) * 100) / 100;
+}
+
+function showPaymentClampWarning(raw: number, clamped: number) {
+  if (raw - clamped > 0.01) {
+    toast.warning(`Máximo permitido: $${clamped.toFixed(2)}`, { duration: 2000 });
+  }
+}
 
 export default function SalesView() {
   const { user } = useAuthStore();
@@ -216,10 +253,7 @@ export default function SalesView() {
   const todayDiscounts = todaySales.reduce((sum, s) => sum + (Number(s.discount) || 0), 0);
   const todayRefunds = 0;
 
-  const isClosed = dailyClosings.some(c => {
-    const d = new Date(c.closing_date).toISOString().split('T')[0];
-    return d === closingDate;
-  });
+  const isClosed = isDateClosed(dailyClosings, closingDate);
 
   const handleExportSales = () => {
     const columns = [
@@ -1243,32 +1277,36 @@ setShowTicket(true);
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs text-text-secondary block mb-1">Efectivo (CUP)</label>
-                  <Input
-                    type="number"
+                  <NumberInput
                     min="0"
+                    max={calculateFieldMax('efectivo', salePaymentMethod, total, user?.usdRate || 0, user?.eurRate || 0, !!user?.cupTransferEnabled, !!user?.usdEnabled, !!user?.eurEnabled)}
                     className="font-mono"
-                    value={salePaymentMethod.efectivo || ''}
-                    onChange={e => {
-                      setSalePaymentMethod(prev => ({...prev, efectivo: Number(e.target.value)}));
+                    value={salePaymentMethod.efectivo || 0}
+                    onValueChange={v => {
+                      setSalePaymentMethod(prev => ({...prev, efectivo: v}));
                       setPaymentError(null);
                       setPaymentWarning(null);
                     }}
+                    onClamp={showPaymentClampWarning}
+                    onFocus={(e) => e.target.select()}
                     placeholder="0.00"
                   />
                 </div>
                 {user?.cupTransferEnabled && (
                 <div>
                   <label className="text-xs text-text-secondary block mb-1">Transferencia (CUP)</label>
-                  <Input
-                    type="number"
+                  <NumberInput
                     min="0"
+                    max={calculateFieldMax('transferencia', salePaymentMethod, total, user?.usdRate || 0, user?.eurRate || 0, !!user?.cupTransferEnabled, !!user?.usdEnabled, !!user?.eurEnabled)}
                     className="font-mono"
-                    value={salePaymentMethod.transferencia || ''}
-                    onChange={e => {
-                      setSalePaymentMethod(prev => ({...prev, transferencia: Number(e.target.value)}));
+                    value={salePaymentMethod.transferencia || 0}
+                    onValueChange={v => {
+                      setSalePaymentMethod(prev => ({...prev, transferencia: v}));
                       setPaymentError(null);
                       setPaymentWarning(null);
                     }}
+                    onClamp={showPaymentClampWarning}
+                    onFocus={(e) => e.target.select()}
                     placeholder="0.00"
                   />
                 </div>
@@ -1276,16 +1314,18 @@ setShowTicket(true);
                 {user?.usdEnabled && (
                 <div>
                   <label className="text-xs text-text-secondary block mb-1">USD (1 USD = {user.usdRate} CUP)</label>
-                  <Input
-                    type="number"
+                  <NumberInput
                     min="0"
+                    max={calculateFieldMax('usd', salePaymentMethod, total, user?.usdRate || 0, user?.eurRate || 0, !!user?.cupTransferEnabled, !!user?.usdEnabled, !!user?.eurEnabled)}
                     className="font-mono"
-                    value={salePaymentMethod.usd || ''}
-                    onChange={e => {
-                      setSalePaymentMethod(prev => ({...prev, usd: Number(e.target.value)}));
+                    value={salePaymentMethod.usd || 0}
+                    onValueChange={v => {
+                      setSalePaymentMethod(prev => ({...prev, usd: v}));
                       setPaymentError(null);
                       setPaymentWarning(null);
                     }}
+                    onClamp={showPaymentClampWarning}
+                    onFocus={(e) => e.target.select()}
                     placeholder="0.00"
                   />
                 </div>
@@ -1293,16 +1333,18 @@ setShowTicket(true);
                 {user?.eurEnabled && (
                 <div>
                   <label className="text-xs text-text-secondary block mb-1">EUR (1 EUR = {user.eurRate} CUP)</label>
-                  <Input
-                    type="number"
+                  <NumberInput
                     min="0"
+                    max={calculateFieldMax('eur', salePaymentMethod, total, user?.usdRate || 0, user?.eurRate || 0, !!user?.cupTransferEnabled, !!user?.usdEnabled, !!user?.eurEnabled)}
                     className="font-mono"
-                    value={salePaymentMethod.eur || ''}
-                    onChange={e => {
-                      setSalePaymentMethod(prev => ({...prev, eur: Number(e.target.value)}));
+                    value={salePaymentMethod.eur || 0}
+                    onValueChange={v => {
+                      setSalePaymentMethod(prev => ({...prev, eur: v}));
                       setPaymentError(null);
                       setPaymentWarning(null);
                     }}
+                    onClamp={showPaymentClampWarning}
+                    onFocus={(e) => e.target.select()}
                     placeholder="0.00"
                   />
                 </div>
@@ -1350,7 +1392,7 @@ setShowTicket(true);
                 onChange={e => setSelectedPendingAccount(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg border border-border/50 bg-bg text-text text-sm"
               >
-                <option value="">Nueva Venta</option>
+                <option value="">Venta Rápida</option>
                 {pendingAccounts.map(account => (
                   <option key={account.id} value={account.id}>
                     {account.client_name} (${(account.total_amount || 0).toFixed(2)})
@@ -1786,24 +1828,26 @@ setShowTicket(true);
             <div className="space-y-4 mb-6">
               <div>
                 <label className="text-sm text-text-secondary block mb-1">Efectivo (CUP)</label>
-                <Input
-                  type="number"
+                <NumberInput
                   min="0"
+                  max={calculateFieldMax('efectivo', chargeBreakdown, selectedAccountForCharge.total_amount || 0, user?.usdRate || 0, user?.eurRate || 0, !!user?.cupTransferEnabled, !!user?.usdEnabled, !!user?.eurEnabled)}
                   className="font-mono"
-                  value={chargeBreakdown.efectivo || ''}
-                  onChange={e => setChargeBreakdown(prev => ({...prev, efectivo: Number(e.target.value)}))}
+                  value={chargeBreakdown.efectivo || 0}
+                  onValueChange={v => setChargeBreakdown(prev => ({...prev, efectivo: v}))}
+                  onClamp={showPaymentClampWarning}
                   placeholder="0.00"
                 />
               </div>
               {user?.cupTransferEnabled && (
               <div>
                 <label className="text-sm text-text-secondary block mb-1">Transferencia (CUP)</label>
-                <Input
-                  type="number"
+                <NumberInput
                   min="0"
+                  max={calculateFieldMax('transferencia', chargeBreakdown, selectedAccountForCharge.total_amount || 0, user?.usdRate || 0, user?.eurRate || 0, !!user?.cupTransferEnabled, !!user?.usdEnabled, !!user?.eurEnabled)}
                   className="font-mono"
-                  value={chargeBreakdown.transferencia || ''}
-                  onChange={e => setChargeBreakdown(prev => ({...prev, transferencia: Number(e.target.value)}))}
+                  value={chargeBreakdown.transferencia || 0}
+                  onValueChange={v => setChargeBreakdown(prev => ({...prev, transferencia: v}))}
+                  onClamp={showPaymentClampWarning}
                   placeholder="0.00"
                 />
               </div>
@@ -1811,12 +1855,13 @@ setShowTicket(true);
               {user?.usdEnabled && (
               <div>
                 <label className="text-sm text-text-secondary block mb-1">USD (1 USD = {user.usdRate} CUP)</label>
-                <Input
-                  type="number"
+                <NumberInput
                   min="0"
+                  max={calculateFieldMax('usd', chargeBreakdown, selectedAccountForCharge.total_amount || 0, user?.usdRate || 0, user?.eurRate || 0, !!user?.cupTransferEnabled, !!user?.usdEnabled, !!user?.eurEnabled)}
                   className="font-mono"
-                  value={chargeBreakdown.usd || ''}
-                  onChange={e => setChargeBreakdown(prev => ({...prev, usd: Number(e.target.value)}))}
+                  value={chargeBreakdown.usd || 0}
+                  onValueChange={v => setChargeBreakdown(prev => ({...prev, usd: v}))}
+                  onClamp={showPaymentClampWarning}
                   placeholder="0.00"
                 />
               </div>
@@ -1824,12 +1869,13 @@ setShowTicket(true);
               {user?.eurEnabled && (
               <div>
                 <label className="text-sm text-text-secondary block mb-1">EUR (1 EUR = {user.eurRate} CUP)</label>
-                <Input
-                  type="number"
+                <NumberInput
                   min="0"
+                  max={calculateFieldMax('eur', chargeBreakdown, selectedAccountForCharge.total_amount || 0, user?.usdRate || 0, user?.eurRate || 0, !!user?.cupTransferEnabled, !!user?.usdEnabled, !!user?.eurEnabled)}
                   className="font-mono"
-                  value={chargeBreakdown.eur || ''}
-                  onChange={e => setChargeBreakdown(prev => ({...prev, eur: Number(e.target.value)}))}
+                  value={chargeBreakdown.eur || 0}
+                  onValueChange={v => setChargeBreakdown(prev => ({...prev, eur: v}))}
+                  onClamp={showPaymentClampWarning}
                   placeholder="0.00"
                 />
               </div>
