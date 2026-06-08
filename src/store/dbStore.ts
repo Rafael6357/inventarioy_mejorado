@@ -4,6 +4,7 @@ import { useAuthStore } from './authStore';
 import { toast } from 'sonner';
 import { cacheAllData, getCachedProducts, getCachedMovements, getCachedWarehouses, getCachedTransitItems, getCachedSales, getCachedRecipes, getCachedEmployees, getCachedCategories, getCachedPendingAccounts, getCachedDailyClosings, getCachedAccessPins, getCachedProductWarehouse, getSyncQueueCount, addToSyncQueue } from '../lib/dexieDb';
 import { syncEngine } from '../lib/syncEngine';
+import { isDateClosed } from '../lib/dateUtils';
 
 let _isFetchingAll = false;
 
@@ -1061,6 +1062,9 @@ addProduct: async (product) => {
     if (!user) throw new Error('No hay usuario autenticado');
 
     const movementDate = movement.date || new Date().toISOString();
+    if (isDateClosed(get().dailyClosings, new Date(movementDate).toISOString().split('T')[0])) {
+      throw new Error('El día está cerrado, no se pueden registrar movimientos');
+    }
     const product = get().products.find(p => p.id === movement.product_id);
     if (!product) throw new Error('Producto no encontrado');
 
@@ -1089,6 +1093,11 @@ addProduct: async (product) => {
             pw.product_id === movement.product_id && pw.warehouse_id === movement.warehouse_id
               ? { ...pw, quantity: newQty } : pw
           ),
+          products: movement.type !== 'SALIDA' ? state.products.map(p =>
+            p.id === movement.product_id
+              ? { ...p, quantity: Math.max(0, newQty) }
+              : p
+          ) : state.products,
         }));
 
         if (movement.type === 'ENTRADA') {
@@ -1213,6 +1222,14 @@ addProduct: async (product) => {
             const newCost = (currentTotalValue + newTotalValue) / totalQty;
             await get().updateProduct(movement.product_id, { cost: newCost });
           }
+
+          set((state) => ({
+            products: state.products.map(p =>
+              p.id === movement.product_id
+                ? { ...p, quantity: Math.max(0, Number(p.quantity || 0) + Number(movement.quantity)) }
+                : p
+            ),
+          }));
         } else if (movement.type === 'SALIDA') {
           if (currentQty < Number(movement.quantity)) {
             throw new Error(`Stock insuficiente en almacén para ${product.name}: disponible ${currentQty}, solicitado ${movement.quantity}`);
@@ -1259,8 +1276,22 @@ addProduct: async (product) => {
           }
         } else if (movement.type === 'MERMA') {
           await get().updateProductWarehouseQuantity(movement.product_id, movement.warehouse_id, Math.max(0, currentQty - Number(movement.quantity)), true);
+          set((state) => ({
+            products: state.products.map(p =>
+              p.id === movement.product_id
+                ? { ...p, quantity: Math.max(0, Number(p.quantity || 0) - Number(movement.quantity)) }
+                : p
+            ),
+          }));
         } else if (movement.type === 'AJUSTE') {
           await get().updateProductWarehouseQuantity(movement.product_id, movement.warehouse_id, Math.max(0, currentQty + Number(movement.quantity)), true);
+          set((state) => ({
+            products: state.products.map(p =>
+              p.id === movement.product_id
+                ? { ...p, quantity: Math.max(0, Number(p.quantity || 0) + Number(movement.quantity)) }
+                : p
+            ),
+          }));
         }
 
         set((state) => ({ movements: [newMovement, ...state.movements] }));
@@ -1494,6 +1525,11 @@ addProduct: async (product) => {
   addSale: async (sale) => {
     const user = useAuthStore.getState().user;
     if (!user) return { success: false, error: 'No hay usuario autenticado' };
+
+    const saleDate = new Date(sale.date).toISOString().split('T')[0];
+    if (isDateClosed(get().dailyClosings, saleDate)) {
+      return { success: false, error: 'El día está cerrado, no se pueden registrar ventas' };
+    }
 
     const itemsToConsume: { productId: string; name: string; qtyNeeded: number; qtyAvailable: number }[] = [];
     const productsMap = new Map(get().products.map(p => [p.id, p]));
@@ -2483,6 +2519,10 @@ deletePendingAccount: async (accountId: string) => {
 
     const date = saleDate || new Date().toISOString().split('T')[0];
     
+    if (isDateClosed(get().dailyClosings, date)) {
+      return { success: false, error: 'El día está cerrado, no se puede cobrar' };
+    }
+    
     if (!navigator.onLine) {
       const saleItems = (account.items as any[]).map(item => ({
         product_id: item.product_id,
@@ -2517,7 +2557,7 @@ deletePendingAccount: async (accountId: string) => {
       if (!result.success) return result;
 
       set((state) => ({
-        pendingAccounts: state.pendingAccounts.map(a => a.id === accountId ? { ...a, status: 'paid' as const, updated_at: new Date().toISOString() } : a),
+        pendingAccounts: state.pendingAccounts.filter(a => a.id !== accountId),
       }));
 
       await addToSyncQueue({
@@ -2528,15 +2568,6 @@ deletePendingAccount: async (accountId: string) => {
       return { success: true };
     }
 
-    const isClosed = get().dailyClosings.some(c => {
-      const d = new Date(c.closing_date).toISOString().split('T')[0];
-      return d === date;
-    });
-    
-    if (isClosed) {
-      return { success: false, error: 'El día está cerrado, no se puede cobrar' };
-    }
-    
     const saleItems = (account.items as any[]).map(item => {
       const itemIsRecipe = item.is_recipe || false;
       const itemRecipeSnapshot = item.recipe_snapshot || null;
@@ -3544,6 +3575,11 @@ deletePendingAccount: async (accountId: string) => {
   createDailyClosing: async (closing) => {
     const user = useAuthStore.getState().user;
     if (!user) return { success: false, error: 'No autenticado' };
+
+    const closingDate = new Date(closing.closing_date).toISOString().split('T')[0];
+    if (isDateClosed(get().dailyClosings, closingDate)) {
+      return { success: false, error: 'Ya existe un cierre para esta fecha' };
+    }
 
     if (!navigator.onLine) {
       const id = crypto.randomUUID();
