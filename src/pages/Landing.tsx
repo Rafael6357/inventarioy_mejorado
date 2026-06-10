@@ -1,4 +1,4 @@
-import { Package, ShoppingCart, ChefHat, Sparkles, ChevronDown, CheckCircle2, Loader2, Users, Instagram, Facebook, Phone, MapPin, DollarSign, Headphones, MessageCircle, Menu, X, LogIn, UserPlus, ClipboardList, TrendingUp, Store, BarChart3, Database, Activity, Star, Quote } from 'lucide-react';
+import { Package, ShoppingCart, ChefHat, Sparkles, ChevronDown, CheckCircle2, Loader2, Users, Instagram, Facebook, Phone, MapPin, DollarSign, Headphones, MessageCircle, Menu, X, LogIn, UserPlus, ClipboardList, TrendingUp, Store, BarChart3, Database, Activity, Star, Quote, Play } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
@@ -178,6 +178,12 @@ export default function Landing() {
                 <a href="#pricing">
                   <Button variant="outline" size="lg" className="w-full sm:w-auto text-base h-12 px-8">
                     Ver Plan
+                  </Button>
+                </a>
+                <a href="https://youtu.be/DWl2cgeqcRA" target="_blank" rel="noopener noreferrer">
+                  <Button size="lg" className="w-full sm:w-auto text-base h-12 px-8 gap-2 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white shadow-lg shadow-red-500/25 hover:shadow-red-500/40 transition-all duration-300" variant="default">
+                    <Play className="h-4 w-4" />
+                    Aprende a usar la App
                   </Button>
                 </a>
               </div>
