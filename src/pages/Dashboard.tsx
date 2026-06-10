@@ -13,7 +13,6 @@ import {
   BarChart3, 
   PieChart, 
   Filter, 
-  Sparkles, 
   Settings, 
   LogOut,
   Menu,
@@ -45,7 +44,6 @@ import AnalysisView from './dashboard/AnalysisView';
 import ChartsView from './dashboard/ChartsView';
 import ConsumptionView from './dashboard/ConsumptionView';
 import FilteredCenterView from './dashboard/FilteredCenterView';
-import AIView from './dashboard/AIView';
 import SettingsView from './dashboard/SettingsView';
 import ActionLogsView from './dashboard/ActionLogsView';
 import UsersView from './dashboard/UsersView';
@@ -103,7 +101,6 @@ export default function Dashboard() {
     { name: 'Análisis', href: '/dashboard/analysis', icon: BarChart3 },
     { name: 'Gráficos', href: '/dashboard/charts', icon: PieChart },
     { name: 'Centro Filtrado', href: '/dashboard/filtered', icon: Filter },
-    { name: 'Asistente IA', href: '/dashboard/ai', icon: Sparkles },
     // RRHH
     { name: 'RRHH', href: '/dashboard/hr', icon: Users },
     // CONFIGURACIÓN
@@ -506,7 +503,6 @@ export default function Dashboard() {
               <Route path="/analysis" element={<AnalysisView />} />
               <Route path="/charts" element={<ChartsView />} />
               <Route path="/filtered" element={<FilteredCenterView />} />
-              <Route path="/ai" element={<AIView />} />
               <Route path="/settings" element={<SettingsView />} />
               <Route path="/action-logs" element={<ActionLogsView />} />
               {user?.email === 'nikko6357@gmail.com' && (
