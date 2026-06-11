@@ -48,12 +48,10 @@ import SettingsView from './dashboard/SettingsView';
 import ActionLogsView from './dashboard/ActionLogsView';
 import UsersView from './dashboard/UsersView';
 import DailyClosingsView from './dashboard/DailyClosingsView';
-import OnboardingWizard, { shouldShowOnboarding } from '../components/OnboardingWizard';
 import PhoneModal from '../components/PhoneModal';
 import { syncEngine } from '../lib/syncEngine';
 
 export default function Dashboard() {
-  const [showOnboarding, setShowOnboarding] = useState(() => shouldShowOnboarding());
   const [showPhoneModal, setShowPhoneModal] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
@@ -548,11 +546,6 @@ export default function Dashboard() {
             </div>
           </div>
         )}
-
-        <OnboardingWizard
-          isOpen={showOnboarding}
-          onClose={() => setShowOnboarding(false)}
-        />
 
         <PhoneModal
           isOpen={showPhoneModal}

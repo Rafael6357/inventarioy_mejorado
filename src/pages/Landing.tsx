@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
 import InventarioYLogo from '../components/InventarioYLogo';
+import TutorialPromptModal, { shouldShowTutorialPrompt } from '../components/TutorialPromptModal';
 import { supabase } from '../lib/supabase';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
@@ -13,9 +14,16 @@ gsap.registerPlugin(ScrollTrigger);
 export default function Landing() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showTutorialPrompt, setShowTutorialPrompt] = useState(() => shouldShowTutorialPrompt());
   const [stats, setStats] = useState<{ products: number; movements: number; users: number; sales: number } | null>(null);
   const [statsError, setStatsError] = useState(false);
   const [isAnnual, setIsAnnual] = useState(false);
+
+  useEffect(() => {
+    if (shouldShowTutorialPrompt()) {
+      setShowTutorialPrompt(true);
+    }
+  }, []);
 
   useEffect(() => {
     supabase.rpc('get_public_stats').then(({ data, error }) => {
@@ -665,6 +673,15 @@ export default function Landing() {
           <p className="text-sm">© {new Date().getFullYear()} InventarioY. Todos los derechos reservados.</p>
         </div>
       </footer>
+
+      <TutorialPromptModal
+        isOpen={showTutorialPrompt}
+        onClose={() => setShowTutorialPrompt(false)}
+        onAccept={() => {
+          window.open('https://youtu.be/DWl2cgeqcRA', '_blank', 'noopener,noreferrer');
+          setShowTutorialPrompt(false);
+        }}
+      />
     </div>
   );
 }

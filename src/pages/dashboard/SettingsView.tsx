@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { useDatabaseStore } from '../../store/dbStore';
-import { Settings, Save, User, Shield, Printer, MessageSquare, DollarSign, QrCode, Copy, ExternalLink, Download, Sparkles, RotateCcw, Lock, ShoppingCart } from 'lucide-react';
+import { Settings, Save, User, Shield, Printer, MessageSquare, DollarSign, QrCode, Copy, ExternalLink, Download, Sparkles, Lock, ShoppingCart } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
@@ -533,29 +533,6 @@ export default function SettingsView() {
             SECCIÓN 5: SISTEMA
             Card completo
             ============================================ */}
-        <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(255,193,7,0.15)]">
-          <h2 className="text-lg font-semibold text-text mb-4 flex items-center gap-2">
-            <Settings className="h-5 w-5 text-primary" />
-            Sistema
-          </h2>
-          <div className="flex items-center justify-between p-4 bg-bg/50 rounded-lg">
-            <div className="space-y-1">
-              <Label className="text-sm font-medium">Tour de Bienvenida</Label>
-              <p className="text-xs text-text-secondary">Reinicia el onboarding para ver el tour nuevamente</p>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                localStorage.removeItem('onboarding_completed');
-                toast.success('Onboarding reiniciado. Recarga la página.');
-              }}
-            >
-              <RotateCcw className="h-3 w-3 mr-1" />
-              Reiniciar
-            </Button>
-          </div>
-        </div>
 
         {/* ============================================
             SECCIÓN 6: SINCRONIZACIÓN
