@@ -13,6 +13,7 @@ import { useCountUp } from '../../lib/animations/useCountUp';
 import { usePersistentFilters } from '../../lib/hooks/usePersistentFilters';
 
 const ITEMS_PER_PAGE = 10;
+const DEFAULT_SUBSCRIPTION_DAYS = 30 as const;
 
 interface UserProfile {
   id: string;
@@ -38,6 +39,16 @@ interface Payment {
   notes: string;
   payment_date: string;
   created_at: string;
+}
+
+interface ConfirmDialog {
+  show: boolean;
+  title: string;
+  message: string;
+  confirmText: string;
+  cancelText: string;
+  variant: 'danger' | 'warning';
+  onConfirm: () => void;
 }
 
 export default function UsersView() {
@@ -66,7 +77,8 @@ export default function UsersView() {
   const [loadingPayments, setLoadingPayments] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
   const [deletingPaymentId, setDeletingPaymentId] = useState<string | null>(null);
-  const [subscriptionDays, setSubscriptionDays] = useState<30 | 365>(30);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog>({ show: false, title: '', message: '', confirmText: '', cancelText: '', variant: 'warning', onConfirm: () => {} });
+  const [subscriptionDays, setSubscriptionDays] = useState<30 | 365>(DEFAULT_SUBSCRIPTION_DAYS);
   const isMountedRef = useRef(true);
   const lastFetchController = useRef<AbortController | null>(null);
   const staggerRef = useStaggerEnter([totalCount]);
@@ -219,7 +231,7 @@ export default function UsersView() {
 
   const closePaymentModal = () => {
     setShowPaymentModal(false);
-    setSubscriptionDays(30);
+    setSubscriptionDays(DEFAULT_SUBSCRIPTION_DAYS);
     setTimeout(() => {
       if (isMountedRef.current) {
         setSelectedUser(null);
@@ -330,6 +342,58 @@ export default function UsersView() {
       default:
         return <span className="inline-flex items-center gap-1 rounded-full bg-text-secondary/10 px-2.5 py-1 text-xs font-medium text-text-secondary">Desconocido</span>;
     }
+  };
+
+  const processPaymentAction = async (profile: UserProfile, formAmount: string, formMethod: string, formReference: string, formNotes: string, formDate: string, formEl: HTMLFormElement) => {
+    const { error: paymentError } = await supabase.from('payments').insert({
+      user_id: profile.id,
+      admin_id: user?.id,
+      amount: Number(formAmount),
+      payment_method: formMethod || 'No especificado',
+      reference: formReference,
+      notes: formNotes,
+      payment_date: formDate || new Date().toISOString().split('T')[0],
+    });
+
+    if (paymentError) {
+      toast.error('Error al registrar el pago');
+      return;
+    }
+
+    const now = new Date();
+    let startDate = now;
+
+    if (profile.subscription_status === 'active' && profile.valid_until) {
+      const currentValidDate = new Date(profile.valid_until);
+      if (currentValidDate > now) {
+        startDate = currentValidDate;
+      }
+    }
+
+    const newDate = new Date(startDate.getTime() + (subscriptionDays * 24 * 60 * 60 * 1000));
+    const formattedDate = newDate.toISOString().split('T')[0];
+
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({
+        subscription_status: 'active',
+        valid_until: formattedDate
+      })
+      .eq('id', profile.id);
+
+    if (updateError) {
+      toast.error('Pago registrado pero error al activar suscripción');
+    } else {
+      toast.success(`Pago registrado y suscripción activada por ${subscriptionDays} días`);
+    }
+
+    setSubscriptionDays(DEFAULT_SUBSCRIPTION_DAYS);
+    formEl.reset();
+    fetchProfiles();
+    if (isMountedRef.current) {
+      fetchUserPayments(profile.id);
+    }
+    closePaymentModal();
   };
 
   const handleStatusChange = async (profile: UserProfile, newStatus: UserProfile['subscription_status'], validUntil?: string | null) => {
@@ -797,14 +861,24 @@ export default function UsersView() {
                   <div className="mt-3 pt-3 border-t border-border">
                     <button
                       onClick={() => {
-                        if (window.confirm('¿Estás seguro de cancelar la suscripción de este usuario?')) {
-                          handleStatusChange(selectedUser, 'canceled');
-                        }
+                        setConfirmDialog({
+                          show: true,
+                          title: 'Cancelar Suscripción',
+                          message: '¿Estás seguro de cancelar la suscripción de este usuario? Esta acción no se puede deshacer.',
+                          confirmText: 'Sí, cancelar',
+                          cancelText: 'No',
+                          variant: 'danger',
+                          onConfirm: () => handleStatusChange(selectedUser, 'canceled'),
+                        });
                       }}
                       disabled={savingStatus}
                       className="w-full flex items-center justify-center gap-2 rounded-lg bg-danger/10 px-3 py-2 text-xs font-medium text-danger hover:bg-danger/20 transition-colors disabled:opacity-50"
                     >
-                      <XCircle className="h-3 w-3" /> Cancelar Suscripción
+                      {savingStatus ? (
+                        <span className="h-3 w-3 animate-spin rounded-full border-2 border-danger border-t-transparent" />
+                      ) : (
+                        <XCircle className="h-3 w-3" />
+                      )} Cancelar Suscripción
                     </button>
                   </div>
                 )}
@@ -827,7 +901,7 @@ export default function UsersView() {
                       <div key={pmt.id} className="flex items-center justify-between rounded-lg border border-border bg-bg px-3 py-2 text-xs">
                         <div>
                           <p className="font-medium text-text">
-                            ${Number(pmt.amount).toLocaleString('es-CO')}
+                            {pmt.amount}
                             {pmt.payment_method && <span className="text-text-secondary ml-1">({pmt.payment_method})</span>}
                           </p>
                           <p className="text-text-secondary">
@@ -879,61 +953,18 @@ export default function UsersView() {
 
                   const currentDays = getDaysRemaining(selectedUser!);
                   if (selectedUser!.subscription_status === 'active' && currentDays > 0) {
-                    const confirmed = window.confirm(
-                      `El usuario ya tiene ${currentDays} días restantes. ¿Está seguro de activar por ${subscriptionDays} días adicionales?`
-                    );
-                    if (!confirmed) return;
-                  }
-
-                  const { error: paymentError } = await supabase.from('payments').insert({
-                    user_id: selectedUser.id,
-                    admin_id: user?.id,
-                    amount: Number(amount),
-                    payment_method: method || 'No especificado',
-                    reference: reference,
-                    notes: notes,
-                    payment_date: date || new Date().toISOString().split('T')[0],
-                  });
-
-                  if (paymentError) {
-                    toast.error('Error al registrar el pago');
+                    setConfirmDialog({
+                      show: true,
+                      title: 'Activar Suscripción',
+                      message: `El usuario ya tiene ${currentDays} días restantes. ¿Está seguro de activar por ${subscriptionDays} días adicionales?`,
+                      confirmText: 'Sí, activar',
+                      cancelText: 'Cancelar',
+                      variant: 'warning',
+                      onConfirm: () => processPaymentAction(selectedUser!, amount, method, reference, notes, date, form),
+                    });
                     return;
                   }
-
-                  const now = new Date();
-                  let startDate = now;
-
-                  if (selectedUser.subscription_status === 'active' && selectedUser.valid_until) {
-                    const currentValidDate = new Date(selectedUser.valid_until);
-                    if (currentValidDate > now) {
-                      startDate = currentValidDate;
-                    }
-                  }
-
-                  const newDate = new Date(startDate.getTime() + (subscriptionDays * 24 * 60 * 60 * 1000));
-                  const formattedDate = newDate.toISOString().split('T')[0];
-
-                  const { error: updateError } = await supabase
-                    .from('profiles')
-                    .update({
-                      subscription_status: 'active',
-                      valid_until: formattedDate
-                    })
-                    .eq('id', selectedUser.id);
-
-                  if (updateError) {
-                    toast.error('Pago registrado pero error al activar suscripción');
-                  } else {
-                    toast.success(`Pago registrado y suscripción activada por ${subscriptionDays} días`);
-                  }
-
-                  setSubscriptionDays(30);
-                  form.reset();
-                  fetchProfiles();
-                  if (isMountedRef.current) {
-                    fetchUserPayments(selectedUser.id);
-                  }
-                  closePaymentModal();
+                  await processPaymentAction(selectedUser!, amount, method, reference, notes, date, form);
                 }} className="space-y-2">
                   <div className="grid grid-cols-2 gap-2">
                     <div>
@@ -994,6 +1025,36 @@ export default function UsersView() {
                   </Button>
                 </form>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDialog.show && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-surface shadow-xl p-6 space-y-4">
+            <h3 className="font-semibold text-text text-lg">{confirmDialog.title}</h3>
+            <p className="text-sm text-text-secondary">{confirmDialog.message}</p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setConfirmDialog(prev => ({ ...prev, show: false }))}
+                className="px-4 py-2 rounded-lg border border-border text-sm text-text-secondary hover:bg-surface-hover transition-colors"
+              >
+                {confirmDialog.cancelText}
+              </button>
+              <button
+                onClick={() => {
+                  confirmDialog.onConfirm();
+                  setConfirmDialog(prev => ({ ...prev, show: false }));
+                }}
+                className={`px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors ${
+                  confirmDialog.variant === 'danger'
+                    ? 'bg-danger hover:bg-danger/90'
+                    : 'bg-primary hover:bg-primary/90'
+                }`}
+              >
+                {confirmDialog.confirmText}
+              </button>
             </div>
           </div>
         </div>

@@ -161,7 +161,7 @@ export default function Landing() {
               <div className="mx-auto max-w-3xl space-y-6 lg:space-y-8">
               <div className="hero-fade inline-flex items-center rounded-full border border-primary/50 bg-primary/10 px-3 py-1 text-sm font-medium text-primary shadow-[0_0_15px_rgba(255,193,7,0.2)]">
                 <Sparkles className="mr-2 h-4 w-4 drop-shadow-[0_0_5px_rgba(255,193,7,0.8)]" />
-                30 Días de Prueba Gratis
+                7 Días de Prueba Gratis
               </div>
               <h1 className="hero-fade text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
                 Gestiona tu inventario <span className="text-gradient">inteligente y fácil</span>
@@ -255,7 +255,7 @@ export default function Landing() {
                   <DollarSign className="h-8 w-8 text-primary" />
                 </div>
                 <h3 className="text-lg font-semibold mb-2">Precio Accesible</h3>
-                <p className="text-text-secondary text-sm">Pensado para su negocio en Cuba: comience con 30 días sin pagar. Sí desea continuar luego de este tiempo, abone 5,000 CUP por mes. Ni un centavo más.</p>
+                <p className="text-text-secondary text-sm">Pensado para su negocio en Cuba: comience con 7 días sin pagar. Sí desea continuar luego de este tiempo, abone 5,000 CUP por mes. Ni un centavo más.</p>
               </div>
               <div className="text-center fade-up" style={{ transitionDelay: '200ms' }}>
                 <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
@@ -403,7 +403,7 @@ export default function Landing() {
                   <span className="absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-black text-xs font-bold text-primary">2</span>
                 </div>
                 <h3 className="text-lg font-semibold mb-2">Pruebe gratis</h3>
-                <p className="text-text-secondary text-sm">Use todos los beneficios durante 30 días sin pagar nada.</p>
+                <p className="text-text-secondary text-sm">Use todos los beneficios durante 7 días sin pagar nada.</p>
               </div>
               <div className="text-center fade-up" style={{ transitionDelay: '200ms' }}>
                 <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary relative">
@@ -510,7 +510,7 @@ export default function Landing() {
                     <>
                       <span className="text-5xl font-extrabold">5,000 CUP</span>
                       <span className="text-text-secondary">/mes</span>
-                      <p className="mt-4 text-sm text-text-secondary">30 Días de Prueba Gratis. Sin costos ocultos.</p>
+                      <p className="mt-4 text-sm text-text-secondary">7 Días de Prueba Gratis. Sin costos ocultos.</p>
                     </>
                   )}
                 </div>
@@ -559,7 +559,7 @@ export default function Landing() {
               {[
                 {
                   q: "¿Cómo funciona la prueba gratis?",
-                  a: "Al registrarte, obtienes automáticamente 30 días de acceso completo a todas las funciones del Plan Profesional."
+                  a: "Al registrarte, obtienes automáticamente 7 días de acceso completo a todas las funciones del Plan Profesional."
                 },
                 {
                   q: "¿Necesito instalar algún software?",

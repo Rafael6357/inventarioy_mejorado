@@ -342,7 +342,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
       const subscription = {
         status: (profile?.subscription_status as any) || 'trialing',
-        trialEndsAt: profile?.trial_ends_at || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        trialEndsAt: profile?.trial_ends_at || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
         validUntil: profile?.valid_until ? profile.valid_until.split('T')[0] : null,
       };
 
@@ -436,7 +436,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         phone: phone || '',
         role: 'user',
         subscription_status: 'trialing',
-        trial_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       });
 
       if (profileError) {

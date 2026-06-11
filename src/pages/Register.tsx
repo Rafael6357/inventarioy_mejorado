@@ -75,7 +75,7 @@ export default function Register() {
           <h2 className="text-2xl font-bold text-text text-gradient hero-glow">Crea tu cuenta</h2>
           <div className="mt-2 inline-flex items-center rounded-full border border-primary/50 bg-primary/10 px-3 py-1 text-xs font-medium text-primary shadow-[0_0_15px_rgba(255,193,7,0.2)]">
             <Sparkles className="mr-2 h-3 w-3 drop-shadow-[0_0_5px_rgba(255,193,7,0.8)]" />
-            Empieza con 30 días gratis
+            Empieza con 7 días gratis
           </div>
         </div>
 
