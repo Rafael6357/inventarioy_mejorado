@@ -153,12 +153,12 @@ export default function Landing() {
       )}
 
       <main className="flex-1">
-        <section className="relative overflow-hidden py-24 lg:py-32">
+        <section className="relative overflow-hidden py-12 lg:py-32">
           <div className="absolute inset-0 opacity-20 mix-blend-overlay" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noise\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.8\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noise)\'/%3E%3C/svg%3E")', backgroundRepeat: 'repeat', backgroundSize: '128px 128px' }}></div>
           <div className="absolute inset-0 bg-gradient-to-b from-primary/10 via-bg to-bg"></div>
           
           <div className="container relative mx-auto px-4 text-center">
-              <div className="mx-auto max-w-3xl space-y-8">
+              <div className="mx-auto max-w-3xl space-y-6 lg:space-y-8">
               <div className="hero-fade inline-flex items-center rounded-full border border-primary/50 bg-primary/10 px-3 py-1 text-sm font-medium text-primary shadow-[0_0_15px_rgba(255,193,7,0.2)]">
                 <Sparkles className="mr-2 h-4 w-4 drop-shadow-[0_0_5px_rgba(255,193,7,0.8)]" />
                 30 Días de Prueba Gratis
@@ -169,19 +169,19 @@ export default function Landing() {
               <p className="hero-fade mx-auto max-w-2xl text-lg text-text-secondary sm:text-xl">
                 La solución integral para restaurantes, cafeterías y comercios en Cuba. Controla tu stock, ventas, recetas y personal en un solo lugar.
               </p>
-              <div className="hero-fade flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+              <div className="hero-fade flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 pt-2 sm:pt-4">
                 <Link to="/register">
-                  <Button size="lg" className="w-full sm:w-auto text-base h-12 px-8">
+                  <Button size="lg" className="w-full sm:w-auto text-sm sm:text-base h-11 sm:h-12 px-6 sm:px-8">
                     Comenzar Gratis
                   </Button>
                 </Link>
                 <a href="#pricing">
-                  <Button variant="outline" size="lg" className="w-full sm:w-auto text-base h-12 px-8">
+                  <Button variant="outline" size="lg" className="w-full sm:w-auto text-sm sm:text-base h-11 sm:h-12 px-6 sm:px-8">
                     Ver Plan
                   </Button>
                 </a>
                 <a href="https://youtu.be/DWl2cgeqcRA" target="_blank" rel="noopener noreferrer">
-                  <Button size="lg" className="w-full sm:w-auto text-base h-12 px-8 gap-2 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white shadow-lg shadow-red-500/25 hover:shadow-red-500/40 transition-all duration-300" variant="default">
+                  <Button size="lg" className="w-full sm:w-auto text-sm sm:text-base h-11 sm:h-12 px-6 sm:px-8 gap-2 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white shadow-lg shadow-red-500/25 hover:shadow-red-500/40 transition-all duration-300" variant="default">
                     <Play className="h-4 w-4" />
                     Aprende a usar la App
                   </Button>
