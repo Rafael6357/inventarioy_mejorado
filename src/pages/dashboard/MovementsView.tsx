@@ -243,14 +243,14 @@ if (endDate) {
           <table className="w-full text-left text-sm text-text [&_tr]:divide-x [&_tr]:divide-border/50">
             <thead className="border-b border-border bg-bg/50 text-xs uppercase text-text-secondary">
               <tr>
-                <th className="px-4 py-3 font-medium">Fecha</th>
+                <th className="px-4 py-3 font-medium whitespace-nowrap md:whitespace-normal">Fecha</th>
                 <th className="px-4 py-3 font-medium">Producto</th>
                 <th className="px-4 py-3 font-medium">Tipo</th>
                 <th className="px-4 py-3 font-medium text-right">Cantidad</th>
-                <th className="px-4 py-3 font-medium text-right">Costo Unitario</th>
-                <th className="px-4 py-3 font-medium text-right">Importe</th>
+                <th className="px-4 py-3 font-medium text-right hidden md:table-cell">Costo Unitario</th>
+                <th className="px-4 py-3 font-medium text-right hidden md:table-cell">Importe</th>
                 <th className="px-4 py-3 font-medium text-right">Balance</th>
-                <th className="px-4 py-3 font-medium">Motivo</th>
+                <th className="px-4 py-3 font-medium hidden md:table-cell">Motivo</th>
               </tr>
             </thead>
             <tbody ref={movementsTbodyRef} className="divide-y divide-border">
@@ -270,7 +270,7 @@ if (endDate) {
                   
                   return (
                     <tr key={movement.id} className="transition-colors hover:bg-surface-hover">
-                      <td className="px-4 py-3 whitespace-nowrap text-text-secondary">
+                      <td className="px-4 py-3 text-text-secondary">
                         {new Date(movement.date).toLocaleString('es-ES', { 
                           year: 'numeric', 
                           month: '2-digit', 
@@ -307,16 +307,16 @@ if (endDate) {
                       }`}>
                         {isEntrada || (isAjuste && Number(movement.quantity) > 0) ? '+' : '-'}{formatNumber(Math.abs(Number(movement.quantity)), 4)} {movement.unit}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono text-text-secondary">
+                      <td className="px-4 py-3 text-right font-mono text-text-secondary hidden md:table-cell">
                         ${movement.cost.toFixed(2)}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono font-medium text-text">
+                      <td className="px-4 py-3 text-right font-mono font-medium text-text hidden md:table-cell">
                         ${(Math.abs(movement.quantity) * movement.cost).toFixed(2)}
                       </td>
                       <td className="px-4 py-3 text-right font-mono font-medium text-text">
                         {movement.balance} {movement.unit}
                       </td>
-                      <td className="px-4 py-3 text-text-secondary truncate max-w-[200px]" title={isConsumoDirecto && movement.note ? movement.note : movement.reason || '-'}>
+                      <td className="px-4 py-3 text-text-secondary truncate max-w-[200px] hidden md:table-cell" title={isConsumoDirecto && movement.note ? movement.note : movement.reason || '-'}>
                         {isConsumoDirecto && movement.note ? movement.note : movement.reason || '-'}
                       </td>
                     </tr>

@@ -284,12 +284,12 @@ export default function ConsumptionView() {
           <table className="w-full text-left text-sm text-text [&_tr]:divide-x [&_tr]:divide-border/50">
             <thead className="bg-bg/50 text-xs uppercase text-text-secondary">
               <tr>
-                <th className="px-6 py-4 font-medium">Ingrediente</th>
-                <th className="px-6 py-4 font-medium">Tipo</th>
-                <th className="px-6 py-4 font-medium">Consumo Directo</th>
-                <th className="px-6 py-4 font-medium">Consumo en Recetas</th>
-                <th className="px-6 py-4 font-medium">Total Consumido</th>
-                <th className="px-6 py-4 font-medium">Costo Total</th>
+                <th className="px-3 py-3 md:px-6 md:py-4 font-medium">Ingrediente</th>
+                <th className="px-3 py-3 md:px-6 md:py-4 font-medium hidden md:table-cell">Tipo</th>
+                <th className="px-3 py-3 md:px-6 md:py-4 font-medium">Consumo Directo</th>
+                <th className="px-3 py-3 md:px-6 md:py-4 font-medium">Consumo en Recetas</th>
+                <th className="px-3 py-3 md:px-6 md:py-4 font-medium">Total Consumido</th>
+                <th className="px-3 py-3 md:px-6 md:py-4 font-medium hidden md:table-cell">Costo Total</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -302,11 +302,11 @@ export default function ConsumptionView() {
               ) : (
                 consumptionData.map((item) => (
                   <tr key={item.product.id} className="transition-colors hover:bg-surface-hover">
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-3 md:px-6 md:py-4">
                       <p className="font-medium text-text">{item.product.name}</p>
                       <p className="text-xs text-text-secondary">{item.product.category}</p>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-3 md:px-6 md:py-4 hidden md:table-cell">
                       {item.product.is_consumo_directo ? (
                         <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-600">
                           Consumo Directo
@@ -325,19 +325,19 @@ export default function ConsumptionView() {
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-3 md:px-6 md:py-4">
                       {item.directQty > 0 ? (
-                        <span className="inline-flex items-center rounded-full bg-surface px-2.5 py-1 text-xs font-medium border border-border">
+                        <span className="inline-flex items-center rounded-full bg-surface px-2 py-1 text-xs font-medium border border-border">
                           {formatNumber(item.directQty, 4)} {item.product.unit}
                         </span>
                       ) : (
                         <span className="text-text-secondary">-</span>
                       )}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-3 md:px-6 md:py-4">
                       {item.recipeQty > 0 ? (
                         <div className="space-y-1">
-                          <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                          <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary">
                             {formatNumber(item.recipeQty, 4)} {item.product.unit}
                           </span>
                           <div className="flex flex-col gap-1 mt-1">
@@ -352,12 +352,12 @@ export default function ConsumptionView() {
                         <span className="text-text-secondary">-</span>
                       )}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-3 md:px-6 md:py-4">
                       <span className="font-bold text-text">
                         {formatNumber(item.totalQty, 4)} {item.product.unit}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-3 md:px-6 md:py-4 hidden md:table-cell">
                       <span className="font-mono text-text-secondary">
                         ${item.totalCost.toFixed(2)}
                       </span>

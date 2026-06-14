@@ -683,10 +683,10 @@ export default function UsersView() {
                 <tr>
                   <th className="px-4 py-3 font-medium">Usuario</th>
                   <th className="px-4 py-3 font-medium">Negocio</th>
-                  <th className="px-4 py-3 font-medium">Teléfono</th>
+                  <th className="px-4 py-3 font-medium hidden md:table-cell">Teléfono</th>
                   <th className="px-4 py-3 font-medium">Estado</th>
                   <th className="px-4 py-3 font-medium">Días</th>
-                  <th className="px-4 py-3 font-medium">Registro</th>
+                  <th className="px-4 py-3 font-medium hidden md:table-cell">Registro</th>
                   <th className="px-4 py-3 font-medium">Acciones</th>
                 </tr>
               </thead>
@@ -705,7 +705,7 @@ export default function UsersView() {
                         <span className="text-text">{profile.business_name}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 hidden md:table-cell">
                       {profile.phone ? (
                         <span className="font-mono text-sm">{profile.phone}</span>
                       ) : (
@@ -724,7 +724,7 @@ export default function UsersView() {
                         {getDaysLeft(profile)}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-text-secondary text-xs whitespace-nowrap">
+                    <td className="px-4 py-3 text-text-secondary text-xs whitespace-nowrap hidden md:table-cell">
                       {formatDate(profile.created_at)}
                     </td>
                     <td className="px-4 py-3">
