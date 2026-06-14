@@ -611,42 +611,42 @@ export default function UsersView() {
           </button>
         )}
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
           <button
             onClick={() => { setStatusFilter('all'); setPage(1); }}
-            className={`px-3 py-1.5 text-xs rounded-full transition-colors ${statusFilter === 'all' ? 'bg-primary text-black' : 'bg-bg text-text-secondary hover:bg-surface-hover'}`}
+            className={`px-2 py-1 sm:px-3 sm:py-1.5 text-xs rounded-full transition-colors ${statusFilter === 'all' ? 'bg-primary text-black' : 'bg-bg text-text-secondary hover:bg-surface-hover'}`}
           >
             Todos
           </button>
           <button
             onClick={() => { setStatusFilter('active'); setPage(1); }}
-            className={`px-3 py-1.5 text-xs rounded-full transition-colors flex items-center gap-1 ${statusFilter === 'active' ? 'bg-success text-white' : 'bg-success/10 text-success hover:bg-success/20'}`}
+            className={`px-2 py-1 sm:px-3 sm:py-1.5 text-xs rounded-full transition-colors flex items-center gap-1 ${statusFilter === 'active' ? 'bg-success text-white' : 'bg-success/10 text-success hover:bg-success/20'}`}
           >
-            <CheckCircle2 className="h-3 w-3" /> Activos
+            <CheckCircle2 className="h-3 w-3" /> <span className="hidden sm:inline">Activos</span>
           </button>
           <button
             onClick={() => { setStatusFilter('trialing'); setPage(1); }}
-            className={`px-3 py-1.5 text-xs rounded-full transition-colors flex items-center gap-1 ${statusFilter === 'trialing' ? 'bg-warning text-black' : 'bg-warning/10 text-warning hover:bg-warning/20'}`}
+            className={`px-2 py-1 sm:px-3 sm:py-1.5 text-xs rounded-full transition-colors flex items-center gap-1 ${statusFilter === 'trialing' ? 'bg-warning text-black' : 'bg-warning/10 text-warning hover:bg-warning/20'}`}
           >
-            <Clock className="h-3 w-3" /> Prueba
+            <Clock className="h-3 w-3" /> <span className="hidden sm:inline">Prueba</span>
           </button>
           <button
             onClick={() => { setStatusFilter('past_due'); setPage(1); }}
-            className={`px-3 py-1.5 text-xs rounded-full transition-colors flex items-center gap-1 ${statusFilter === 'past_due' ? 'bg-danger text-white' : 'bg-danger/10 text-danger hover:bg-danger/20'}`}
+            className={`px-2 py-1 sm:px-3 sm:py-1.5 text-xs rounded-full transition-colors flex items-center gap-1 ${statusFilter === 'past_due' ? 'bg-danger text-white' : 'bg-danger/10 text-danger hover:bg-danger/20'}`}
           >
-            Vencidos
+            <AlertCircle className="h-3 w-3" /> <span className="hidden sm:inline">Vencidos</span>
           </button>
           <button
             onClick={() => { setStatusFilter('canceled'); setPage(1); }}
-            className={`px-3 py-1.5 text-xs rounded-full transition-colors flex items-center gap-1 ${statusFilter === 'canceled' ? 'bg-text-secondary text-white' : 'bg-bg text-text-secondary hover:bg-surface-hover'}`}
+            className={`px-2 py-1 sm:px-3 sm:py-1.5 text-xs rounded-full transition-colors flex items-center gap-1 ${statusFilter === 'canceled' ? 'bg-text-secondary text-white' : 'bg-bg text-text-secondary hover:bg-surface-hover'}`}
           >
-            <XCircle className="h-3 w-3" /> Cancelados
+            <XCircle className="h-3 w-3" /> <span className="hidden sm:inline">Cancelados</span>
           </button>
           <button
             onClick={() => { setStatusFilter('uncontacted'); setPage(1); }}
-            className={`px-3 py-1.5 text-xs rounded-full transition-colors flex items-center gap-1 ${statusFilter === 'uncontacted' ? 'bg-primary text-black' : 'bg-bg text-text-secondary hover:bg-surface-hover'}`}
+            className={`px-2 py-1 sm:px-3 sm:py-1.5 text-xs rounded-full transition-colors flex items-center gap-1 ${statusFilter === 'uncontacted' ? 'bg-primary text-black' : 'bg-bg text-text-secondary hover:bg-surface-hover'}`}
           >
-            <Phone className="h-3 w-3" /> Pendientes
+            <Phone className="h-3 w-3" /> <span className="hidden sm:inline">Pendientes</span>
           </button>
         </div>
 
@@ -733,28 +733,28 @@ export default function UsersView() {
                           profile.last_contacted_at ? (
                             <button
                               onClick={() => handleContact(profile)}
-                              className="inline-flex items-center gap-1 rounded-lg bg-text-secondary/10 px-3 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:bg-text-secondary/20"
+                              className="inline-flex items-center gap-1 rounded-lg bg-text-secondary/10 p-1.5 sm:px-3 sm:py-1.5 text-xs font-medium text-text-secondary transition-colors hover:bg-text-secondary/20"
                               title={`Contactado el ${new Date(profile.last_contacted_at).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`}
                             >
                               <Phone className="h-3 w-3" />
-                              Recontactar
+                              <span className="hidden sm:inline">Recontactar</span>
                             </button>
                           ) : (
                             <button
                               onClick={() => handleContact(profile)}
-                              className="inline-flex items-center gap-1 rounded-lg bg-success/10 px-3 py-1.5 text-xs font-medium text-success hover:bg-success/20 transition-colors"
+                              className="inline-flex items-center gap-1 rounded-lg bg-success/10 p-1.5 sm:px-3 sm:py-1.5 text-xs font-medium text-success hover:bg-success/20 transition-colors"
                             >
                               <Phone className="h-3 w-3" />
-                              Contactar
+                              <span className="hidden sm:inline">Contactar</span>
                             </button>
                           )
                         )}
                         <button
                           onClick={() => openPaymentModal(profile)}
-                          className="inline-flex items-center gap-1 rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
+                          className="inline-flex items-center gap-1 rounded-lg bg-primary/10 p-1.5 sm:px-3 sm:py-1.5 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
                         >
                           <DollarSign className="h-3 w-3" />
-                          Gestionar
+                          <span className="hidden sm:inline">Gestionar</span>
                         </button>
                       </div>
                     </td>
