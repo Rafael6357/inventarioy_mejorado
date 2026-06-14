@@ -527,7 +527,7 @@ export default function StockView() {
                 <th className="px-3 py-3 font-medium min-w-[120px] cursor-pointer hover:text-text" onClick={() => toggleSort('name')}>
                   <div className="flex items-center">Producto <SortIcon field="name" /></div>
                 </th>
-                <th className="px-3 py-3 font-medium min-w-[100px]">Categoría</th>
+                <th className="px-3 py-3 font-medium min-w-[100px] hidden md:table-cell">Categoría</th>
                 <th className="px-3 py-3 font-medium min-w-[90px]">Tipo</th>
                 <th className="px-3 py-3 font-medium text-right min-w-[80px] cursor-pointer hover:text-text" onClick={() => toggleSort('available')}>
                   <div className="flex items-center justify-end">Disponible <SortIcon field="available" /></div>
@@ -535,15 +535,15 @@ export default function StockView() {
                 <th className="px-3 py-3 font-medium text-right min-w-[80px] cursor-pointer hover:text-text" onClick={() => toggleSort('in_transit')}>
                   <div className="flex items-center justify-end">En Tránsito <SortIcon field="in_transit" /></div>
                 </th>
-                <th className="px-3 py-3 font-medium text-right min-w-[90px] cursor-pointer hover:text-text" onClick={() => toggleSort('cost')}>
+                <th className="px-3 py-3 font-medium text-right min-w-[90px] cursor-pointer hover:text-text hidden md:table-cell" onClick={() => toggleSort('cost')}>
                   <div className="flex items-center justify-end">Costo Unit. <SortIcon field="cost" /></div>
                 </th>
-                <th className="px-3 py-3 font-medium text-right min-w-[90px] cursor-pointer hover:text-text" onClick={() => toggleSort('total')}>
+                <th className="px-3 py-3 font-medium text-right min-w-[90px] cursor-pointer hover:text-text hidden md:table-cell" onClick={() => toggleSort('total')}>
                   <div className="flex items-center justify-end">Total <SortIcon field="total" /></div>
                 </th>
                 <th className="px-3 py-3 font-medium min-w-[80px]">Unidad</th>
-                <th className="px-3 py-3 font-medium min-w-[80px]">Parámetros</th>
-                <th className="px-4 py-3 font-medium cursor-pointer hover:text-text" onClick={() => toggleSort('date')}>
+                <th className="px-3 py-3 font-medium min-w-[80px] hidden md:table-cell">Parámetros</th>
+                <th className="px-4 py-3 font-medium cursor-pointer hover:text-text hidden md:table-cell" onClick={() => toggleSort('date')}>
                   <div className="flex items-center">Fecha Última Actualización <SortIcon field="date" /></div>
                 </th>
                 <th className="px-4 py-3 font-medium text-center">Acciones</th>
@@ -585,7 +585,7 @@ export default function StockView() {
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-text-secondary">{product.category}</td>
+                      <td className="px-4 py-3 text-text-secondary hidden md:table-cell">{product.category}</td>
                       <td className="px-4 py-3">
                         {product.is_consumo_directo ? (
                           <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-600">
@@ -615,16 +615,16 @@ export default function StockView() {
                           <span className="text-text-secondary">-</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono">
+                      <td className="px-4 py-3 text-right font-mono hidden md:table-cell">
                         ${formatNumber(Number(product.cost), 2)}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono font-medium text-primary">
+                      <td className="px-4 py-3 text-right font-mono font-medium text-primary hidden md:table-cell">
                         ${formatNumber(physicalStock * Number(product.cost), 2)}
                       </td>
                       <td className="px-4 py-3 text-text-secondary">
                         {product.unit}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 hidden md:table-cell">
                         {isConfigured ? (
                           <div className="flex flex-wrap gap-1 text-xs">
                             <span className="inline-flex items-center rounded bg-primary/10 px-1.5 py-0.5 text-primary" title="ROP">
@@ -635,7 +635,7 @@ export default function StockView() {
                           <span className="text-xs text-text-secondary">Sin configurar</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-text-secondary">
+                      <td className="px-4 py-3 text-text-secondary hidden md:table-cell">
                         {lastUpdate ? new Date(lastUpdate).toLocaleString('es-ES', { 
                           year: 'numeric', 
                           month: '2-digit', 

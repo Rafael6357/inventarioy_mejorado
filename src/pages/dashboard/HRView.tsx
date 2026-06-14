@@ -1005,13 +1005,13 @@ export default function HRView() {
                         <thead className="bg-bg text-text-secondary">
                           <tr>
                             <th className="px-4 py-2 text-left">Empleado</th>
-                            <th className="px-4 py-2 text-left">Cargo/Ocupación</th>
-                            <th className="px-4 py-2 text-left">NIT/Carnet</th>
-                            <th className="px-4 py-2 text-right">Salario Base</th>
+                            <th className="px-4 py-2 text-left hidden md:table-cell">Cargo/Ocupación</th>
+                            <th className="px-4 py-2 text-left hidden md:table-cell">NIT/Carnet</th>
+                            <th className="px-4 py-2 text-right hidden md:table-cell">Salario Base</th>
                             <th className="px-4 py-2 text-right">Salario Devengado</th>
-                            <th className="px-4 py-2 text-right">Vacaciones (Días)</th>
-                            <th className="px-4 py-2 text-right">Base Exenta</th>
-                            <th className="px-4 py-2 text-right">Base Imponible</th>
+                            <th className="px-4 py-2 text-right hidden md:table-cell">Vacaciones (Días)</th>
+                            <th className="px-4 py-2 text-right hidden md:table-cell">Base Exenta</th>
+                            <th className="px-4 py-2 text-right hidden md:table-cell">Base Imponible</th>
                             <th className="px-4 py-2 text-right">Retenciones</th>
                             <th className="px-4 py-2 text-right">Neto a Cobrar</th>
                             <th className="px-4 py-2 text-center">Acciones</th>
@@ -1023,9 +1023,9 @@ export default function HRView() {
                             return (
                             <tr key={entry.id} className="hover:bg-bg/50">
                               <td className="px-4 py-2 font-medium">{entry.employee_name}</td>
-                              <td className="px-4 py-2 text-text-secondary">{employee?.role || '-'}</td>
-                              <td className="px-4 py-2 text-text-secondary">{employee?.nit_id || '-'}</td>
-                              <td className="px-4 py-2 text-right text-text-secondary">${entry.base_salary.toFixed(2)}</td>
+                              <td className="px-4 py-2 text-text-secondary hidden md:table-cell">{employee?.role || '-'}</td>
+                              <td className="px-4 py-2 text-text-secondary hidden md:table-cell">{employee?.nit_id || '-'}</td>
+                              <td className="px-4 py-2 text-right text-text-secondary hidden md:table-cell">${entry.base_salary.toFixed(2)}</td>
                               <td className="px-4 py-2 text-right">
                                 {editingEntry === entry.id ? (
                                   <div className="flex items-center justify-end gap-1">
@@ -1059,7 +1059,7 @@ export default function HRView() {
                                   </div>
                                 )}
                               </td>
-                              <td className="px-4 py-2 text-center">
+                              <td className="px-4 py-2 text-center hidden md:table-cell">
                                 {editingEntry === entry.id + '_vacations' ? (
                                   <div className="flex items-center justify-center gap-1">
                                     <Input
@@ -1094,8 +1094,8 @@ export default function HRView() {
                                   </div>
                                 )}
                               </td>
-                              <td className="px-4 py-2 text-right text-text-secondary">-${entry.exemption_base.toFixed(2)}</td>
-                              <td className="px-4 py-2 text-right text-text-secondary">${entry.taxable_base.toFixed(2)}</td>
+                              <td className="px-4 py-2 text-right text-text-secondary hidden md:table-cell">-${entry.exemption_base.toFixed(2)}</td>
+                              <td className="px-4 py-2 text-right text-text-secondary hidden md:table-cell">${entry.taxable_base.toFixed(2)}</td>
                               <td className="px-4 py-2 text-right text-danger">${(entry.tax_amount + entry.special_contribution).toFixed(2)}</td>
                               <td className="px-4 py-2 text-right font-bold text-success">${entry.net_salary.toFixed(2)}</td>
                               <td className="px-4 py-2 text-center">

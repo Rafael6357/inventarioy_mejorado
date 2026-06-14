@@ -583,7 +583,7 @@ export default function AnalysisView() {
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-success"></span> Exceso: &gt;15 días</span>
             </div>
 
-            <div className="overflow-y-auto max-h-[400px]">
+            <div className="overflow-x-auto overflow-y-auto max-h-[400px]">
               <table className="w-full text-left text-sm text-text [&_tr]:divide-x [&_tr]:divide-border/50">
                 <thead className="sticky top-0 z-10 border-b border-border bg-bg/95 text-xs uppercase text-text-secondary shadow-sm">
                   <tr>
