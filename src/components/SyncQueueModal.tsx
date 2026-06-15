@@ -159,7 +159,7 @@ export default function SyncQueueModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div ref={backdropRef} className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div ref={backdropRef} className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm modal-backdrop">
       <div ref={cardRef} className="w-full max-w-lg mx-4 max-h-[80vh] rounded-xl bg-surface border border-border shadow-2xl flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h3 className="text-base font-semibold text-text">Cambios pendientes</h3>

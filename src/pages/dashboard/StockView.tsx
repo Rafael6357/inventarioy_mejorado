@@ -706,7 +706,7 @@ export default function StockView() {
       </div>
 
       {productToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm modal-backdrop">
           <div className="w-full max-w-md rounded-2xl border border-border/50 bg-surface p-6 shadow-2xl">
             <div className="mb-6 flex flex-col items-center text-center">
               <div className="mb-4 rounded-full bg-danger/10 p-4 text-danger">
@@ -739,7 +739,7 @@ export default function StockView() {
       )}
 
       {editingProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm modal-backdrop">
           <div className="w-full max-w-md rounded-2xl border border-border/50 bg-surface p-6 shadow-2xl max-h-[80vh] flex flex-col">
             <div className="mb-6 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
@@ -848,7 +848,7 @@ export default function StockView() {
         const difference = adjustmentModal.physicalStock - Number(adjustmentModal.product.quantity);
         
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm modal-backdrop">
             <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl">
               <div className="mb-6 flex items-center justify-between">
                 <div className="flex items-center gap-3">

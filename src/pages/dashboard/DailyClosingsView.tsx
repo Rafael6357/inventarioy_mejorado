@@ -539,7 +539,7 @@ export default function DailyClosingsView() {
 
       {/* Detalle Modal */}
       {selectedClosing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm modal-backdrop">
           <div className="w-full max-w-md rounded-2xl border border-border/50 bg-surface p-6 shadow-2xl">
             <div className="mb-6 flex items-center justify-between">
               <div>
@@ -697,7 +697,7 @@ export default function DailyClosingsView() {
 
       {/* Sales Ticket Preview Modal */}
       {showPreview && selectedClosing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm modal-backdrop">
           <div className="w-full max-w-lg rounded-2xl border border-border/50 bg-surface p-4 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="mb-4 flex items-center justify-between print-hide">
               <h2 className="text-lg font-bold text-text">Previsualización de Ticket</h2>

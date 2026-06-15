@@ -833,7 +833,7 @@ export default function UsersView() {
       )}
 
       {showPaymentModal && selectedUser && (
-        <div key={selectedUser.id} className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div key={selectedUser.id} className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 modal-backdrop">
           <div className="w-full max-w-lg rounded-2xl border border-border bg-surface shadow-xl max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-surface border-b border-border p-4 flex items-center justify-between">
               <div>
@@ -1034,7 +1034,7 @@ export default function UsersView() {
       )}
 
       {confirmDialog.show && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 modal-backdrop">
           <div className="w-full max-w-md rounded-2xl border border-border bg-surface shadow-xl p-6 space-y-4">
             <h3 className="font-semibold text-text text-lg">{confirmDialog.title}</h3>
             <p className="text-sm text-text-secondary">{confirmDialog.message}</p>

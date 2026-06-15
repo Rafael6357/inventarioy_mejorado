@@ -7,9 +7,15 @@ import { Button } from '../../components/ui/button';
 import { calculateMargin, exportToExcel } from '../../lib/utils';
 
 export default function FilteredCenterView() {
-  const { products } = useDatabaseStore();
+  const { products, productWarehouse, warehouses, currentWarehouseId, setCurrentWarehouse } = useDatabaseStore();
   
   const activeProducts = products.filter(p => p.is_active !== false);
+
+  const getDisponible = (productId: string): number => {
+    if (!currentWarehouseId || productWarehouse.length === 0) return Number(products.find(p => p.id === productId)?.quantity || 0);
+    const pw = productWarehouse.find(p => p.product_id === productId && p.warehouse_id === currentWarehouseId);
+    return pw ? pw.quantity : 0;
+  };
 
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
@@ -57,7 +63,7 @@ export default function FilteredCenterView() {
     // 4. Stock Status Filter
     if (stockFilter !== 'ALL') {
       result = result.filter(p => {
-        const physicalStock = Number(p.quantity);
+        const physicalStock = getDisponible(p.id);
         const rop = Number(p.rop) || 0;
         
         // Si ROP no está configurado (0), exclude from LOW/OVER/NORMAL filters
@@ -79,11 +85,11 @@ export default function FilteredCenterView() {
         valA = a.price;
         valB = b.price;
       } else if (sortBy === 'stock') {
-        valA = Number(a.quantity);
-        valB = Number(b.quantity);
+        valA = getDisponible(a.id);
+        valB = getDisponible(b.id);
       } else if (sortBy === 'value') {
-        const physA = Number(a.quantity);
-        const physB = Number(b.quantity);
+        const physA = getDisponible(a.id);
+        const physB = getDisponible(b.id);
         valA = physA * Number(a.cost);
         valB = physB * Number(b.cost);
       }
@@ -94,7 +100,7 @@ export default function FilteredCenterView() {
     });
 
     return result;
-  }, [activeProducts, searchTerm, categoryFilter, typeFilter, stockFilter, sortBy, sortOrder]);
+  }, [activeProducts, searchTerm, categoryFilter, typeFilter, stockFilter, sortBy, sortOrder, productWarehouse, currentWarehouseId]);
 
   const toggleSort = (field: string) => {
     if (sortBy === field) {
@@ -132,7 +138,7 @@ export default function FilteredCenterView() {
               { header: 'Valor Total', key: 'totalValue', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
             ];
             const data = filteredAndSortedProducts.map(p => {
-              const physicalStock = Number(p.quantity);
+              const physicalStock = getDisponible(p.id);
               const margin = p.is_individual && p.price && p.price > 0 ? ((p.price - p.cost) / p.price) * 100 : 0;
               const state = (Number(p.rop) || 0) === 0 ? 'Sin configurar' : (physicalStock <= p.rop ? 'Bajo' : (physicalStock > p.rop * 2 ? 'Exceso' : 'Normal'));
               return {
@@ -155,7 +161,7 @@ export default function FilteredCenterView() {
 
       {/* Filters Bar */}
       <div className="rounded-xl border border-border bg-surface p-4 shadow-sm">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
           <div className="space-y-1.5">
             <Label className="text-xs text-text-secondary">Búsqueda General</Label>
             <div className="relative">
@@ -212,6 +218,21 @@ export default function FilteredCenterView() {
             </select>
           </div>
 
+          {warehouses.length > 1 && (
+            <div className="space-y-1.5">
+              <Label className="text-xs text-text-secondary">Almacén</Label>
+              <select
+                className="w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary h-10"
+                value={currentWarehouseId || ''}
+                onChange={(e) => setCurrentWarehouse(e.target.value)}
+              >
+                {warehouses.map(w => (
+                  <option key={w.id} value={w.id}>{w.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div className="space-y-1.5 flex flex-col justify-end">
             <div className="flex items-center gap-2 h-10 px-3 rounded-md bg-bg border border-border text-sm text-text-secondary">
               <Filter className="h-4 w-4" />
@@ -238,8 +259,8 @@ export default function FilteredCenterView() {
                 <th className="px-4 py-3 font-medium cursor-pointer hover:bg-surface-hover transition-colors" onClick={() => toggleSort('price')}>
                   <div className="flex items-center">Precio <SortIcon field="price" /></div>
                 </th>
-                <th className="px-4 py-3 font-medium">Margen %</th>
-                <th className="px-4 py-3 font-medium cursor-pointer hover:bg-surface-hover transition-colors" onClick={() => toggleSort('value')}>
+                <th className="px-4 py-3 font-medium hidden md:table-cell">Margen %</th>
+                <th className="px-4 py-3 font-medium cursor-pointer hover:bg-surface-hover transition-colors hidden md:table-cell" onClick={() => toggleSort('value')}>
                   <div className="flex items-center">Valor Total <SortIcon field="value" /></div>
                 </th>
               </tr>
@@ -266,7 +287,7 @@ export default function FilteredCenterView() {
                 </tr>
               ) : (
                 filteredAndSortedProducts.map((product) => {
-                  const physicalStock = Number(product.quantity);
+                  const physicalStock = getDisponible(product.id);
                   const isLow = (Number(product.rop) || 0) > 0 && physicalStock <= product.rop;
                   const isOver = (Number(product.rop) || 0) > 0 && physicalStock > product.rop * 2;
                   const noRopConfigured = (Number(product.rop) || 0) === 0;
@@ -290,7 +311,7 @@ export default function FilteredCenterView() {
                         </span>
                       </td>
                       <td className="px-4 py-3 font-mono">
-                        {product.quantity} <span className="text-xs text-text-secondary">{product.unit}</span>
+                        {physicalStock} <span className="text-xs text-text-secondary">{product.unit}</span>
                       </td>
                       <td className="px-4 py-3">
                         {noRopConfigured ? (
@@ -314,7 +335,7 @@ export default function FilteredCenterView() {
                       <td className="px-4 py-3 font-mono text-text-secondary">
                         {product.is_individual ? `$${product.price.toFixed(2)}` : <span className="text-text-secondary">—</span>}
                       </td>
-                      <td className="px-4 py-3 font-mono">
+                      <td className="px-4 py-3 font-mono hidden md:table-cell">
                         {product.is_individual && product.price && product.price > 0 ? (
                           <span className={calculateMargin(Number(product.cost), Number(product.price)) < 30 ? 'text-warning' : 'text-success'}>
                             {calculateMargin(Number(product.cost), Number(product.price)).toFixed(2)}%
@@ -323,7 +344,7 @@ export default function FilteredCenterView() {
                           <span className="text-text-secondary">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 font-mono font-medium text-text">
+                      <td className="px-4 py-3 font-mono font-medium text-text hidden md:table-cell">
                         ${totalValue.toFixed(2)}
                       </td>
                     </tr>

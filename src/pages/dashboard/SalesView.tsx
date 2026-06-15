@@ -1057,7 +1057,7 @@ setShowTicket(true);
                   <div className="flex items-center gap-2">
                     <button 
                       onClick={() => updateQuantity(item.product_id, -1)}
-                      className="rounded-xl bg-surface-hover p-1 text-text hover:bg-border transition-colors"
+                      className="rounded-xl bg-surface-hover p-3 text-text hover:bg-border transition-colors"
                     >
                       <Minus className="h-4 w-4" />
                     </button>
@@ -1073,7 +1073,7 @@ setShowTicket(true);
                     />
                     <button 
                       onClick={() => updateQuantity(item.product_id, 1)}
-                      className="rounded-md bg-surface-hover p-1 text-text hover:bg-border transition-colors"
+                      className="rounded-md bg-surface-hover p-3 text-text hover:bg-border transition-colors"
                     >
                       <Plus className="h-4 w-4" />
                     </button>
@@ -1202,7 +1202,7 @@ setShowTicket(true);
 
       {/* Checkout Preview Modal */}
       {showPreview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm modal-backdrop">
           <div className="w-full max-w-md max-h-[85vh] overflow-y-auto rounded-2xl border border-border/50 bg-surface p-6 shadow-2xl">
             <div className="mb-6 flex items-center justify-between">
               <h2 className="text-xl font-bold text-text">Resumen de Venta</h2>
@@ -1571,7 +1571,7 @@ setShowTicket(true);
 
       {/* Cierre de Caja Modal */}
       {showClosingModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm modal-backdrop">
           <div className="w-full max-w-md rounded-2xl border border-border/50 bg-surface p-6 shadow-2xl">
             <div className="mb-6 flex items-center justify-between">
               <div>
@@ -1724,7 +1724,7 @@ setShowTicket(true);
       )}
 
       {showNewPendingModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm modal-backdrop">
           <div className="w-full max-w-md rounded-2xl border border-border/50 bg-surface p-6 shadow-2xl">
             <div className="mb-6 flex items-center justify-between">
               <div>
@@ -1798,7 +1798,7 @@ setShowTicket(true);
 
       {/* Modal de Cobro Mixto */}
       {showChargeMixModal && selectedAccountForCharge && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm modal-backdrop">
           <div className="w-full max-w-md rounded-2xl border border-border/50 bg-surface p-6 shadow-2xl">
             <div className="mb-6 flex items-center justify-between">
               <div>
@@ -2014,7 +2014,7 @@ setShowTicket(true);
 
       {/* Modal de Justificación para Cancelar */}
       {showCancelJustModal && selectedAccountForCancel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm modal-backdrop">
           <div className="w-full max-w-md rounded-2xl border border-border/50 bg-surface p-6 shadow-2xl">
             <div className="mb-6 flex items-center justify-between">
               <div>
@@ -2088,7 +2088,7 @@ setShowTicket(true);
 
       {/* Modal de Advertencia de Cierre - Diseño Profesional */}
       {showClosingWarning && closingWarningData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm modal-backdrop">
           <div className="w-full max-w-md rounded-2xl border border-warning/50 bg-surface p-6 shadow-2xl">
             <div className="mb-6 flex items-center gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-warning/20">
@@ -2145,7 +2145,7 @@ setShowTicket(true);
         </div>
       )}
     {showEditItemModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm modal-backdrop">
           <div className="w-full max-w-sm mx-4 bg-surface rounded-xl shadow-2xl border border-border/50 p-6">
             <h3 className="text-lg font-semibold text-text mb-4">Editar Producto</h3>
             <p className="text-sm text-text-secondary mb-4">

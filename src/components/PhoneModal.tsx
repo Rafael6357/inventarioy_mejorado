@@ -67,7 +67,7 @@ export default function PhoneModal({ isOpen, onClose }: PhoneModalProps) {
   };
 
   return (
-    <div ref={backdropRef} className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
+    <div ref={backdropRef} className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
       <div ref={cardRef} className="w-full max-w-md mx-4 bg-surface border border-border rounded-2xl shadow-2xl">
         <div className="flex items-center justify-between p-6 border-b border-border">
           <div className="flex items-center gap-3">

@@ -91,7 +91,7 @@ export default function PinModal({ isOpen, moduleName, onSuccess, onCancel, isIn
   };
 
   return (
-    <div ref={backdropRef} className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+    <div ref={backdropRef} className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm modal-backdrop">
       <div ref={cardRef} className="w-full max-w-sm rounded-2xl border border-border/50 bg-surface p-6 shadow-2xl">
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-3">

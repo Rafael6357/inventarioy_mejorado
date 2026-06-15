@@ -116,6 +116,16 @@
     cursor: pointer;
     padding: 2px;
   }
+
+  /* Prevent body scroll behind modal overlays on iOS */
+  .modal-backdrop {
+    overscroll-behavior: contain;
+  }
+
+  /* Eliminar delay de 300ms en tap iOS */
+  button, a, input, select, textarea, .clickable {
+    touch-action: manipulation;
+  }
 }
 
 @keyframes glow-pulse {
