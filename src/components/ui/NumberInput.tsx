@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Input, type InputProps } from "./input";
-import { cn } from "./button";
+import { cn } from "../../lib/utils";
 
 export interface NumberInputProps
   extends Omit<InputProps, "value" | "onChange" | "type"> {

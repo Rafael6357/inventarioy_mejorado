@@ -1,26 +1,15 @@
-const { supabase } = require('./src/lib/supabase');
+import { supabase } from './src/lib/supabase.js';
 
 async function updateConstraint() {
   console.log('Actualizando constraint de sales...');
-  
-  // Verificar constraint actual
-  const { data: checkData, error: checkError } = await supabase
-    .from('sales')
-    .select('sale_type')
-    .limit(1);
-  
-  console.log('Verificando tabla sales...');
-  
-  // Intentar actualizar constraint usando pg_catalog
-  const { data, error } = await supabase.rpc('pg_catalog.to_regclass', {
-    text: 'sales_sale_type_check'
+
+  const { data, error } = await supabase.rpc('exec_sql', {
+    sql: `ALTER TABLE sales DROP CONSTRAINT IF EXISTS sales_sale_type_check;
+          ALTER TABLE sales ADD CONSTRAINT sales_sale_type_check
+          CHECK (sale_type IN ('BAR', 'RESTAURANT', 'CAFETERIA', 'OTHER'));`
   });
-  
+
   console.log('Resultado:', data, error);
-  
-  // Como no tenemos acceso directo a ALTER TABLE desde el cliente,
-  // intentaremos una venta con BAR para ver si funciona
-  console.log('Probando con una venta tipo BAR...');
 }
 
 updateConstraint().catch(console.error);

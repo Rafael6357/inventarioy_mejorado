@@ -217,7 +217,7 @@ export default function AnalysisView() {
       // 3. Movimiento de consumo directo (CONSUMO_DIRECTO)
       const consumoDirecto = safeMovements.filter(m => 
         m.product_id === product.id && 
-        m.type === 'CONSUMO_DIRECTO' &&
+        (m.type as string) === 'CONSUMO_DIRECTO' &&
         new Date(m.date) >= fromDate && new Date(m.date) <= toDate
       ).reduce((sum, m) => sum + Number(m.quantity), 0);
       

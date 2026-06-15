@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { cn } from '../../lib/utils';
 
-export interface SwitchProps extends React.InputHTMLAttributes<HTMLButtonElement> {
+export interface SwitchProps extends Omit<React.HTMLAttributes<HTMLButtonElement>, 'type'> {
   checked?: boolean;
   onCheckedChange?: (checked: boolean) => void;
 }

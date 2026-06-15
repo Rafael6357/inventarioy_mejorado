@@ -64,7 +64,7 @@ export default function Dashboard() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, isLoading: authLoading, initialize } = useAuthStore();
-  const { fetchAll, isLoading: dbLoading, accessPins, verifiedRole, clearVerifiedRole, verifyPinSimple, setAccessPins } = useDatabaseStore();
+  const { fetchAll, isLoading: dbLoading, accessPins, verifiedRole, clearVerifiedRole, verifyPinSimple } = useDatabaseStore();
   const [localVerifiedRole, setLocalVerifiedRole] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('verifiedRole');
@@ -109,7 +109,7 @@ export default function Dashboard() {
   const navigation = useMemo(() => {
     let nav = [...baseNav];
     
-    if (user?.email === 'nikko6357@gmail.com') {
+    if (user?.email === import.meta.env.VITE_ADMIN_EMAIL) {
       nav.push({ name: 'Gestión de Usuarios', href: '/dashboard/users', icon: Users });
     }
     
@@ -253,7 +253,7 @@ export default function Dashboard() {
   }, [user]);
 
   useEffect(() => {
-    const unsub = syncEngine.onEvent((event, data) => {
+    const unsub = syncEngine.onEvent((event: string, data: any) => {
       if (event === 'synced') {
         toast.success(`${data.count} cambio${data.count !== 1 ? 's' : ''} sincronizado${data.count !== 1 ? 's' : ''}`);
       }
@@ -261,7 +261,7 @@ export default function Dashboard() {
         toast.info('Un producto duplicado fue ignorado durante la sincronización');
       }
     });
-    return unsub;
+    return () => { unsub(); };
   }, []);
 
   const checkUncontactedUsers = useCallback(async () => {
@@ -289,7 +289,7 @@ export default function Dashboard() {
   }, [navigate]);
 
   useEffect(() => {
-    if (user?.email !== 'nikko6357@gmail.com' || hasCheckedUncontacted.current) return;
+    if (user?.email !== import.meta.env.VITE_ADMIN_EMAIL || hasCheckedUncontacted.current) return;
     hasCheckedUncontacted.current = true;
     checkUncontactedUsers();
   }, [user, checkUncontactedUsers]);
@@ -503,7 +503,7 @@ export default function Dashboard() {
               <Route path="/filtered" element={<FilteredCenterView />} />
               <Route path="/settings" element={<SettingsView />} />
               <Route path="/action-logs" element={<ActionLogsView />} />
-              {user?.email === 'nikko6357@gmail.com' && (
+              {user?.email === import.meta.env.VITE_ADMIN_EMAIL && (
                 <Route path="/users" element={<UsersView />} />
               )}
             </Routes>

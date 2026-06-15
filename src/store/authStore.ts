@@ -7,10 +7,9 @@ const checkRealInternetConnection = async (): Promise<boolean> => {
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
-    
-    // Usar el propio endpoint de Supabase - si responde, hay internet real
-    const { error } = await supabase.from('products').select('id').limit(1).maybeSingle();
-    
+
+    const { error } = await supabase.from('products').select('id').limit(1).abortSignal(controller.signal).maybeSingle();
+
     clearTimeout(timeoutId);
     return !error;
   } catch {
@@ -42,6 +41,7 @@ export interface User {
   address: string;
   businessHours: string;
   businessCode: string;
+  themePreference: 'light' | 'dark' | 'system';
 }
 
 interface AuthState {
@@ -52,7 +52,7 @@ interface AuthState {
   register: (email: string, password: string, name: string, businessName: string, phone?: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   updateSubscription: (updates: Partial<User['subscription']>) => void;
-  fetchUser: () => Promise<void>;
+  fetchUser: () => Promise<boolean>;
   initialize: () => Promise<void>;
 }
 
@@ -60,7 +60,8 @@ let _isInitializing = false;
 let _authListenerSubscription: any = null;
 
 const checkSubscriptionActive = (email: string, subscription: User['subscription']): boolean => {
-  if (email === 'nikko6357@gmail.com') {
+  const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
+  if (adminEmail && email === adminEmail) {
     return true;
   }
   
@@ -298,12 +299,12 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       
       if (authError) {
         console.error('Error en getUser:', authError);
-        return;
+        return false;
       }
       
       if (!authUser) {
         console.log('No hay usuario autenticado');
-        return;
+        return false;
       }
 
       let profile = null;
@@ -337,7 +338,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       if (!profile) {
         console.warn('No se pudo obtener el perfil después de retries');
         set({ isLoading: false });
-        return;
+        return false;
       }
 
       const subscription = {
@@ -366,6 +367,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         address: profile?.address || '',
         businessHours: profile?.business_hours || '',
         businessCode: profile?.business_code || '',
+        themePreference: (profile?.theme_preference as 'light' | 'dark' | 'system') || 'dark',
       };
 
       console.log('Usuario cargado:', user.email, 'role:', user.role, 'subscriptionActive:', user.isSubscriptionActive);
@@ -376,9 +378,11 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       }
       
       set({ user, isAuthenticated: true, isLoading: false });
+      return true;
     } catch (err) {
       console.error('Error en fetchUser:', err);
       set({ isLoading: false });
+      return false;
     }
   },
 
@@ -402,8 +406,13 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       const credentials = btoa(JSON.stringify({ email, password }));
       localStorage.setItem('saved_credentials', credentials);
       localStorage.setItem('saved_email', email);
-      
-      await get().fetchUser();
+
+      const userLoaded = await get().fetchUser();
+      if (!userLoaded) {
+        localStorage.removeItem('saved_credentials');
+        localStorage.removeItem('saved_email');
+        return { success: false, error: 'Error al cargar los datos del usuario. Intenta de nuevo.' };
+      }
       return { success: true };
     }
 
@@ -437,6 +446,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         role: 'user',
         subscription_status: 'trialing',
         trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        theme_preference: 'dark',
       });
 
       if (profileError) {

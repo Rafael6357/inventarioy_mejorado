@@ -80,7 +80,7 @@ export default function UsersView() {
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog>({ show: false, title: '', message: '', confirmText: '', cancelText: '', variant: 'warning', onConfirm: () => {} });
   const [subscriptionDays, setSubscriptionDays] = useState<30 | 365>(DEFAULT_SUBSCRIPTION_DAYS);
   const isMountedRef = useRef(true);
-  const lastFetchController = useRef<AbortController | null>(null);
+  const fetchGeneration = useRef(0);
   const staggerRef = useStaggerEnter([totalCount]);
   const totalCountUpRef = useCountUp(totalCount);
   const activeCountUpRef = useCountUp(profiles.filter(p => getEffectiveStatus(p) === 'active').length);
@@ -103,7 +103,7 @@ export default function UsersView() {
   }, [searchTerm]);
 
   useEffect(() => {
-    if (user?.email === 'nikko6357@gmail.com') {
+    if (user?.email === import.meta.env.VITE_ADMIN_EMAIL) {
       fetchProfiles();
     }
   }, [page, limit, debouncedSearch, statusFilter, dateOrder, user?.email]);
@@ -118,13 +118,10 @@ export default function UsersView() {
   const fetchProfiles = async () => {
     if (!isMountedRef.current) return;
 
-    if (lastFetchController.current) {
-      lastFetchController.current.abort();
-    }
-    const controller = new AbortController();
-    lastFetchController.current = controller;
+    const generation = ++fetchGeneration.current;
     setLoading(true);
 
+    const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
     try {
@@ -166,12 +163,15 @@ export default function UsersView() {
       ]);
 
       clearTimeout(timeoutId);
+      if (generation !== fetchGeneration.current) return;
 
       if (countResult.error) throw countResult.error;
       if (dataResult.error) throw dataResult.error;
       setProfiles(dataResult.data || []);
       setTotalCount(countResult.count || 0);
     } catch (error: any) {
+      if (generation !== fetchGeneration.current) return;
+
       const isTimeout = error?.name === 'AbortError'
         || error?.message?.includes('timeout')
         || error?.message?.includes('Timeout');
@@ -182,7 +182,10 @@ export default function UsersView() {
         toast.error('Error al cargar los usuarios');
       }
     } finally {
-      if (isMountedRef.current) setLoading(false);
+      clearTimeout(timeoutId);
+      if (isMountedRef.current && generation === fetchGeneration.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -519,7 +522,7 @@ export default function UsersView() {
     inactive: profiles.filter(p => ['past_due', 'canceled'].includes(getEffectiveStatus(p))).length,
   };
 
-  if (user?.email !== 'nikko6357@gmail.com') {
+  if (user?.email !== import.meta.env.VITE_ADMIN_EMAIL) {
     return (
       <div className="flex h-full items-center justify-center p-8">
         <div className="text-center">
@@ -651,7 +654,7 @@ export default function UsersView() {
         </div>
 
         <button
-          onClick={() => setDateOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+          onClick={() => setDateOrder(dateOrder === 'desc' ? 'asc' : 'desc')}
           className="flex items-center gap-1.5 rounded-xl border border-border bg-bg px-4 py-2 text-xs font-medium text-text-secondary hover:bg-surface-hover transition-colors"
           title={dateOrder === 'desc' ? 'Ordenando de más reciente a más antiguo' : 'Ordenando de más antiguo a más reciente'}
         >

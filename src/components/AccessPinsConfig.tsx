@@ -299,7 +299,7 @@ export default function AccessPinsConfig() {
                   onChange={e => setPinValue(e.target.value.replace(/\D/g, ''))}
                   placeholder="0000"
                   className="font-mono text-center text-lg tracking-widest pr-10"
-                  style={{ WebkitTextSecurity: showPin ? 'none' : 'disc' }}
+                  style={{ WebkitTextSecurity: showPin ? 'none' : 'disc' } as React.CSSProperties}
                   autoComplete="new-password"
                 />
                 <button
@@ -320,7 +320,7 @@ export default function AccessPinsConfig() {
                   onChange={e => setConfirmPin(e.target.value.replace(/\D/g, ''))}
                   placeholder="0000"
                   className="font-mono text-center text-lg tracking-widest pr-10"
-                  style={{ WebkitTextSecurity: showConfirmPin ? 'none' : 'disc' }}
+                  style={{ WebkitTextSecurity: showConfirmPin ? 'none' : 'disc' } as React.CSSProperties}
                   autoComplete="new-password"
                 />
                 <button

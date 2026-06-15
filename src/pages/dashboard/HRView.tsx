@@ -1074,7 +1074,7 @@ export default function HRView() {
                                     <Button size="sm" className="h-7" onClick={async () => {
                                       try {
                                         const { updatePayrollEntry } = useDatabaseStore.getState();
-                                        await updatePayrollEntry(entry.id, { vacation_days: editingVacations });
+                                        await updatePayrollEntry(entry.id, { vacation_days: editingVacations } as any);
                                         await getPayrollEntries(payrollMonth.month, payrollMonth.year);
                                         setEditingEntry(null);
                                         toast.success('Vacaciones actualizadas');

@@ -36,7 +36,7 @@ const DEFAULT_CATEGORIES = [
 
 export default function InventoryView() {
   const { user } = useAuthStore();
-  const { products, addProduct, addMovement, logAction, warehouses, currentWarehouseId, productWarehouse, updateProductWarehouseQuantity, set, transitItems, movements } = useDatabaseStore();
+  const { products, addProduct, addMovement, logAction, warehouses, currentWarehouseId, productWarehouse, updateProductWarehouseQuantity, transitItems, movements } = useDatabaseStore();
   
   const activeProducts = products.filter(p => p.is_active !== false);
 
@@ -184,7 +184,7 @@ export default function InventoryView() {
     }
 
     // Validar nota obligatoria para CONSUMO_DIRECTO
-    if (movement.type === 'CONSUMO_DIRECTO' && !movement.note.trim()) {
+    if ((movement.type as string) === 'CONSUMO_DIRECTO' && !movement.note.trim()) {
       toast.error('La nota es obligatoria para Consumo Directo');
       return;
     }
@@ -386,7 +386,7 @@ export default function InventoryView() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="quantity">Cantidad Inicial *</Label>
-                <NumberInput id="quantity" min="0" step="0.01" required value={newProduct.quantity} onValueChange={v => setNewProduct({...newProduct, quantity: v})} />
+                <NumberInput id="quantity" min={0} step="0.01" required value={newProduct.quantity} onValueChange={v => setNewProduct({...newProduct, quantity: v})} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="unit">Unidad *</Label>
@@ -405,14 +405,14 @@ export default function InventoryView() {
 
               <div className="space-y-2">
                 <Label htmlFor="cost">Costo Unitario *</Label>
-                <NumberInput
-                  id="cost"
-                  min="0.01"
-                  step="0.01"
-                  required
-                  value={newProduct.cost}
-                  onValueChange={v => setNewProduct({...newProduct, cost: v})}
-                />
+                  <NumberInput
+                    id="cost"
+                    min={0.01}
+                    step="0.01"
+                    required
+                    value={newProduct.cost}
+                    onValueChange={v => setNewProduct({...newProduct, cost: v})}
+                  />
               </div>
 
             <div className="space-y-2">
@@ -442,7 +442,7 @@ export default function InventoryView() {
               {newProduct.is_individual && (
                 <div className="space-y-2 sm:w-1/2">
                   <Label htmlFor="price">Precio de Venta *</Label>
-                  <NumberInput id="price" min="0.01" step="0.01" required value={newProduct.price} onValueChange={v => setNewProduct({...newProduct, price: v})} />
+                  <NumberInput id="price" min={0.01} step="0.01" required value={newProduct.price} onValueChange={v => setNewProduct({...newProduct, price: v})} />
                 </div>
               )}
 
@@ -580,7 +580,7 @@ export default function InventoryView() {
                 <Label htmlFor="mov_qty">Cantidad *</Label>
                 <NumberInput
                   id="mov_qty"
-                  min="0.0001"
+                  min={0.0001}
                   step="any"
                   required
                   value={movement.quantity}
@@ -625,7 +625,7 @@ export default function InventoryView() {
             {movement.type === 'ENTRADA' && (
               <div className="space-y-2">
                 <Label htmlFor="mov_cost">Costo Unitario *</Label>
-                <NumberInput id="mov_cost" min="0" step="0.01" required value={movement.cost} onValueChange={v => setMovement({...movement, cost: v})} />
+                <NumberInput id="mov_cost" min={0} step="0.01" required value={movement.cost} onValueChange={v => setMovement({...movement, cost: v})} />
               </div>
             )}
 

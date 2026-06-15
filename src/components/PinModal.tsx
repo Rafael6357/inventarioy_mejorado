@@ -40,7 +40,7 @@ export default function PinModal({ isOpen, moduleName, onSuccess, onCancel, isIn
       setShowPin(false);
       const inputElement = document.getElementById('pin-input-field');
       if (inputElement) {
-        inputElement.value = '';
+        (inputElement as HTMLInputElement).value = '';
       }
     }
   }, [isOpen]);
@@ -136,7 +136,7 @@ export default function PinModal({ isOpen, moduleName, onSuccess, onCancel, isIn
               style={{
                 WebkitTextSecurity: showPin ? 'none' : 'disc',
                 MozAppearance: 'textfield'
-              }}
+              } as React.CSSProperties}
               disabled={blocked || isVerifying}
               maxLength={4}
               autoComplete="new-password"

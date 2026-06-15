@@ -167,6 +167,15 @@ export interface PendingItem {
   unit_price: number;
   subtotal: number;
   added_at: string;
+  is_recipe?: boolean;
+  recipe_snapshot?: {
+    name: string;
+    ingredients: {
+      product_id: string;
+      quantity: number;
+      cost: number;
+    }[];
+  };
 }
 
 export interface AccessPin {
@@ -190,8 +199,8 @@ export const ROLE_LABELS: Record<string, string> = {
 };
 
 export const ROLE_MODULES: Record<string, string[]> = {
-  owner: ['sales', 'inventory', 'movements', 'transit', 'recipes', 'consumption', 'closings', 'charts', 'analysis', 'filtered', 'hr', 'ai', 'settings'],
-  economist: ['sales', 'inventory', 'movements', 'transit', 'recipes', 'consumption', 'closings', 'charts', 'analysis', 'filtered', 'hr', 'ai', 'settings'],
+  owner: ['sales', 'inventory', 'movements', 'transit', 'recipes', 'consumption', 'closings', 'charts', 'analysis', 'filtered', 'hr', 'settings'],
+  economist: ['sales', 'inventory', 'movements', 'transit', 'recipes', 'consumption', 'closings', 'charts', 'analysis', 'filtered', 'hr', 'settings'],
   admin: ['inventory', 'movements', 'transit'],
   supervisor: ['sales', 'closings'],
   clerk: ['sales'],
@@ -210,7 +219,6 @@ export const MODULE_ROLES: Record<string, string[]> = {
   '/analysis': ['owner', 'economist'],
   '/charts': ['owner', 'economist'],
   '/filtered': ['owner', 'economist'],
-  '/ai': ['owner', 'economist'],
   '/settings': ['owner'],
   '/action-logs': ['owner', 'economist'],
 };
@@ -329,20 +337,6 @@ const isRateLimitError = (err: any): boolean => {
   return err?.status === 429 || err?.code === '429' || 
          err?.message?.includes('rate limit') || 
          err?.message?.includes('too many requests');
-};
-
-const checkRealInternetConnection = async (): Promise<boolean> => {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
-    
-    const { error } = await supabase.from('products').select('id').limit(1).maybeSingle();
-    
-    clearTimeout(timeoutId);
-    return !error;
-  } catch {
-    return false;
-  }
 };
 
 const withTimeout = async <T>(
@@ -528,7 +522,7 @@ interface DatabaseState {
   uploadEmployeeDocument: (file: File, employeeId: string, docType: 'CONTRATO' | 'IDENTIFICACION' | 'OTRO', name?: string) => Promise<{ success: boolean; error?: string }>;
 
   createPendingAccount: (clientName: string) => Promise<{ success: boolean; error?: string; accountId?: string }>;
-addItemsToPendingAccount: (accountId: string, items: { product_id: string; product_name: string; quantity: number; unit_price: number; subtotal: number }[], isAccountHouse?: boolean, saleType?: 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA')
+addItemsToPendingAccount: (accountId: string, items: { product_id: string; product_name: string; quantity: number; unit_price: number; subtotal: number; is_recipe?: boolean; recipe_snapshot?: { name: string; ingredients: { product_id: string; quantity: number; cost: number }[] } }[], isAccountHouse?: boolean, saleType?: 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA')
     => Promise<{ success: boolean; error?: string }>;
   updatePendingAccount: (accountId: string, updates: Partial<PendingAccount>) => Promise<{ success: boolean; error?: string }>;
   updatePendingAccountItems: (accountId: string, items: PendingItem[]) => Promise<{ success: boolean; error?: string }>;
@@ -568,7 +562,6 @@ addItemsToPendingAccount: (accountId: string, items: { product_id: string; produ
   getEmployeesCount: (search?: string, departmentId?: string) => Promise<number>;
   getDepartmentsCount: (search?: string) => Promise<number>;
 
-  syncPendingData: () => Promise<void>;
   forceRefreshData: () => Promise<void>;
   
   // Warehouse management
@@ -854,11 +847,11 @@ addProduct: async (product) => {
       str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 
     const isDuplicate = get().products.some(
-      p => normalizeString(p.name) === normalizeString(product.name) && p.is_active !== false
+      p => p.user_id === user.id && p.is_active === true && normalizeString(p.name) === normalizeString(product.name)
     );
 
     if (isDuplicate) {
-      throw new Error(`¡Ups! El producto "${product.name}" ya existe. Intenta con otro nombre.`);
+      throw new Error(`El producto "${product.name}" ya existe.`);
     }
 
     const productId = crypto.randomUUID();
@@ -890,14 +883,14 @@ addProduct: async (product) => {
       const payload: any = { product: productData };
       if (pwEntry) {
         const movementId = crypto.randomUUID();
-        const offlineMovement = {
+        const offlineMovement: Movement = {
           id: movementId, user_id: user.id, product_id: productId, type: 'ENTRADA',
           quantity: Number(product.quantity), unit: product.unit, date: now,
           cost: Number(product.cost), reason: 'Stock inicial (Registro de producto)',
           status: 'NORMAL', warehouse_id: mainWarehouse.id, created_at: now,
         };
         payload.movement = offlineMovement;
-        set((state) => ({ movements: [offlineMovement as any, ...state.movements] }));
+        set((state) => ({ movements: [offlineMovement, ...state.movements] }));
         payload.productWarehouse = [{
           product_id: productId, warehouse_id: mainWarehouse.id,
           quantity: Number(product.quantity), in_transit: 0,
@@ -984,6 +977,22 @@ addProduct: async (product) => {
   },
 
   updateProduct: async (id, updates) => {
+    const { user } = useAuthStore.getState();
+    if (!user) throw new Error('No hay usuario autenticado');
+
+    if (updates.name !== undefined) {
+      const normalizeString = (str: string) =>
+        str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
+      const isDuplicate = get().products.some(
+        p => p.id !== id && p.user_id === user.id && p.is_active === true && normalizeString(p.name) === normalizeString(updates.name!)
+      );
+
+      if (isDuplicate) {
+        throw new Error(`El producto "${updates.name}" ya existe.`);
+      }
+    }
+
     const capitalizedUpdates = {
       ...updates,
       ...(updates.name !== undefined && { name: capitalize(updates.name) }),
@@ -1763,10 +1772,12 @@ addProduct: async (product) => {
 
         updatePromises.push(
           withTimeout(
-            supabase
-              .from('transit_items')
-              .update({ remaining: newRemaining, consumed: newConsumed, updated_at: new Date().toISOString() })
-              .eq('id', item.id),
+            Promise.resolve(
+              supabase
+                .from('transit_items')
+                .update({ remaining: newRemaining, consumed: newConsumed, updated_at: new Date().toISOString() })
+                .eq('id', item.id)
+            ),
             10000
           ).then(({ error }: any) => {
             if (error) throw new Error('No se pudo actualizar el item en tránsito');
@@ -1870,7 +1881,7 @@ addProduct: async (product) => {
     const newQuantity = Number(product.quantity) + quantity;
 
     if (!navigator.onLine) {
-      const localMovement = {
+      const localMovement: Movement = {
         id: crypto.randomUUID(),
         user_id: user.id,
         product_id: product.id,
@@ -2231,21 +2242,21 @@ addProduct: async (product) => {
     }
   },
 
-  addItemsToPendingAccount: async (accountId: string, items: { product_id: string; product_name: string; quantity: number; unit_price: number; subtotal: number }[], isAccountHouse: boolean = false, saleType: 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA' = 'SALON') => {
+  addItemsToPendingAccount: async (accountId: string, items: { product_id: string; product_name: string; quantity: number; unit_price: number; subtotal: number; is_recipe?: boolean; recipe_snapshot?: { name: string; ingredients: { product_id: string; quantity: number; cost: number }[] } }[], isAccountHouse: boolean = false, saleType: 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA' = 'SALON') => {
     const account = get().pendingAccounts.find(a => a.id === accountId);
     if (!account) return { success: false, error: 'Cuenta no encontrada' };
 
     // Guardar el estado de Cuenta Casa para toda la cuenta
-    const accountIsAccountHouse = (account as any).is_account_house || isAccountHouse;
+    const accountIsAccountHouse = account.is_account_house || isAccountHouse;
     // Usar el tipo de venta proporcionado o el que ya tenga la cuenta
-    const accountSaleType = saleType || (account as any).sale_type || 'SALON';
+    const accountSaleType = saleType || account.sale_type || 'SALON';
 
     // Verificar tránsito disponible antes de agregar
     for (const item of items) {
       const product = get().products.find(p => p.id === item.product_id);
       
-      const itemIsRecipe = (item as any).is_recipe;
-      const itemRecipeSnapshot = (item as any).recipe_snapshot;
+      const itemIsRecipe = item.is_recipe;
+      const itemRecipeSnapshot = item.recipe_snapshot;
       
       if (itemIsRecipe && itemRecipeSnapshot?.ingredients) {
         // Si es receta, verificar cada ingrediente usando recipe_snapshot del item
@@ -2283,14 +2294,14 @@ addProduct: async (product) => {
       added_at: new Date().toISOString(),
     }));
 
-    const allItems = [...(account.items as any[]), ...newItems];
+    const allItems = [...account.items, ...newItems];
     const newTotal = allItems.reduce((sum, item) => sum + item.subtotal, 0);
 
     if (!navigator.onLine) {
       set((state) => ({
         pendingAccounts: state.pendingAccounts.map(a =>
           a.id === accountId
-            ? { ...a, items: allItems as any, total_amount: accountIsAccountHouse ? 0 : newTotal, is_account_house: accountIsAccountHouse, sale_type: accountSaleType, updated_at: new Date().toISOString() }
+            ? { ...a, items: allItems, total_amount: accountIsAccountHouse ? 0 : newTotal, is_account_house: accountIsAccountHouse, sale_type: accountSaleType, updated_at: new Date().toISOString() }
             : a
         ),
       }));
@@ -2340,14 +2351,14 @@ addProduct: async (product) => {
     const account = get().pendingAccounts.find(a => a.id === accountId);
     if (!account) return { success: false, error: 'Cuenta no encontrada' };
 
-    const isAccountHouse = (account as any).is_account_house || false;
+    const isAccountHouse = account.is_account_house || false;
     const newTotal = isAccountHouse ? 0 : items.reduce((sum, item) => sum + item.subtotal, 0);
 
     if (!navigator.onLine) {
       set((state) => ({
         pendingAccounts: state.pendingAccounts.map(a =>
           a.id === accountId
-            ? { ...a, items: items as any, total_amount: newTotal, updated_at: new Date().toISOString() }
+            ? { ...a, items: items, total_amount: newTotal, updated_at: new Date().toISOString() }
             : a
         ),
       }));
@@ -2381,10 +2392,10 @@ addProduct: async (product) => {
     const account = get().pendingAccounts.find(a => a.id === accountId);
     if (!account) return { success: false, error: 'Cuenta no encontrada' };
     
-    const currentIsAccountHouse = (account as any).is_account_house || false;
+    const currentIsAccountHouse = account.is_account_house || false;
     const newIsAccountHouse = !currentIsAccountHouse;
     
-    const accountItems = (account.items as any[]) || [];
+    const accountItems = account.items || [];
     const newTotal = newIsAccountHouse ? 0 : accountItems.reduce((sum, item) => sum + item.subtotal, 0);
 
     if (!navigator.onLine) {
@@ -2425,7 +2436,7 @@ deletePendingAccount: async (accountId: string) => {
 
     if (!navigator.onLine) {
       const transitRestores: { transitItemId: string; quantity: number }[] = [];
-      const accountItems = account.items as any[] || [];
+      const accountItems = account.items || [];
 
       for (const item of accountItems) {
         const product = get().products.find(p => p.id === item.product_id);
@@ -2462,7 +2473,7 @@ deletePendingAccount: async (accountId: string) => {
       return { success: true };
     }
 
-    const accountItems = account.items as any[] || [];
+    const accountItems = account.items || [];
 
     for (const item of accountItems) {
       const product = get().products.find(p => p.id === item.product_id);
@@ -2513,7 +2524,7 @@ deletePendingAccount: async (accountId: string) => {
 
     const account = get().pendingAccounts.find(a => a.id === accountId);
     if (!account) return { success: false, error: 'Cuenta no encontrada' };
-    if (!account.items || (account.items as any[]).length === 0) {
+    if (!account.items || account.items.length === 0) {
       return { success: false, error: 'La cuenta no tiene productos' };
     }
 
@@ -2524,7 +2535,7 @@ deletePendingAccount: async (accountId: string) => {
     }
     
     if (!navigator.onLine) {
-      const saleItems = (account.items as any[]).map(item => ({
+      const saleItems = account.items.map(item => ({
         product_id: item.product_id,
         quantity: item.quantity,
         unit_cost: 0,
@@ -2534,8 +2545,8 @@ deletePendingAccount: async (accountId: string) => {
         recipe_snapshot: item.recipe_snapshot || null,
       }));
 
-      const isAccountHouse = (account as any).is_account_house || false;
-      const saleType = (account as any).sale_type || 'SALON';
+    const isAccountHouse = account.is_account_house || false;
+      const saleType = account.sale_type || 'SALON';
       const totalPaidCup = (efectivo || 0) + (transferencia || 0) + ((usd || 0) * (user.usdRate || 0)) + ((eur || 0) * (user.eurRate || 0));
 
       const result = await get().addSale({
@@ -2568,7 +2579,7 @@ deletePendingAccount: async (accountId: string) => {
       return { success: true };
     }
 
-    const saleItems = (account.items as any[]).map(item => {
+    const saleItems = account.items.map(item => {
       const itemIsRecipe = item.is_recipe || false;
       const itemRecipeSnapshot = item.recipe_snapshot || null;
       
@@ -2583,8 +2594,8 @@ deletePendingAccount: async (accountId: string) => {
       };
     });
 
-    const isAccountHouse = (account as any).is_account_house || false;
-    const saleType = (account as any).sale_type || 'SALON';
+    const isAccountHouse = account.is_account_house || false;
+    const saleType = account.sale_type || 'SALON';
     const totalPaidCup = (efectivo || 0) + (transferencia || 0) + ((usd || 0) * (user.usdRate || 0)) + ((eur || 0) * (user.eurRate || 0));
     
     const result = await get().addSale({
@@ -2701,7 +2712,7 @@ deletePendingAccount: async (accountId: string) => {
     return { success: true };
   },
 
-  verifyPinForModule: async (modulePath: string, pin: string): Promise<{ success: boolean; error?: string; blocked?: boolean; remainingTime?: number }> => {
+  verifyPinForModule: async (modulePath: string, pin: string): Promise<{ success: boolean; error?: string; blocked?: boolean; remainingTime?: number; verifiedRole?: string }> => {
     const user = useAuthStore.getState().user;
     if (!user) return { success: false, error: 'No hay usuario autenticado' };
 
@@ -2835,7 +2846,7 @@ deletePendingAccount: async (accountId: string) => {
         .order('created_at', { ascending: false });
 
       if (!error && data) {
-        set({ actionLogs: data as any[] });
+        set({ actionLogs: data });
       }
     } catch (err) {
       console.warn('[getActionLogs] Error cargando logs:', err);
@@ -3805,10 +3816,6 @@ deletePendingAccount: async (accountId: string) => {
     set((state) => ({
       employeeDocuments: state.employeeDocuments.filter((d) => d.id !== id),
     }));
-  },
-
-  syncPendingData: async () => {
-    console.log('[syncPendingData] Offline sync disabled - using Supabase only');
   },
 
 forceRefreshData: async () => {

@@ -441,7 +441,7 @@ export default function RecipesView() {
                         {editingRecipeId === recipe.id ? (
                           <div className="flex items-center gap-1">
                             <NumberInput
-                              min="0.01"
+                              min={0.01}
                               step="0.01"
                               value={editingPrice}
                               onValueChange={(v) => setEditingPrice(v)}

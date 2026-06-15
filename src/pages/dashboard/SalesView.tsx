@@ -136,13 +136,13 @@ export default function SalesView() {
     const account = pendingAccounts.find(a => a.id === editingItemAccountId);
     if (!account) return;
 
-    const currentItems = (account.items as any[]) || [];
+    const currentItems = account.items || [];
     const newItems = currentItems.map(i => {
       if (i.product_id === editingItem.product_id && i.added_at === editingItem.added_at) {
         return {
           ...i,
           quantity: editItemQuantity,
-          subtotal: editItemQuantity * (i.price || i.unit_price)
+          subtotal: editItemQuantity * (i.unit_price)
         };
       }
       return i;
@@ -163,7 +163,7 @@ export default function SalesView() {
     const account = pendingAccounts.find(a => a.id === accountId);
     if (!account) return;
 
-    const currentItems = (account.items as any[]) || [];
+    const currentItems = account.items || [];
     const newItems = currentItems.filter(i => 
       !(i.product_id === itemToDelete.product_id && i.added_at === itemToDelete.added_at)
     );
@@ -887,10 +887,10 @@ setShowTicket(true);
                 </div>
                 <div className="space-y-2 max-h-96 overflow-y-auto overflow-hidden">
               {pendingAccounts.map(account => {
-                const accountItems = (account.items as any[]) || [];
+                const accountItems = account.items || [];
                 const isExpanded = expandedAccounts.has(account.id);
                 return (
-                  <div key={account.id} className={`p-3 rounded-lg border ${(account as any).is_account_house ? 'bg-danger/10 border-danger/30' : 'bg-warning/5 border-warning/20'}`}>
+                  <div key={account.id} className={`p-3 rounded-lg border ${account.is_account_house ? 'bg-danger/10 border-danger/30' : 'bg-warning/5 border-warning/20'}`}>
                     <div 
                       className="flex items-center justify-between mb-2 cursor-pointer"
                       onClick={() => toggleAccountExpansion(account.id)}
@@ -902,17 +902,17 @@ setShowTicket(true);
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-medium text-text text-sm">{account.client_name}</p>
                           <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                            (account as any).sale_type === 'DOMICILIO' ? 'bg-blue-100 text-blue-700' : 
-                            (account as any).sale_type === 'BAR' ? 'bg-purple-100 text-purple-700' :
-                            (account as any).sale_type === 'VENTA_RAPIDA' ? 'bg-green-100 text-green-700' :
+                            account.sale_type === 'DOMICILIO' ? 'bg-blue-100 text-blue-700' : 
+                            account.sale_type === 'BAR' ? 'bg-purple-100 text-purple-700' :
+                            account.sale_type === 'VENTA_RAPIDA' ? 'bg-green-100 text-green-700' :
                             'bg-gray-100 text-gray-600'
                           }`}>
-                            {(account as any).sale_type === 'SALON' ? 'SALÓN' : 
-                             (account as any).sale_type === 'DOMICILIO' ? 'A DOMICILIO' : 
-                             (account as any).sale_type === 'BAR' ? 'BAR' : 
-                             (account as any).sale_type === 'VENTA_RAPIDA' ? 'VENTA RÁPIDA' : 'SALÓN'}
+                            {account.sale_type === 'SALON' ? 'SALÓN' : 
+                             account.sale_type === 'DOMICILIO' ? 'A DOMICILIO' : 
+                             account.sale_type === 'BAR' ? 'BAR' : 
+                             account.sale_type === 'VENTA_RAPIDA' ? 'VENTA RÁPIDA' : 'SALÓN'}
                           </span>
-                          {(account as any).is_account_house && (
+                          {account.is_account_house && (
                             <span className="text-xs px-1.5 py-0.5 bg-danger/20 text-danger rounded font-medium">CUENTA CASA</span>
                           )}
                         </div>
@@ -926,13 +926,13 @@ setShowTicket(true);
                           onClick={async () => {
                             const result = await togglePendingAccountType(account.id);
                             if (result.success) {
-                              toast.success((account as any).is_account_house ? 'Cambiado a venta normal' : 'Cambiado a Cuenta Casa');
+                              toast.success(account.is_account_house ? 'Cambiado a venta normal' : 'Cambiado a Cuenta Casa');
                             } else {
                               toast.error(result.error || 'Error al cambiar tipo de cuenta');
                             }
                           }}
-                          className={`text-xs px-2 py-0.5 rounded text-xs font-medium ${(account as any).is_account_house ? 'bg-danger/10 text-danger border border-danger/30' : 'bg-warning/10 text-warning border border-warning/30'}`}
-                          title={(account as any).is_account_house ? 'Cambiar a venta normal' : 'Cambiar a Cuenta Casa'}
+                          className={`text-xs px-2 py-0.5 rounded text-xs font-medium ${account.is_account_house ? 'bg-danger/10 text-danger border border-danger/30' : 'bg-warning/10 text-warning border border-warning/30'}`}
+                          title={account.is_account_house ? 'Cambiar a venta normal' : 'Cambiar a Cuenta Casa'}
                         >
                           CC
                         </button>
@@ -967,7 +967,7 @@ setShowTicket(true);
                         <div className="space-y-1">
                           {accountItems.map((item, index) => (
                             <div key={`${item.product_id}-${index}`} className="flex items-center justify-between text-xs pl-2 group">
-                              <span className="text-text">{item.name || item.product_name}</span>
+                              <span className="text-text">{item.product_name}</span>
                               <div className="flex items-center gap-2">
                                 <button
                                   onClick={() => handleEditItem(account.id, item)}
@@ -977,7 +977,7 @@ setShowTicket(true);
                                   x{item.quantity}
                                 </button>
                                 <span className="text-text-secondary">
-                                  ${((item.price || item.unit_price) * item.quantity).toFixed(2)}
+                                  ${(item.unit_price * item.quantity).toFixed(2)}
                                 </span>
                                 <button
                                   onClick={() => handleDeleteItem(account.id, item)}
@@ -1017,7 +1017,7 @@ setShowTicket(true);
                   ${product.price.toFixed(2)}
                 </p>
                 <p className="mt-1 text-xs text-text-secondary">
-                  {product.is_recipe ? 'Receta' : `En Tránsito: ${(product as any).in_transit || 0} ${product.unit}`}
+                  {product.is_recipe ? 'Receta' : `En Tránsito: ${(product as { in_transit?: number }).in_transit || 0} ${product.unit}`}
                 </p>
               </button>
             ))}
@@ -1104,7 +1104,7 @@ setShowTicket(true);
                 id="saleType"
                 className="w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 value={saleType}
-                onChange={e => setSaleType(e.target.value as any)}
+                onChange={e => setSaleType(e.target.value as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA')}
               >
                 <option value="SALON">Salón</option>
                 <option value="DOMICILIO">Domicilio</option>
@@ -1135,7 +1135,7 @@ setShowTicket(true);
               </label>
               <Input
                 type="number"
-                min="0"
+                min={0}
                 step="0.01"
                 className="w-full h-9 font-mono"
                 value={deliveryFee || ''}
@@ -1150,13 +1150,13 @@ setShowTicket(true);
               type="checkbox"
               id="accountHouse"
               checked={isAccountHouse}
-              disabled={selectedPendingAccount ? (pendingAccounts.find(a => a.id === selectedPendingAccount)?.items as any[] || []).length > 0 : false}
+              disabled={selectedPendingAccount ? (pendingAccounts.find(a => a.id === selectedPendingAccount)?.items || []).length > 0 : false}
               onChange={e => setIsAccountHouse(e.target.checked)}
               className="w-4 h-4 rounded border-border text-primary focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
             />
-            <label htmlFor="accountHouse" className={`text-sm ${selectedPendingAccount ? ((pendingAccounts.find(a => a.id === selectedPendingAccount)?.items as any[] || []).length > 0 ? 'text-text-secondary' : 'text-text') : 'text-text'}`}>
+            <label htmlFor="accountHouse" className={`text-sm ${selectedPendingAccount ? ((pendingAccounts.find(a => a.id === selectedPendingAccount)?.items || []).length > 0 ? 'text-text-secondary' : 'text-text') : 'text-text'}`}>
               Cuenta Casa
-              {selectedPendingAccount && (pendingAccounts.find(a => a.id === selectedPendingAccount)?.items as any[] || []).length > 0 && (
+              {selectedPendingAccount && (pendingAccounts.find(a => a.id === selectedPendingAccount)?.items || []).length > 0 && (
                 <span className="text-xs ml-1 text-warning">(usar botón CC)</span>
               )}
             </label>
@@ -1171,7 +1171,7 @@ setShowTicket(true);
             <span className="text-text-secondary">Descuento ($)</span>
             <Input 
               type="number" 
-              min="0" 
+              min={0} 
               step="0.01" 
               className="w-24 h-8 text-right font-mono" 
               value={discount || ''} 
@@ -1278,7 +1278,7 @@ setShowTicket(true);
                 <div>
                   <label className="text-xs text-text-secondary block mb-1">Efectivo (CUP)</label>
                   <NumberInput
-                    min="0"
+                    min={0}
                     max={calculateFieldMax('efectivo', salePaymentMethod, total, user?.usdRate || 0, user?.eurRate || 0, !!user?.cupTransferEnabled, !!user?.usdEnabled, !!user?.eurEnabled)}
                     className="font-mono"
                     value={salePaymentMethod.efectivo || 0}
@@ -1296,7 +1296,7 @@ setShowTicket(true);
                 <div>
                   <label className="text-xs text-text-secondary block mb-1">Transferencia (CUP)</label>
                   <NumberInput
-                    min="0"
+                    min={0}
                     max={calculateFieldMax('transferencia', salePaymentMethod, total, user?.usdRate || 0, user?.eurRate || 0, !!user?.cupTransferEnabled, !!user?.usdEnabled, !!user?.eurEnabled)}
                     className="font-mono"
                     value={salePaymentMethod.transferencia || 0}
@@ -1315,7 +1315,7 @@ setShowTicket(true);
                 <div>
                   <label className="text-xs text-text-secondary block mb-1">USD (1 USD = {user.usdRate} CUP)</label>
                   <NumberInput
-                    min="0"
+                    min={0}
                     max={calculateFieldMax('usd', salePaymentMethod, total, user?.usdRate || 0, user?.eurRate || 0, !!user?.cupTransferEnabled, !!user?.usdEnabled, !!user?.eurEnabled)}
                     className="font-mono"
                     value={salePaymentMethod.usd || 0}
@@ -1334,7 +1334,7 @@ setShowTicket(true);
                 <div>
                   <label className="text-xs text-text-secondary block mb-1">EUR (1 EUR = {user.eurRate} CUP)</label>
                   <NumberInput
-                    min="0"
+                    min={0}
                     max={calculateFieldMax('eur', salePaymentMethod, total, user?.usdRate || 0, user?.eurRate || 0, !!user?.cupTransferEnabled, !!user?.usdEnabled, !!user?.eurEnabled)}
                     className="font-mono"
                     value={salePaymentMethod.eur || 0}
@@ -1403,7 +1403,7 @@ setShowTicket(true);
 
             {selectedPendingAccount && (() => {
               const selectedAccount = pendingAccounts.find(a => a.id === selectedPendingAccount);
-              const accountItems = selectedAccount ? (selectedAccount.items as any[]) : [];
+              const accountItems = selectedAccount ? selectedAccount.items : [];
               return selectedAccount && accountItems.length > 0 ? (
                 <div className="mb-4 p-3 bg-surface-hover rounded-lg border border-border/30">
                   <p className="text-sm font-medium text-text mb-2">
@@ -1430,7 +1430,7 @@ setShowTicket(true);
                 <p className="text-xs font-medium text-warning mb-2">Cuentas Pendientes</p>
                 <div className="space-y-2 max-h-32 overflow-y-auto">
                   {pendingAccounts.map(account => {
-                    const accountItems = (account.items as any[]) || [];
+                    const accountItems = account.items || [];
                     return (
                       <div key={account.id} className="flex items-center justify-between text-xs p-2 bg-surface rounded">
                         <div className="flex-1">
@@ -1616,7 +1616,7 @@ setShowTicket(true);
                   <label className="text-xs text-text-secondary block mb-1">CUP Efectivo</label>
                   <Input
                     type="number"
-                    min="0"
+                    min={0}
                     className="font-mono"
                     value={currencyBreakdown.cupEfectivo || ''}
                     onChange={e => setCurrencyBreakdown({...currencyBreakdown, cupEfectivo: Number(e.target.value)})}
@@ -1628,7 +1628,7 @@ setShowTicket(true);
                   <label className="text-xs text-text-secondary block mb-1">CUP Transferencia</label>
                   <Input
                     type="number"
-                    min="0"
+                    min={0}
                     className="font-mono"
                     value={currencyBreakdown.cupTransfer || ''}
                     onChange={e => setCurrencyBreakdown({...currencyBreakdown, cupTransfer: Number(e.target.value)})}
@@ -1641,7 +1641,7 @@ setShowTicket(true);
                   <label className="text-xs text-text-secondary block mb-1">USD</label>
                   <Input
                     type="number"
-                    min="0"
+                    min={0}
                     className="font-mono"
                     value={currencyBreakdown.usd || ''}
                     onChange={e => setCurrencyBreakdown({...currencyBreakdown, usd: Number(e.target.value)})}
@@ -1654,7 +1654,7 @@ setShowTicket(true);
                   <label className="text-xs text-text-secondary block mb-1">EUR</label>
                   <Input
                     type="number"
-                    min="0"
+                    min={0}
                     className="font-mono"
                     value={currencyBreakdown.eur || ''}
                     onChange={e => setCurrencyBreakdown({...currencyBreakdown, eur: Number(e.target.value)})}
@@ -1829,7 +1829,7 @@ setShowTicket(true);
               <div>
                 <label className="text-sm text-text-secondary block mb-1">Efectivo (CUP)</label>
                 <NumberInput
-                  min="0"
+                  min={0}
                   max={calculateFieldMax('efectivo', chargeBreakdown, selectedAccountForCharge.total_amount || 0, user?.usdRate || 0, user?.eurRate || 0, !!user?.cupTransferEnabled, !!user?.usdEnabled, !!user?.eurEnabled)}
                   className="font-mono"
                   value={chargeBreakdown.efectivo || 0}
@@ -1842,7 +1842,7 @@ setShowTicket(true);
               <div>
                 <label className="text-sm text-text-secondary block mb-1">Transferencia (CUP)</label>
                 <NumberInput
-                  min="0"
+                  min={0}
                   max={calculateFieldMax('transferencia', chargeBreakdown, selectedAccountForCharge.total_amount || 0, user?.usdRate || 0, user?.eurRate || 0, !!user?.cupTransferEnabled, !!user?.usdEnabled, !!user?.eurEnabled)}
                   className="font-mono"
                   value={chargeBreakdown.transferencia || 0}
@@ -1856,7 +1856,7 @@ setShowTicket(true);
               <div>
                 <label className="text-sm text-text-secondary block mb-1">USD (1 USD = {user.usdRate} CUP)</label>
                 <NumberInput
-                  min="0"
+                  min={0}
                   max={calculateFieldMax('usd', chargeBreakdown, selectedAccountForCharge.total_amount || 0, user?.usdRate || 0, user?.eurRate || 0, !!user?.cupTransferEnabled, !!user?.usdEnabled, !!user?.eurEnabled)}
                   className="font-mono"
                   value={chargeBreakdown.usd || 0}
@@ -1870,7 +1870,7 @@ setShowTicket(true);
               <div>
                 <label className="text-sm text-text-secondary block mb-1">EUR (1 EUR = {user.eurRate} CUP)</label>
                 <NumberInput
-                  min="0"
+                  min={0}
                   max={calculateFieldMax('eur', chargeBreakdown, selectedAccountForCharge.total_amount || 0, user?.usdRate || 0, user?.eurRate || 0, !!user?.cupTransferEnabled, !!user?.usdEnabled, !!user?.eurEnabled)}
                   className="font-mono"
                   value={chargeBreakdown.eur || 0}
@@ -1966,7 +1966,7 @@ setShowTicket(true);
                           }
                         }
                         setTicketData({
-                          items: ((selectedAccountForCharge.items as any[]) || []).map((item: any) => ({
+                          items: (selectedAccountForCharge.items || []).map((item: any) => ({
                             name: item.product_name,
                             quantity: item.quantity,
                             unitPrice: item.unit_price,

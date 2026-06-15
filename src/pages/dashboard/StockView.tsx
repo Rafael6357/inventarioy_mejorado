@@ -7,7 +7,7 @@ import { Button } from '../../components/ui/button';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { validateNumber, exportToExcel } from '../../lib/utils';
-import { normalizeUnit, getCompatibleUnits, convertUnit } from '../../lib/unitConversion';
+import { normalizeUnit, getCompatibleUnits, convertUnit, type UnitAbbrev } from '../../lib/unitConversion';
 import { formatNumber } from '../../lib/formatNumber';
 import { useStaggerEnter } from '../../lib/animations/useStaggerEnter';
 import { usePersistentFilters } from '../../lib/hooks/usePersistentFilters';
@@ -132,7 +132,7 @@ export default function StockView() {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     
     const recentUsage = movements
-      .filter(m => m.product_id === productId && (m.type === 'SALIDA' || m.type === 'CONSUMO') && !m.reason?.startsWith('Venta #') && m.reason !== 'Venta de producto/ingrediente' && new Date(m.date) >= thirtyDaysAgo)
+      .filter(m => m.product_id === productId && (m.type === 'SALIDA' || (m.type as string) === 'CONSUMO') && !m.reason?.startsWith('Venta #') && m.reason !== 'Venta de producto/ingrediente' && new Date(m.date) >= thirtyDaysAgo)
       .reduce((sum, m) => sum + Number(m.quantity), 0);
     
     const dailyAvg = recentUsage / 30;
@@ -277,7 +277,7 @@ export default function StockView() {
     
     const recentMovements = movements.filter(m => {
       return m.product_id === productId && 
-             (m.type === 'SALIDA' || m.type === 'CONSUMO') &&
+             (m.type === 'SALIDA' || (m.type as string) === 'CONSUMO') &&
              new Date(m.date) >= thirtyDaysAgo;
     });
     
@@ -667,7 +667,7 @@ export default function StockView() {
                               setAdjustmentModal({
                                 product: adjustedProduct,
                                 physicalStock: 0,
-                                unit: compatibleUnits.includes(product.unit) ? product.unit : baseUnit,
+                                unit: compatibleUnits.includes(product.unit as UnitAbbrev) ? product.unit : baseUnit,
                                 date: new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 19),
                               });
                             }}

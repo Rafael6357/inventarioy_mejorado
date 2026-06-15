@@ -606,7 +606,7 @@ const handleWaste = async () => {
                     <div className="flex-1">
                       <label className="text-xs font-medium text-text-secondary">Cantidad *</label>
                       <NumberInput
-                        min="0.0001"
+                        min={0.0001}
                         max={maxInCurrentUnit}
                         step="0.01"
                         value={cancelModal.quantity}
@@ -721,7 +721,7 @@ const handleWaste = async () => {
                     <div className="flex-1">
                       <label className="text-xs font-medium text-text-secondary">Cantidad *</label>
                       <NumberInput
-                        min="0.0001"
+                        min={0.0001}
                         max={maxInCurrentUnit}
                         step="0.01"
                         value={wasteModal.quantity}
@@ -836,7 +836,7 @@ const handleWaste = async () => {
                     <div className="flex-1">
                       <label className="text-xs font-medium text-text-secondary">Cantidad consumida *</label>
                       <NumberInput
-                        min="0.0001"
+                        min={0.0001}
                         max={maxInCurrentUnit}
                         step="0.01"
                         value={consumptionModal.quantity}
