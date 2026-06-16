@@ -172,7 +172,7 @@ export default function Landing() {
                 7 Días de Prueba Gratis
               </div>
               <h1 className="hero-fade text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
-                Gestiona tu inventario <span className="text-gradient">inteligente y fácil</span>
+                Gestiona tu inventario <span className="text-gradient">fácil y potente</span>
               </h1>
               <p className="hero-fade mx-auto max-w-2xl text-lg text-text-secondary sm:text-xl">
                 La solución integral para restaurantes, cafeterías y comercios en Cuba. Controla tu stock, ventas, recetas y personal en un solo lugar.
@@ -346,7 +346,7 @@ export default function Landing() {
               <p className="text-text-secondary max-w-2xl mx-auto">Herramientas profesionales diseñadas específicamente para PYMES, restaurantes y comercios.</p>
             </div>
             
-            <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
               {[
                 {
                   title: "Gestión de Inventario",
@@ -362,11 +362,6 @@ export default function Landing() {
                   title: "Recetas y Cocciones",
                   description: "Calcula costos exactos por porción y descuenta ingredientes automáticamente.",
                   icon: ChefHat,
-                },
-                {
-                  title: "Asistente IA",
-                  description: "Análisis inteligente de tus datos para predecir demanda y optimizar compras.",
-                  icon: Sparkles,
                 },
               ].map((feature, index) => (
                 <div key={feature.title} className="relative overflow-hidden rounded-2xl border border-border bg-surface p-8 transition-all hover:border-primary/50 hover:shadow-[0_0_30px_-10px_rgba(255,193,7,0.3)] fade-up" style={{ transitionDelay: `${index * 100}ms` }}>
@@ -537,7 +532,7 @@ export default function Landing() {
                     "Control de empleados y nómina",
                     "Biblioteca de documentos para empleados (PNO, Reglamento)",
                     "Gráficos y estadísticas en tiempo real",
-                    "Análisis con IA de tu negocio",
+                    "Análisis de rotación y auditoría de inventario",
                     "Exportación de datos a Excel",
                     "Acceso desde cualquier dispositivo con internet",
                     "Soporte prioritario",

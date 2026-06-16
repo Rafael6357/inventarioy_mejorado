@@ -17,7 +17,6 @@ const MODULE_TRANSLATIONS: Record<string, string> = {
   analysis: 'Análisis',
   filtered: 'Centro Filtrado',
   hr: 'RR.HH.',
-  ai: 'IA',
   settings: 'Configuración',
 };
 
