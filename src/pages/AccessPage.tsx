@@ -153,7 +153,7 @@ export default function AccessPage() {
     <div className="min-h-screen bg-bg flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <InventarioYLogo size="xl" />
+          <InventarioYLogo size="xl" variant="image" />
         </div>
 
         <div className="bg-surface rounded-2xl border border-border/50 p-6 shadow-2xl">

@@ -83,7 +83,7 @@ export default function Landing() {
       <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-bg/80 backdrop-blur-xl supports-[backdrop-filter]:bg-bg/60 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-2">
-            <InventarioYLogo size="lg" />
+            <InventarioYLogo size="lg" variant="image" />
           </div>
           <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-text-secondary">
             <a href="#features" className="hover:text-primary transition-colors">Características</a>
@@ -124,7 +124,7 @@ export default function Landing() {
           <div className="absolute inset-0 bg-black/50" onClick={() => setIsMobileMenuOpen(false)} />
           <div className="absolute right-0 top-0 h-full w-64 bg-surface border-l border-border shadow-2xl animate-in slide-in-from-right">
             <div className="flex items-center justify-between p-4 border-b border-border">
-              <InventarioYLogo size="md" />
+              <InventarioYLogo size="md" variant="image" />
               <button onClick={() => setIsMobileMenuOpen(false)} className="text-text-secondary hover:text-text">
                 <X className="h-5 w-5" />
               </button>
@@ -626,7 +626,7 @@ export default function Landing() {
       <footer className="border-t border-border bg-surface py-12">
         <div className="container mx-auto px-4 text-center text-text-secondary">
           <div className="flex items-center justify-center gap-2 mb-6">
-            <InventarioYLogo size="lg" />
+            <InventarioYLogo size="lg" variant="image" />
           </div>
           
           {/* Redes Sociales */}

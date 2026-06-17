@@ -298,7 +298,7 @@ export default function Dashboard() {
     return (
       <div className="flex h-screen items-center justify-center bg-bg">
         <div className="text-center">
-          <div className="mb-2"><InventarioYLogo size="xl" /></div>
+          <div className="mb-2"><InventarioYLogo size="xl" variant="image" /></div>
           <p className="text-text-secondary">Cargando...</p>
         </div>
       </div>

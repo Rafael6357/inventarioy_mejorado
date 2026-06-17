@@ -70,7 +70,7 @@ export default function Register() {
       <div className="w-full max-w-md space-y-8 rounded-2xl border border-border/50 bg-surface/80 backdrop-blur-xl p-8 shadow-[0_0_40px_-10px_rgba(255,193,7,0.15)]">
         <div className="flex flex-col items-center text-center">
           <div className="mb-4">
-            <InventarioYLogo size="lg" />
+            <InventarioYLogo size="lg" variant="image" />
           </div>
           <h2 className="text-2xl font-bold text-text text-gradient hero-glow">Crea tu cuenta</h2>
           <div className="mt-2 inline-flex items-center rounded-full border border-primary/50 bg-primary/10 px-3 py-1 text-xs font-medium text-primary shadow-[0_0_15px_rgba(255,193,7,0.2)]">
