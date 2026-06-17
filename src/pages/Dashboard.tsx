@@ -297,9 +297,9 @@ export default function Dashboard() {
   if (authLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-bg">
-        <div className="text-center">
-          <div className="mb-2"><InventarioYLogo size="xl" variant="image" /></div>
-          <p className="text-text-secondary">Cargando...</p>
+        <div className="flex flex-col items-center gap-3">
+          <InventarioYLogo size="xl" variant="image" />
+          <p className="text-text-secondary drop-shadow-[0_0_8px_rgba(255,193,7,0.8)]">Cargando...</p>
         </div>
       </div>
     );
