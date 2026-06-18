@@ -1203,8 +1203,8 @@ setShowTicket(true);
       {/* Checkout Preview Modal */}
       {showPreview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm modal-backdrop">
-          <div className="w-full max-w-md max-h-[85vh] overflow-y-auto rounded-2xl border border-border/50 bg-surface p-6 shadow-2xl">
-            <div className="mb-6 flex items-center justify-between">
+          <div className="w-full max-w-md max-h-[95vh] md:max-h-[85vh] overflow-y-auto overscroll-contain rounded-2xl border border-border/50 bg-surface p-3 md:p-6 shadow-2xl">
+            <div className="mb-4 md:mb-6 flex items-center justify-between">
               <h2 className="text-xl font-bold text-text">Resumen de Venta</h2>
               <button
                 onClick={() => {
@@ -1219,7 +1219,7 @@ setShowTicket(true);
               </button>
             </div>
 
-            <div className="mb-6 max-h-[40vh] overflow-y-auto pr-2 space-y-3">
+            <div className="mb-4 md:mb-6 space-y-2 md:space-y-3">
               {cart.map(item => (
                 <div key={item.product_id} className="flex justify-between text-sm border-b border-border/50 pb-2">
                   <div className="flex gap-2 text-text">
@@ -1231,7 +1231,7 @@ setShowTicket(true);
               ))}
             </div>
 
-            <div className="space-y-3 rounded-xl bg-bg/50 p-4 mb-6">
+            <div className="space-y-2 md:space-y-3 rounded-xl bg-bg/50 p-3 md:p-4 mb-4 md:mb-6">
               <div className="flex justify-between text-sm">
                 <span className="text-text-secondary">Subtotal:</span>
                 <span className="font-mono text-text">${subtotal.toFixed(2)}</span>
@@ -1269,12 +1269,12 @@ setShowTicket(true);
             </div>
 
             {!isAccountHouse && (
-            <div className="mb-4 p-4 rounded-xl bg-bg/50 border border-border/30">
-              <h4 className="text-sm font-semibold text-text mb-3 flex items-center gap-2">
+            <div className="mb-3 md:mb-4 p-3 md:p-4 rounded-xl bg-bg/50 border border-border/30">
+              <h4 className="text-sm font-semibold text-text mb-2 md:mb-3 flex items-center gap-2">
                 Método de Pago <span className="text-danger">*</span>
               </h4>
-              <p className="text-xs text-text-secondary mb-3">Especifique el desglose del pago realizado por el cliente</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <p className="text-xs text-text-secondary mb-2 md:mb-3">Especifique el desglose del pago realizado por el cliente</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-3">
                 <div>
                   <label className="text-xs text-text-secondary block mb-1">Efectivo (CUP)</label>
                   <NumberInput
@@ -1369,13 +1369,13 @@ setShowTicket(true);
             </div>
             )}
 
-            <div className="mb-6 text-sm text-text-secondary bg-surface-hover p-3 rounded-lg">
+            <div className="mb-4 md:mb-6 text-sm text-text-secondary bg-surface-hover p-3 rounded-lg">
               <p><span className="font-medium text-text">Vendedor:</span> {sellerName}</p>
               <p><span className="font-medium text-text">Tipo:</span> {saleType === 'SALON' ? 'En Salón' : saleType === 'DOMICILIO' ? 'A Domicilio' : saleType === 'BAR' ? 'Bar' : saleType === 'VENTA_RAPIDA' ? 'Venta Rápida' : 'Venta'}</p>
             </div>
 
-            <div className="mb-4 p-3 bg-surface-hover rounded-lg">
-              <div className="flex items-center justify-between mb-2">
+            <div className="mb-3 md:mb-4 p-3 bg-surface-hover rounded-lg">
+              <div className="flex items-center justify-between mb-1 md:mb-2">
                 <label className="text-sm font-medium text-text">Cliente:</label>
                 <Button
                   variant="ghost"
@@ -1405,7 +1405,7 @@ setShowTicket(true);
               const selectedAccount = pendingAccounts.find(a => a.id === selectedPendingAccount);
               const accountItems = selectedAccount ? selectedAccount.items : [];
               return selectedAccount && accountItems.length > 0 ? (
-                <div className="mb-4 p-3 bg-surface-hover rounded-lg border border-border/30">
+                <div className="mb-3 md:mb-4 p-3 bg-surface-hover rounded-lg border border-border/30">
                   <p className="text-sm font-medium text-text mb-2">
                     Pedidos de {selectedAccount.client_name}:
                   </p>
@@ -1426,7 +1426,7 @@ setShowTicket(true);
             })()}
 
             {pendingAccounts && pendingAccounts.length > 0 && (
-              <div className="mb-4 p-3 bg-warning/10 rounded-lg border border-warning/30">
+              <div className="mb-3 md:mb-4 p-3 bg-warning/10 rounded-lg border border-warning/30">
                 <p className="text-xs font-medium text-warning mb-2">Cuentas Pendientes</p>
                 <div className="space-y-2 max-h-32 sm:max-h-48 overflow-y-auto">
                   {pendingAccounts.map(account => {
