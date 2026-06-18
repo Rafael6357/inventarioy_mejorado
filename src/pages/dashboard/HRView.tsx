@@ -282,7 +282,6 @@ export default function HRView() {
   const [payrollTotal, setPayrollTotal] = useState(0);
 
   const [configBaseExenta, setConfigBaseExenta] = useState(0);
-  const [configImpuesto, setConfigImpuesto] = useState(0);
   
   const [orgDocModal, setOrgDocModal] = useState<'PNO' | 'REGLAMENTO' | null>(null);
   const [orgDocFile, setOrgDocFile] = useState<File | null>(null);
@@ -293,13 +292,10 @@ export default function HRView() {
     PNO: localStorage.getItem('org_doc_pno') || null,
     REGLAMENTO: localStorage.getItem('org_doc_reglamento') || null,
   };
-  const [configContribucion, setConfigContribucion] = useState(0);
 
   useEffect(() => {
     if (payrollConfig) {
       setConfigBaseExenta(payrollConfig.tax_exemption_base);
-      setConfigImpuesto(payrollConfig.tax_rate);
-      setConfigContribucion(payrollConfig.special_contribution_rate);
     }
   }, [payrollConfig]);
 
@@ -962,10 +958,13 @@ export default function HRView() {
                       { header: 'NIT/Carnet', key: 'nit_id' },
                       { header: 'Salario Base', key: 'base_salary', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
                       { header: 'Salario Devengado', key: 'earned_salary', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
+                      { header: 'Base de Vacaciones', key: 'vacation_base', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
                       { header: 'Vacaciones (Días)', key: 'vacation_days', format: (v: number) => v?.toString() || '0' },
                       { header: 'Base Exenta', key: 'exemption_base', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
                       { header: 'Base Imponible', key: 'taxable_base', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
-                      { header: 'Retenciones', key: 'tax_amount', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
+                      { header: 'IIP', key: 'tax_amount', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
+                      { header: 'CESS', key: 'special_contribution', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
+                      { header: 'SS Empleador', key: 'employer_contribution', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
                       { header: 'Neto a Cobrar', key: 'net_salary', format: (v: number) => v?.toFixed(2).replace('.', ',') || '0,00' },
                     ];
                     
@@ -975,7 +974,6 @@ export default function HRView() {
                         ...entry,
                         role: employee?.role || '',
                         nit_id: employee?.nit_id || '',
-                        tax_amount: (entry.tax_amount || 0) + (entry.special_contribution || 0),
                       };
                     });
                     
@@ -1009,17 +1007,20 @@ export default function HRView() {
                       <table className="w-full text-sm">
                         <thead className="bg-bg text-text-secondary">
                           <tr>
-                            <th className="px-4 py-2 text-left">Empleado</th>
-                            <th className="px-4 py-2 text-left hidden md:table-cell">Cargo/Ocupación</th>
-                            <th className="px-4 py-2 text-left hidden md:table-cell">NIT/Carnet</th>
-                            <th className="px-4 py-2 text-right hidden md:table-cell">Salario Base</th>
-                            <th className="px-4 py-2 text-right">Salario Devengado</th>
-                            <th className="px-4 py-2 text-right hidden md:table-cell">Vacaciones (Días)</th>
-                            <th className="px-4 py-2 text-right hidden md:table-cell">Base Exenta</th>
-                            <th className="px-4 py-2 text-right hidden md:table-cell">Base Imponible</th>
-                            <th className="px-4 py-2 text-right">Retenciones</th>
-                            <th className="px-4 py-2 text-right">Neto a Cobrar</th>
-                            <th className="px-4 py-2 text-center">Acciones</th>
+                             <th className="px-4 py-2 text-left" title="Nombre del trabajador">Empleado</th>
+                             <th className="px-4 py-2 text-left hidden md:table-cell" title="Puesto que ocupa el trabajador en la entidad">Cargo/Ocupación</th>
+                             <th className="px-4 py-2 text-left hidden md:table-cell" title="Número de Identificación Tributaria o Carnet de Identidad">NIT/Carnet</th>
+                             <th className="px-4 py-2 text-right hidden md:table-cell" title="Salario mensual acordado con el trabajador">Salario Base</th>
+                             <th className="px-4 py-2 text-right" title="Salario del período antes de aplicar deducciones. Click para editar">Salario Devengado</th>
+                             <th className="px-4 py-2 text-right hidden md:table-cell" title="Salario + 9.09% de provisión de vacaciones. Base para todos los cálculos legales">Base de Vac.</th>
+                             <th className="px-4 py-2 text-right hidden md:table-cell" title="Días de vacaciones tomadas en el período (solo registro informativo). Click para editar">Vac. (Días)</th>
+                             <th className="px-4 py-2 text-right hidden md:table-cell" title="Monto exento de IIP según Res. 41/2023 ($3,260 CUP/mes)">Base Exenta</th>
+                             <th className="px-4 py-2 text-right hidden md:table-cell" title="Base de Vac. − Base Exenta. Sobre este monto se aplica la escala progresiva de IIP">Base Imponible</th>
+                             <th className="px-4 py-2 text-right" title="Impuesto sobre los Ingresos Personales. Escala progresiva 0%–30%">IIP</th>
+                             <th className="px-4 py-2 text-right" title="Contribución Especial a la Seguridad Social. 5% o 5%+10% s/excedente">CESS</th>
+                             <th className="px-4 py-2 text-right" title="Aportación del empleador a la Seguridad Social (14%). No se descuenta del salario">SS Emp.</th>
+                             <th className="px-4 py-2 text-right" title="Salario Devengado − IIP − CESS (no incluye SS Empleador ni provisión de vacaciones)">Neto a Cobrar</th>
+                             <th className="px-4 py-2 text-center" title="Opciones adicionales por empleado">Acciones</th>
                           </tr>
                         </thead>
                         <tbody ref={hrTbodyRef} className="divide-y divide-border">
@@ -1064,6 +1065,7 @@ export default function HRView() {
                                   </div>
                                 )}
                               </td>
+                              <td className="px-4 py-2 text-right text-text-secondary hidden md:table-cell">${entry.vacation_base?.toFixed(2) || '0,00'}</td>
                               <td className="px-4 py-2 text-center hidden md:table-cell">
                                 {editingEntry === entry.id + '_vacations' ? (
                                   <div className="flex items-center justify-center gap-1">
@@ -1092,16 +1094,18 @@ export default function HRView() {
                                 ) : (
                                   <div className="flex items-center justify-center gap-1 cursor-pointer hover:text-primary" onClick={() => {
                                     setEditingEntry(entry.id + '_vacations');
-                                    setEditingVacations((entry as any).vacation_days || 0);
+                                    setEditingVacations(entry.vacation_days || 0);
                                   }}>
-                                    <span>{(entry as any).vacation_days || 0}</span>
+                                    <span>{entry.vacation_days || 0}</span>
                                     <Edit className="h-3 w-3 opacity-50" />
                                   </div>
                                 )}
                               </td>
                               <td className="px-4 py-2 text-right text-text-secondary hidden md:table-cell">-${entry.exemption_base.toFixed(2)}</td>
                               <td className="px-4 py-2 text-right text-text-secondary hidden md:table-cell">${entry.taxable_base.toFixed(2)}</td>
-                              <td className="px-4 py-2 text-right text-danger">${(entry.tax_amount + entry.special_contribution).toFixed(2)}</td>
+                              <td className="px-4 py-2 text-right text-danger">${entry.tax_amount.toFixed(2)}</td>
+                              <td className="px-4 py-2 text-right text-danger">${entry.special_contribution.toFixed(2)}</td>
+                              <td className="px-4 py-2 text-right text-text-secondary">${entry.employer_contribution?.toFixed(2) || '0,00'}</td>
                               <td className="px-4 py-2 text-right font-bold text-success">${entry.net_salary.toFixed(2)}</td>
                               <td className="px-4 py-2 text-center">
                                 {entry.is_custom && (
@@ -1156,11 +1160,30 @@ export default function HRView() {
                 </div>
               )}
 
-              <div className="rounded-xl border border-primary bg-primary/5 p-4 flex justify-between">
-                <span className="font-semibold">Total General Nómina</span>
-                <span className="text-xl font-bold text-primary">
-                  ${payrollEntries.reduce((sum, e) => sum + e.net_salary, 0).toFixed(2)}
-                </span>
+              <div className="rounded-xl border border-primary bg-primary/5 p-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span title="Suma del Impuesto sobre los Ingresos Personales de todos los trabajadores">Total IIP</span>
+                  <span className="font-semibold text-danger">${payrollEntries.reduce((sum, e) => sum + e.tax_amount, 0).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span title="Suma de la Contribución Especial a la Seguridad Social de todos los trabajadores">Total CESS</span>
+                  <span className="font-semibold text-danger">${payrollEntries.reduce((sum, e) => sum + e.special_contribution, 0).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span title="Suma del aporte patronal (14%) a la Seguridad Social. No se descuenta del salario">Total SS Empleador</span>
+                  <span className="font-semibold text-text-secondary">${payrollEntries.reduce((sum, e) => sum + (e.employer_contribution || 0), 0).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span title="Suma de la provisión mensual de vacaciones (9.09% del salario). No se descuenta del salario">Total Provisión de Vacaciones</span>
+                  <span className="font-semibold text-text-secondary">${payrollEntries.reduce((sum, e) => sum + ((e.vacation_base || 0) - e.earned_salary), 0).toFixed(2)}</span>
+                </div>
+                <hr className="border-border" />
+                <div className="flex justify-between">
+                  <span className="font-semibold" title="Total a pagar a los trabajadores: Salario Devengado − IIP − CESS">Total Neto a Pagar</span>
+                  <span className="text-xl font-bold text-primary">
+                    ${payrollEntries.reduce((sum, e) => sum + e.net_salary, 0).toFixed(2)}
+                  </span>
+                </div>
               </div>
             </div>
           ) : (
@@ -1196,37 +1219,7 @@ export default function HRView() {
                       toast.success('Base exenta actualizada', { duration: 1500 });
                     }}
                   />
-                  <p className="text-xs text-text-secondary">Monto que está libre de impuestos. En Cuba es aproximadamente $4,800 CUP/mes</p>
-                </div>
-                
-
-                <div className="space-y-2">
-                  <Label>% de impuesto sobre la venta</Label>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    value={configImpuesto}
-                    onChange={e => setConfigImpuesto(Number(e.target.value))}
-                    onBlur={e => {
-                      const { updatePayrollConfig } = useDatabaseStore.getState();
-                      updatePayrollConfig({ tax_rate: Number(e.target.value) });
-                      toast.success('Porcentaje de impuesto actualizado', { duration: 1500 });
-                    }}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>% Contribución Especial</Label>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    value={configContribucion}
-                    onChange={e => setConfigContribucion(Number(e.target.value))}
-                    onBlur={e => {
-                      const { updatePayrollConfig } = useDatabaseStore.getState();
-                      updatePayrollConfig({ special_contribution_rate: Number(e.target.value) });
-                      toast.success('Contribución especial actualizada', { duration: 1500 });
-                    }}
-                  />
+                  <p className="text-xs text-text-secondary">Base exenta según Res. 41/2023</p>
                 </div>
               </div>
             ) : (

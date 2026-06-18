@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { cacheAllData, getCachedProducts, getCachedMovements, getCachedWarehouses, getCachedTransitItems, getCachedSales, getCachedRecipes, getCachedEmployees, getCachedCategories, getCachedPendingAccounts, getCachedDailyClosings, getCachedAccessPins, getCachedProductWarehouse, getSyncQueueCount, addToSyncQueue } from '../lib/dexieDb';
 import { syncEngine } from '../lib/syncEngine';
 import { isDateClosed } from '../lib/dateUtils';
+import { calcularNomina } from '../utils/payrollCalculations';
 
 let _isFetchingAll = false;
 
@@ -323,6 +324,9 @@ export interface PayrollEntry {
   tax_amount: number;
   special_contribution: number;
   net_salary: number;
+  vacation_days: number;
+  vacation_base: number;
+  employer_contribution: number;
   is_custom: boolean;
   created_at: string;
   updated_at: string;
@@ -3119,7 +3123,7 @@ deletePendingAccount: async (accountId: string) => {
       const defaultConfig = {
         tax_exemption_base: 3260,
         tax_rate: 5,
-        special_contribution_rate: 3,
+        special_contribution_rate: 5,
       };
 
       const { data: newData, error: insertError } = await supabase
@@ -3179,10 +3183,7 @@ deletePendingAccount: async (accountId: string) => {
     const entriesToInsert = employees.map(emp => {
       const earned_salary = emp.salary;
       const exemption_base = currentConfig.tax_exemption_base;
-      const taxable_base = Math.max(0, earned_salary - exemption_base);
-      const tax_amount = taxable_base * (currentConfig.tax_rate / 100);
-      const special_contribution = earned_salary * (currentConfig.special_contribution_rate / 100);
-      const net_salary = earned_salary - tax_amount - special_contribution;
+      const result = calcularNomina(earned_salary, exemption_base);
 
       const empDept = departments.find(d => d.id === emp.category);
 
@@ -3196,11 +3197,13 @@ deletePendingAccount: async (accountId: string) => {
         base_salary: emp.salary,
         earned_salary,
         exemption_base,
-        taxable_base,
-        tax_amount: Math.round(tax_amount * 100) / 100,
-        special_contribution: Math.round(special_contribution * 100) / 100,
-        net_salary: Math.round(net_salary * 100) / 100,
+        taxable_base: result.taxableBase,
+        tax_amount: result.taxAmount,
+        special_contribution: result.specialContribution,
+        net_salary: result.netSalary,
         vacation_days: 0,
+        vacation_base: result.vacationBase,
+        employer_contribution: result.employerContribution,
         is_custom: false,
       };
     });
@@ -3462,19 +3465,18 @@ deletePendingAccount: async (accountId: string) => {
     if (updates.earned_salary !== undefined) {
       const earned_salary = updates.earned_salary;
       const exemption_base = config.tax_exemption_base;
-      const taxable_base = Math.max(0, earned_salary - exemption_base);
-      const tax_amount = Math.round(taxable_base * (config.tax_rate / 100) * 100) / 100;
-      const special_contribution = Math.round(earned_salary * (config.special_contribution_rate / 100) * 100) / 100;
-      const net_salary = Math.round((earned_salary - tax_amount - special_contribution) * 100) / 100;
+      const result = calcularNomina(earned_salary, exemption_base);
 
       finalUpdates = {
         ...updates,
         earned_salary,
         exemption_base,
-        taxable_base,
-        tax_amount,
-        special_contribution,
-        net_salary,
+        taxable_base: result.taxableBase,
+        tax_amount: result.taxAmount,
+        special_contribution: result.specialContribution,
+        net_salary: result.netSalary,
+        vacation_base: result.vacationBase,
+        employer_contribution: result.employerContribution,
       };
     }
 
@@ -3513,19 +3515,18 @@ deletePendingAccount: async (accountId: string) => {
 
     const earned_salary = employee.salary;
     const exemption_base = config.tax_exemption_base;
-    const taxable_base = Math.max(0, earned_salary - exemption_base);
-    const tax_amount = taxable_base * (config.tax_rate / 100);
-    const special_contribution = earned_salary * (config.special_contribution_rate / 100);
-    const net_salary = earned_salary - tax_amount - special_contribution;
+    const result = calcularNomina(earned_salary, exemption_base);
 
     await get().updatePayrollEntry(id, {
       base_salary: employee.salary,
       earned_salary,
       exemption_base,
-      taxable_base,
-      tax_amount: Math.round(tax_amount * 100) / 100,
-      special_contribution: Math.round(special_contribution * 100) / 100,
-      net_salary: Math.round(net_salary * 100) / 100,
+      taxable_base: result.taxableBase,
+      tax_amount: result.taxAmount,
+      special_contribution: result.specialContribution,
+      net_salary: result.netSalary,
+      vacation_base: result.vacationBase,
+      employer_contribution: result.employerContribution,
       is_custom: false,
     });
   },
