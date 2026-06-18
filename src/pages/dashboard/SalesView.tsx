@@ -1572,8 +1572,8 @@ setShowTicket(true);
       {/* Cierre de Caja Modal */}
       {showClosingModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm modal-backdrop">
-          <div className="w-full max-w-md rounded-2xl border border-border/50 bg-surface p-6 shadow-2xl">
-            <div className="mb-6 flex items-center justify-between">
+          <div className="w-full max-w-md max-h-[95vh] md:max-h-[85vh] overflow-y-auto overscroll-contain rounded-2xl border border-border/50 bg-surface p-3 md:p-6 shadow-2xl">
+            <div className="mb-4 md:mb-6 flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-bold text-text">Cierre de Caja</h2>
                 <p className="text-sm text-text-secondary">{closingDate}</p>
@@ -1586,7 +1586,7 @@ setShowTicket(true);
               </button>
             </div>
 
-            <div className="space-y-3 rounded-xl bg-bg/50 p-4 mb-6">
+            <div className="space-y-2 md:space-y-3 rounded-xl bg-bg/50 p-3 md:p-4 mb-4 md:mb-6">
               <div className="flex justify-between text-sm">
                 <span className="text-text-secondary">Ventas registradas:</span>
                 <span className="font-mono text-text">{closingSales.length}</span>
@@ -1725,8 +1725,8 @@ setShowTicket(true);
 
       {showNewPendingModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm modal-backdrop">
-          <div className="w-full max-w-md rounded-2xl border border-border/50 bg-surface p-6 shadow-2xl">
-            <div className="mb-6 flex items-center justify-between">
+          <div className="w-full max-w-md max-h-[95vh] md:max-h-[85vh] overflow-y-auto overscroll-contain rounded-2xl border border-border/50 bg-surface p-3 md:p-6 shadow-2xl">
+            <div className="mb-4 md:mb-6 flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-bold text-text">Nueva Cuenta Pendiente</h2>
                 <p className="text-sm text-text-secondary">Ingrese el nombre del cliente</p>
@@ -1739,7 +1739,7 @@ setShowTicket(true);
               </button>
             </div>
 
-            <div className="mb-6">
+            <div className="mb-4 md:mb-6">
               <label className="text-sm font-medium text-text mb-2 block">Nombre del Cliente</label>
               <Input
                 value={newPendingName}
