@@ -211,21 +211,21 @@ export default function ConsumptionView() {
           </p>
         </div>
         
-        <div className="flex items-center gap-3 bg-surface p-2 rounded-lg border border-border shadow-sm overflow-visible">
+        <div className="flex items-center gap-3 bg-surface p-2 rounded-lg border border-border shadow-sm overflow-visible flex-wrap">
           <Calendar className="h-5 w-5 text-primary shrink-0" />
           <span className="text-xs text-text-secondary shrink-0">Desde:</span>
           <Input 
             type="date" 
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className="border-none bg-transparent focus:ring-0 w-28 no-spin"
+            className="border-none bg-transparent focus:ring-0 w-24 sm:w-28 no-spin"
           />
           <span className="text-xs text-text-secondary shrink-0">Hasta:</span>
           <Input 
             type="date" 
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
-            className="border-none bg-transparent focus:ring-0 w-28 no-spin"
+            className="border-none bg-transparent focus:ring-0 w-24 sm:w-28 no-spin"
           />
           {(startDate !== today || endDate !== today) && (
             <button

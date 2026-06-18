@@ -178,7 +178,7 @@ if (endDate) {
           </div>
           
           <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
-            <div className="flex items-center gap-2 bg-bg border border-border rounded-xl px-2">
+            <div className="flex items-center gap-1 sm:gap-2 bg-bg border border-border rounded-xl px-1 sm:px-2">
               <Calendar className="h-4 w-4 text-text-secondary" />
               <input
                 type="date"

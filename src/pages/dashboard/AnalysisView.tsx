@@ -416,7 +416,7 @@ export default function AnalysisView() {
           </div>
         </div>
 
-        <div className="flex gap-2 mt-3">
+        <div className="flex gap-2 mt-3 flex-wrap">
           <Button size="sm" variant="outline" onClick={setHoy}>Hoy</Button>
           <Button size="sm" variant="outline" onClick={setAyer}>Ayer</Button>
           <Button size="sm" variant="outline" onClick={setUltimos15}>Últimos 15 días</Button>
@@ -560,7 +560,7 @@ export default function AnalysisView() {
               />
             </div>
           </div>
-          <div className="flex gap-1">
+          <div className="flex gap-1 flex-wrap">
             <Button size="sm" variant="outline" onClick={setTurnoverHoy}>Hoy</Button>
             <Button size="sm" variant="outline" onClick={setTurnoverAyer}>Ayer</Button>
             <Button size="sm" variant="outline" onClick={setTurnoverUltimos30}>30D</Button>
@@ -583,7 +583,7 @@ export default function AnalysisView() {
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-success"></span> Exceso: &gt;15 días</span>
             </div>
 
-            <div className="overflow-x-auto overflow-y-auto max-h-[400px]">
+            <div className="overflow-x-auto overflow-y-auto max-h-[50vh] sm:max-h-[400px]">
               <table className="w-full text-left text-sm text-text [&_tr]:divide-x [&_tr]:divide-border/50">
                 <thead className="sticky top-0 z-10 border-b border-border bg-bg/95 text-xs uppercase text-text-secondary shadow-sm">
                   <tr>

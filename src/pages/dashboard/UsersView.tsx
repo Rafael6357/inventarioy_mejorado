@@ -617,37 +617,37 @@ export default function UsersView() {
         <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
           <button
             onClick={() => { setStatusFilter('all'); setPage(1); }}
-            className={`px-2 py-1 sm:px-3 sm:py-1.5 text-xs rounded-full transition-colors ${statusFilter === 'all' ? 'bg-primary text-black' : 'bg-bg text-text-secondary hover:bg-surface-hover'}`}
+            className={`px-3 py-2 sm:px-3 sm:py-1.5 text-xs rounded-full transition-colors ${statusFilter === 'all' ? 'bg-primary text-black' : 'bg-bg text-text-secondary hover:bg-surface-hover'}`}
           >
             Todos
           </button>
           <button
             onClick={() => { setStatusFilter('active'); setPage(1); }}
-            className={`px-2 py-1 sm:px-3 sm:py-1.5 text-xs rounded-full transition-colors flex items-center gap-1 ${statusFilter === 'active' ? 'bg-success text-white' : 'bg-success/10 text-success hover:bg-success/20'}`}
+            className={`px-3 py-2 sm:px-3 sm:py-1.5 text-xs rounded-full transition-colors flex items-center gap-1 ${statusFilter === 'active' ? 'bg-success text-white' : 'bg-success/10 text-success hover:bg-success/20'}`}
           >
             <CheckCircle2 className="h-3 w-3" /> <span className="hidden sm:inline">Activos</span>
           </button>
           <button
             onClick={() => { setStatusFilter('trialing'); setPage(1); }}
-            className={`px-2 py-1 sm:px-3 sm:py-1.5 text-xs rounded-full transition-colors flex items-center gap-1 ${statusFilter === 'trialing' ? 'bg-warning text-black' : 'bg-warning/10 text-warning hover:bg-warning/20'}`}
+            className={`px-3 py-2 sm:px-3 sm:py-1.5 text-xs rounded-full transition-colors flex items-center gap-1 ${statusFilter === 'trialing' ? 'bg-warning text-black' : 'bg-warning/10 text-warning hover:bg-warning/20'}`}
           >
             <Clock className="h-3 w-3" /> <span className="hidden sm:inline">Prueba</span>
           </button>
           <button
             onClick={() => { setStatusFilter('past_due'); setPage(1); }}
-            className={`px-2 py-1 sm:px-3 sm:py-1.5 text-xs rounded-full transition-colors flex items-center gap-1 ${statusFilter === 'past_due' ? 'bg-danger text-white' : 'bg-danger/10 text-danger hover:bg-danger/20'}`}
+            className={`px-3 py-2 sm:px-3 sm:py-1.5 text-xs rounded-full transition-colors flex items-center gap-1 ${statusFilter === 'past_due' ? 'bg-danger text-white' : 'bg-danger/10 text-danger hover:bg-danger/20'}`}
           >
             <AlertCircle className="h-3 w-3" /> <span className="hidden sm:inline">Vencidos</span>
           </button>
           <button
             onClick={() => { setStatusFilter('canceled'); setPage(1); }}
-            className={`px-2 py-1 sm:px-3 sm:py-1.5 text-xs rounded-full transition-colors flex items-center gap-1 ${statusFilter === 'canceled' ? 'bg-text-secondary text-white' : 'bg-bg text-text-secondary hover:bg-surface-hover'}`}
+            className={`px-3 py-2 sm:px-3 sm:py-1.5 text-xs rounded-full transition-colors flex items-center gap-1 ${statusFilter === 'canceled' ? 'bg-text-secondary text-white' : 'bg-bg text-text-secondary hover:bg-surface-hover'}`}
           >
             <XCircle className="h-3 w-3" /> <span className="hidden sm:inline">Cancelados</span>
           </button>
           <button
             onClick={() => { setStatusFilter('uncontacted'); setPage(1); }}
-            className={`px-2 py-1 sm:px-3 sm:py-1.5 text-xs rounded-full transition-colors flex items-center gap-1 ${statusFilter === 'uncontacted' ? 'bg-primary text-black' : 'bg-bg text-text-secondary hover:bg-surface-hover'}`}
+            className={`px-3 py-2 sm:px-3 sm:py-1.5 text-xs rounded-full transition-colors flex items-center gap-1 ${statusFilter === 'uncontacted' ? 'bg-primary text-black' : 'bg-bg text-text-secondary hover:bg-surface-hover'}`}
           >
             <Phone className="h-3 w-3" /> <span className="hidden sm:inline">Pendientes</span>
           </button>
@@ -834,7 +834,7 @@ export default function UsersView() {
 
       {showPaymentModal && selectedUser && (
         <div key={selectedUser.id} className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 modal-backdrop">
-          <div className="w-full max-w-lg rounded-2xl border border-border bg-surface shadow-xl max-h-[90vh] overflow-y-auto">
+          <div className="w-full max-w-lg rounded-2xl border border-border bg-surface shadow-xl max-h-[90dvh] overflow-y-auto">
             <div className="sticky top-0 bg-surface border-b border-border p-4 flex items-center justify-between">
               <div>
                 <h3 className="font-semibold text-text">{selectedUser.business_name || selectedUser.name}</h3>
@@ -969,7 +969,7 @@ export default function UsersView() {
                   }
                   await processPaymentAction(selectedUser!, amount, method, reference, notes, date, form);
                 }} className="space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
                       <label className="text-xs text-text-secondary">Monto *</label>
                       <input name="amount" type="number" min="1" step="0.01" required placeholder="50000" className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" />
@@ -979,7 +979,7 @@ export default function UsersView() {
                       <input name="date" type="date" defaultValue={new Date().toISOString().split('T')[0]} className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
                       <label className="text-xs text-text-secondary">Método de Pago</label>
                       <select name="method" className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary">
@@ -999,7 +999,7 @@ export default function UsersView() {
 
                   <div className="rounded-lg border border-border bg-bg p-3 space-y-2">
                     <span className="text-sm font-medium text-text">Activar Suscripción:</span>
-                    <div className="flex gap-4 ml-0">
+                    <div className="flex gap-4 ml-0 flex-wrap">
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input
                           type="radio"
@@ -1035,7 +1035,7 @@ export default function UsersView() {
 
       {confirmDialog.show && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 modal-backdrop">
-          <div className="w-full max-w-md rounded-2xl border border-border bg-surface shadow-xl p-6 space-y-4">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-surface shadow-xl p-6 space-y-4 max-h-[90dvh] overflow-y-auto">
             <h3 className="font-semibold text-text text-lg">{confirmDialog.title}</h3>
             <p className="text-sm text-text-secondary">{confirmDialog.message}</p>
             <div className="flex justify-end gap-3">

@@ -385,7 +385,7 @@ export default function SettingsView() {
                     value={formData.ticketMessage}
                     onChange={e => setFormData(prev => ({...prev, ticketMessage: e.target.value}))}
                     maxLength={100}
-                    className="h-8"
+                    className="h-10 sm:h-8"
                   />
                 </div>
               )}
@@ -411,7 +411,7 @@ export default function SettingsView() {
                     min="1"
                     value={currencySettings.usdRate}
                     onChange={e => setCurrencySettings(prev => ({...prev, usdRate: Number(e.target.value)}))}
-                    className="h-8 text-sm"
+                    className="h-10 sm:h-8 text-sm"
                     placeholder="Tasa USD→CUP"
                   />
                 )}
@@ -428,7 +428,7 @@ export default function SettingsView() {
                     min="1"
                     value={currencySettings.eurRate}
                     onChange={e => setCurrencySettings(prev => ({...prev, eurRate: Number(e.target.value)}))}
-                    className="h-8 text-sm"
+                    className="h-10 sm:h-8 text-sm"
                     placeholder="Tasa EUR→CUP"
                   />
                 )}
@@ -452,10 +452,10 @@ export default function SettingsView() {
                 {user?.id && (
                   <>
                     <div className="flex justify-center">
-                      <div id="qr-code" className="bg-white p-2 rounded-lg">
+                      <div id="qr-code" className="bg-white p-2 rounded-lg max-w-full overflow-hidden">
                         <QRCode
                           value={`${window.location.origin}/menu?b=${user.id}`}
-                          size={120}
+                          size={Math.min(120, window.innerWidth - 100)}
                           level="H"
                         />
                       </div>

@@ -278,7 +278,7 @@ export default function FilteredCenterView() {
                           setCategoryFilter('ALL');
                           setStockFilter('ALL');
                         }}
-                        className="mt-4 text-primary hover:underline"
+                        className="mt-4 px-4 py-2 text-primary hover:underline"
                       >
                         Limpiar filtros
                       </button>

@@ -281,7 +281,7 @@ const handleWaste = async () => {
         </div>
       )}
 
-      <div ref={transitStatsRef} className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div ref={transitStatsRef} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         <div className="rounded-xl border border-border bg-surface p-4 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
@@ -579,7 +579,7 @@ const handleWaste = async () => {
         
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm modal-backdrop">
-            <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl">
+            <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl max-h-[90dvh] overflow-y-auto">
               <div className="mb-6 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-danger/10">
@@ -646,7 +646,7 @@ const handleWaste = async () => {
                         <button
                           key={pct}
                           onClick={() => setCancelModal(prev => ({ ...prev, quantity: qtyInUnit }))}
-                          className="flex-1 rounded-lg border border-border bg-surface px-2 py-1 text-xs text-text-secondary hover:border-primary hover:text-primary transition-colors"
+                          className="flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text-secondary hover:border-primary hover:text-primary transition-colors"
                         >
                           {i === 2 ? '100%' : `${i === 0 ? 25 : 50}%`}
                         </button>
@@ -694,7 +694,7 @@ const handleWaste = async () => {
         
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm modal-backdrop">
-            <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl">
+            <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl max-h-[90dvh] overflow-y-auto">
               <div className="mb-6 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning/10">
@@ -761,7 +761,7 @@ const handleWaste = async () => {
                         <button
                           key={`waste-${pct}`}
                           onClick={() => setWasteModal(prev => ({ ...prev, quantity: qtyInUnit }))}
-                          className="flex-1 rounded-lg border border-border bg-surface px-2 py-1 text-xs text-text-secondary hover:border-primary hover:text-primary transition-colors"
+                          className="flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text-secondary hover:border-primary hover:text-primary transition-colors"
                         >
                           {i === 2 ? '100%' : `${i === 0 ? 25 : 50}%`}
                         </button>
@@ -809,7 +809,7 @@ const handleWaste = async () => {
         
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm modal-backdrop">
-            <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl">
+            <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl max-h-[90dvh] overflow-y-auto">
               <div className="mb-6 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
@@ -876,7 +876,7 @@ const handleWaste = async () => {
                         <button
                           key={`consumption-${pct}`}
                           onClick={() => setConsumptionModal(prev => ({ ...prev, quantity: qtyInUnit }))}
-                          className="flex-1 rounded-lg border border-border bg-surface px-2 py-1 text-xs text-text-secondary hover:border-primary hover:text-primary transition-colors"
+                          className="flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text-secondary hover:border-primary hover:text-primary transition-colors"
                         >
                           {i === 2 ? '100%' : `${i === 0 ? 25 : 50}%`}
                         </button>

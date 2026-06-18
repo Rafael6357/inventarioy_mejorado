@@ -293,7 +293,7 @@ export default function RecipesView() {
                             <NumberInput
                               min={0}
                               step="any"
-                              className="h-8 w-20 text-right text-sm"
+                              className="h-8 w-full sm:w-20 text-right text-sm"
                               value={ing.quantity}
                               onValueChange={(v) => updateIngredientQuantity(ing.product_id, v)}
                             />
@@ -318,7 +318,7 @@ export default function RecipesView() {
                             <button 
                               type="button"
                               onClick={() => removeIngredient(ing.product_id)}
-                              className="text-text-secondary hover:text-danger p-1"
+                              className="text-text-secondary hover:text-danger p-2"
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
@@ -432,7 +432,7 @@ export default function RecipesView() {
                     
                     <h3 className="font-semibold text-text text-lg pr-8">{recipe.name}</h3>
                     
-                    <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
+                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
                       <div className="rounded-md bg-surface p-2 text-center">
                         <p className="text-xs text-text-secondary">Costo</p>
                         <p className="font-mono font-medium">${cost.toFixed(2)}</p>
@@ -445,7 +445,7 @@ export default function RecipesView() {
                               step="0.01"
                               value={editingPrice}
                               onValueChange={(v) => setEditingPrice(v)}
-                              className="h-8 w-16 text-center font-mono text-primary text-sm"
+                              className="h-8 w-20 sm:w-16 text-center font-mono text-primary text-sm"
                             />
                             <button onClick={() => saveEditPrice(recipe.id)} className="text-success hover:text-green-400">
                               <Check className="h-4 w-4" />

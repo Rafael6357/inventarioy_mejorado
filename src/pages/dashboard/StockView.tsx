@@ -434,7 +434,7 @@ export default function StockView() {
 
       <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-4 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(255,193,7,0.15)]">
         <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center">
-          <div className="relative w-52">
+          <div className="relative w-full sm:w-52">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary" />
             <Input
               placeholder="Buscar por nombre o categoría..."
@@ -509,7 +509,7 @@ export default function StockView() {
         <div className="flex items-center gap-1">
           <button 
             onClick={() => scrollTable('left')}
-            className="flex-shrink-0 p-1 hover:bg-surface-hover rounded text-text-secondary hover:text-text transition-colors"
+            className="flex-shrink-0 p-2 hover:bg-surface-hover rounded text-text-secondary hover:text-text transition-colors"
             title="Desplazar a la izquierda"
           >
             <ChevronLeft className="h-5 w-5" />
@@ -697,7 +697,7 @@ export default function StockView() {
           
           <button 
             onClick={() => scrollTable('right')}
-            className="flex-shrink-0 p-1 hover:bg-surface-hover rounded text-text-secondary hover:text-text transition-colors"
+            className="flex-shrink-0 p-2 hover:bg-surface-hover rounded text-text-secondary hover:text-text transition-colors"
             title="Desplazar a la derecha"
           >
             <ChevronRight className="h-5 w-5" />
@@ -740,7 +740,7 @@ export default function StockView() {
 
       {editingProduct && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm modal-backdrop">
-          <div className="w-full max-w-md rounded-2xl border border-border/50 bg-surface p-6 shadow-2xl max-h-[80vh] flex flex-col">
+          <div className="w-full max-w-md rounded-2xl border border-border/50 bg-surface p-6 shadow-2xl max-h-[80dvh] flex flex-col">
             <div className="mb-6 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
                 <div className="rounded-lg bg-primary/10 p-2 text-primary">
@@ -759,7 +759,7 @@ export default function StockView() {
               </button>
             </div>
 
-            <div className="space-y-4 overflow-y-auto max-h-[50vh] pr-2">
+            <div className="space-y-4 overflow-y-auto max-h-[50dvh] pr-2">
               <div className="space-y-2">
                 <Label htmlFor="edit_rop">ROP (Punto de Reorden)</Label>
                 <div className="flex gap-2">
@@ -887,7 +887,7 @@ export default function StockView() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="physical_stock">Stock Físico *</Label>
                     <Input

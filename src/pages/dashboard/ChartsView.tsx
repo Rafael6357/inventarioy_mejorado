@@ -76,7 +76,7 @@ export default function ChartsView() {
             <h2 className="text-lg font-semibold text-text">Evolución de Ventas</h2>
           </div>
           
-          <div className="h-[300px] w-full">
+          <div className="h-[250px] sm:h-[300px] w-full">
             {salesOverTime.length === 0 ? (
               <div className="flex h-full items-center justify-center text-text-secondary">
                 No hay datos de ventas suficientes
@@ -108,7 +108,7 @@ export default function ChartsView() {
             <h2 className="text-lg font-semibold text-text">Top 5 Productos Más Vendidos</h2>
           </div>
           
-          <div className="h-[250px] w-full">
+          <div className="h-[200px] sm:h-[250px] w-full">
             {topProducts.length === 0 ? (
               <div className="flex h-full items-center justify-center text-text-secondary">
                 No hay datos de ventas

@@ -787,7 +787,7 @@ setShowTicket(true);
           </Button>
         </div>
       )}
-    <div className="flex h-[calc(100vh-8rem)] flex-col gap-6 lg:flex-row">
+    <div className="flex h-[calc(100dvh-8rem)] flex-col gap-6 lg:flex-row">
       {/* Panel Izquierdo - Catálogo de Productos */}
       <div className="flex flex-1 flex-col rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(255,193,7,0.15)]">
         <div className="border-b border-border/50 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -885,7 +885,7 @@ setShowTicket(true);
                     </button>
                   </div>
                 </div>
-                <div className="space-y-2 max-h-96 overflow-y-auto overflow-hidden">
+                <div className="space-y-2 max-h-96 overflow-y-auto">
               {pendingAccounts.map(account => {
                 const accountItems = account.items || [];
                 const isExpanded = expandedAccounts.has(account.id);
@@ -931,13 +931,13 @@ setShowTicket(true);
                               toast.error(result.error || 'Error al cambiar tipo de cuenta');
                             }
                           }}
-                          className={`text-xs px-2 py-0.5 rounded text-xs font-medium ${account.is_account_house ? 'bg-danger/10 text-danger border border-danger/30' : 'bg-warning/10 text-warning border border-warning/30'}`}
+                          className={`text-xs px-2 py-1.5 rounded text-xs font-medium ${account.is_account_house ? 'bg-danger/10 text-danger border border-danger/30' : 'bg-warning/10 text-warning border border-warning/30'}`}
                           title={account.is_account_house ? 'Cambiar a venta normal' : 'Cambiar a Cuenta Casa'}
                         >
                           CC
                         </button>
                         <Button
-                          size="sm"
+                          size="default"
                           className="text-xs bg-success hover:bg-success/80"
                           onClick={() => {
                             setSelectedAccountForCharge(account);
@@ -948,7 +948,7 @@ setShowTicket(true);
                           Cobrar
                         </Button>
                         <Button
-                          size="sm"
+                          size="default"
                           variant="ghost"
                           className="text-xs text-danger hover:text-danger"
                           onClick={() => {
@@ -962,7 +962,7 @@ setShowTicket(true);
                         </div>
                     </div>
                     {isExpanded && accountItems.length > 0 && (
-                      <div className="mt-2 pt-2 border-t border-border/30 max-h-40 overflow-y-auto">
+                      <div className="mt-2 pt-2 border-t border-border/30 max-h-40 sm:max-h-56 overflow-y-auto">
                         <p className="text-xs font-medium text-text-secondary mb-1">Productos:</p>
                         <div className="space-y-1">
                           {accountItems.map((item, index) => (
@@ -1007,7 +1007,7 @@ setShowTicket(true);
               <button
                 key={product.id}
                 onClick={() => addToCart(product)}
-                className="flex flex-col items-center justify-center rounded-xl border border-border/50 bg-bg/50 p-4 text-center transition-all duration-300 hover:border-primary/50 hover:bg-primary/10 hover:shadow-[0_0_15px_-3px_rgba(205,164,52,0.2)] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-surface"
+                className="flex flex-col items-center justify-center rounded-xl border border-border/50 bg-bg/50 p-3 sm:p-4 text-center transition-all duration-300 hover:border-primary/50 hover:bg-primary/10 hover:shadow-[0_0_15px_-3px_rgba(205,164,52,0.2)] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-surface"
               >
                 <div className="mb-2 rounded-full bg-surface-hover p-3 text-text-secondary transition-colors group-hover:text-primary group-hover:bg-primary/20">
                   <ShoppingCart className="h-6 w-6" />
@@ -1048,9 +1048,9 @@ setShowTicket(true);
           ) : (
             <div className="space-y-4">
               {cart.map(item => (
-                <div key={item.product_id} className="flex items-center justify-between gap-4 rounded-lg border border-border bg-bg p-3">
+                <div key={item.product_id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-bg p-2 sm:p-3">
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-text truncate text-sm">{item.name}</h4>
+                    <h4 className="font-medium text-text truncate text-sm" title={item.name}>{item.name}</h4>
                     <p className="font-mono text-xs text-primary">${item.price.toFixed(2)}</p>
                   </div>
                   
@@ -1069,7 +1069,7 @@ setShowTicket(true);
                       value={item.quantity}
                       onChange={(e) => handleQuantityChange(item.product_id, e.target.value)}
                       onBlur={(e) => handleQuantityBlur(item.product_id, e.target.value)}
-                      className="w-16 text-center font-mono text-sm border border-border rounded px-1 py-0.5 bg-bg text-text focus:outline-none focus:ring-1 focus:ring-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      className="w-20 text-center font-mono text-sm border border-border rounded px-1 py-0.5 bg-bg text-text focus:outline-none focus:ring-1 focus:ring-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                     <button 
                       onClick={() => updateQuantity(item.product_id, 1)}
@@ -1079,13 +1079,13 @@ setShowTicket(true);
                     </button>
                   </div>
                   
-                  <div className="text-right font-mono font-medium text-sm w-16">
+                  <div className="text-right font-mono font-medium text-sm w-20">
                     ${(item.price * item.quantity).toFixed(2)}
                   </div>
                   
                   <button 
                     onClick={() => removeFromCart(item.product_id)}
-                    className="text-text-secondary hover:text-danger transition-colors p-1"
+                    className="text-text-secondary hover:text-danger transition-colors p-2"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -1097,7 +1097,7 @@ setShowTicket(true);
 
         <div className="border-t border-border bg-bg/50">
           <div className="max-h-[280px] overflow-y-auto p-4 space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
               <label htmlFor="saleType" className="text-xs font-medium text-text-secondary block mb-1">Tipo de Venta</label>
               <select 
@@ -1274,7 +1274,7 @@ setShowTicket(true);
                 Método de Pago <span className="text-danger">*</span>
               </h4>
               <p className="text-xs text-text-secondary mb-3">Especifique el desglose del pago realizado por el cliente</p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs text-text-secondary block mb-1">Efectivo (CUP)</label>
                   <NumberInput
@@ -1409,7 +1409,7 @@ setShowTicket(true);
                   <p className="text-sm font-medium text-text mb-2">
                     Pedidos de {selectedAccount.client_name}:
                   </p>
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                  <div className="space-y-2 max-h-40 sm:max-h-56 overflow-y-auto">
                     {accountItems.map((item: any, index: number) => (
                       <div key={`${item.product_id}-${index}`} className="flex justify-between text-sm">
                         <span className="text-text">{item.quantity}x {item.product_name}</span>
@@ -1428,7 +1428,7 @@ setShowTicket(true);
             {pendingAccounts && pendingAccounts.length > 0 && (
               <div className="mb-4 p-3 bg-warning/10 rounded-lg border border-warning/30">
                 <p className="text-xs font-medium text-warning mb-2">Cuentas Pendientes</p>
-                <div className="space-y-2 max-h-32 overflow-y-auto">
+                <div className="space-y-2 max-h-32 sm:max-h-48 overflow-y-auto">
                   {pendingAccounts.map(account => {
                     const accountItems = account.items || [];
                     return (
@@ -1611,7 +1611,7 @@ setShowTicket(true);
 
             <div className="mb-4">
               <h3 className="text-sm font-semibold text-text mb-3">Desgloce por Moneda</h3>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs text-text-secondary block mb-1">CUP Efectivo</label>
                   <Input

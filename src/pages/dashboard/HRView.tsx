@@ -420,62 +420,67 @@ export default function HRView() {
           <p className="text-sm text-text-secondary">Gestión de personal y documentación laboral</p>
         </div>
 
-        <div className="flex rounded-xl border border-border bg-surface p-1 shadow-sm overflow-x-auto">
+<div className="flex rounded-xl border border-border bg-surface p-1 shadow-sm overflow-x-auto">
           <button
             onClick={() => setActiveTab('personal')}
-            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all whitespace-nowrap ${
+            className={`flex items-center gap-2 rounded-lg px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
               activeTab === 'personal'
                 ? 'bg-primary text-white shadow-sm'
                 : 'text-text-secondary hover:text-text'
             }`}
           >
             <Users className="h-4 w-4" />
-            Personal
+            <span className="hidden xs:inline">Personal</span>
+            <span className="inline xs:hidden">Pers.</span>
           </button>
           <button
             onClick={() => setActiveTab('departamentos')}
-            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all whitespace-nowrap ${
+            className={`flex items-center gap-2 rounded-lg px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
               activeTab === 'departamentos'
                 ? 'bg-primary text-white shadow-sm'
                 : 'text-text-secondary hover:text-text'
             }`}
           >
             <Building2 className="h-4 w-4" />
-            Departamentos
+            <span className="hidden xs:inline">Departamentos</span>
+            <span className="inline xs:hidden">Deptos.</span>
           </button>
           <button
             onClick={() => setActiveTab('nomina')}
-            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all whitespace-nowrap ${
+            className={`flex items-center gap-2 rounded-lg px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
               activeTab === 'nomina'
                 ? 'bg-primary text-white shadow-sm'
                 : 'text-text-secondary hover:text-text'
             }`}
           >
-            <Calculator className="h-4 w-4" />
-            Nómina
+            <DollarSign className="h-4 w-4" />
+            <span className="hidden xs:inline">Nómina</span>
+            <span className="inline xs:hidden">Nóm.</span>
           </button>
           <button
             onClick={() => setActiveTab('configuracion')}
-            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all whitespace-nowrap ${
+            className={`flex items-center gap-2 rounded-lg px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
               activeTab === 'configuracion'
                 ? 'bg-primary text-white shadow-sm'
                 : 'text-text-secondary hover:text-text'
             }`}
           >
             <Settings className="h-4 w-4" />
-            Configuración
+            <span className="hidden xs:inline">Configuración</span>
+            <span className="inline xs:hidden">Config.</span>
           </button>
           <button
-              onClick={() => setActiveTab('documentos')}
-              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all whitespace-nowrap ${
-                activeTab === 'documentos'
-                  ? 'bg-primary text-white shadow-sm'
-                  : 'text-text-secondary hover:text-text'
-              }`}
-            >
-              <FolderOpen className="h-4 w-4" />
-              Biblioteca de Documentos
-            </button>
+            onClick={() => setActiveTab('documentos')}
+            className={`flex items-center gap-2 rounded-lg px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
+              activeTab === 'documentos'
+                ? 'bg-primary text-white shadow-sm'
+                : 'text-text-secondary hover:text-text'
+            }`}
+          >
+            <FolderOpen className="h-4 w-4" />
+            <span className="hidden xs:inline">Biblioteca</span>
+            <span className="inline xs:hidden">Docs</span>
+          </button>
         </div>
       </div>
 
@@ -592,7 +597,7 @@ export default function HRView() {
               <div className="space-y-2">
                 <Label>Foto del Empleado</Label>
                 <div className="flex items-center gap-3">
-                  <label className="flex items-center justify-center w-20 h-20 rounded-lg border-2 border-dashed border-border hover:border-primary cursor-pointer transition-colors overflow-hidden bg-bg">
+                  <label className="flex items-center justify-center w-24 h-24 sm:w-20 sm:h-20 rounded-lg border-2 border-dashed border-border hover:border-primary cursor-pointer transition-colors overflow-hidden bg-bg">
                     {newEmployeePhoto ? (
                       <img src={URL.createObjectURL(newEmployeePhoto)} alt="Preview" className="w-full h-full object-cover" />
                     ) : (
@@ -837,7 +842,7 @@ export default function HRView() {
                               <Input
                                 value={editingDepartment.name}
                                 onChange={e => setEditingDepartment({ ...editingDepartment, name: e.target.value })}
-                                className="h-8 w-48"
+                                className="h-8 w-full sm:w-48 max-w-[200px]"
                               />
                               <Button size="sm" onClick={async () => {
                                 const { updateDepartment } = useDatabaseStore.getState();
@@ -1068,7 +1073,7 @@ export default function HRView() {
                                       max="30"
                                       value={editingVacations}
                                       onChange={e => setEditingVacations(Number(e.target.value))}
-                                      className="w-16 h-7 text-center text-sm"
+                                      className="w-20 h-7 text-center text-sm"
                                       autoFocus
                                     />
                                     <Button size="sm" className="h-7" onClick={async () => {
@@ -1328,7 +1333,7 @@ export default function HRView() {
       {/* Biblioteca de Documentos - Modal para PNO y Reglamento */}
       {orgDocModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm modal-backdrop">
-          <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl max-h-[90dvh] overflow-y-auto">
             <div className="mb-6 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="rounded-lg bg-primary/10 p-2 text-primary">

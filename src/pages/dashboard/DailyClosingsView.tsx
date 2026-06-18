@@ -245,7 +245,7 @@ export default function DailyClosingsView() {
             {filteredClosings.length} cierres encontrados
           </p>
         </div>
-        <div ref={statsRef} className="flex gap-3 text-right flex-wrap">
+        <div ref={statsRef} className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
           <div className="bg-bg/50 rounded-lg px-4 py-2 border border-border/50">
             <p className="text-xs text-text-secondary">Total Histórico</p>
             <p className="font-mono font-bold text-primary">$<span ref={ventasCountRef}>0.00</span></p>
@@ -327,7 +327,7 @@ export default function DailyClosingsView() {
             type="date"
             value={startDate}
             onChange={e => setStartDate(e.target.value)}
-            className="h-10 text-sm w-36"
+            className="h-10 text-sm w-full sm:w-36 max-w-[180px]"
           />
         </div>
         <div className="flex items-center gap-2">
@@ -336,14 +336,14 @@ export default function DailyClosingsView() {
             type="date"
             value={endDate}
             onChange={e => setEndDate(e.target.value)}
-            className="h-10 text-sm w-36"
+            className="h-10 text-sm w-full sm:w-36 max-w-[180px]"
           />
         </div>
         <div className="flex items-center gap-2">
           <select
             value={employeeFilter}
             onChange={e => setEmployeeFilter(e.target.value)}
-            className="h-10 rounded-md border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary min-w-[160px]"
+            className="h-10 rounded-md border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary min-w-[140px] sm:min-w-[160px]"
           >
             <option value="">Todos los empleados</option>
             {uniqueEmployees.map(emp => (
@@ -540,7 +540,7 @@ export default function DailyClosingsView() {
       {/* Detalle Modal */}
       {selectedClosing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm modal-backdrop">
-          <div className="w-full max-w-md rounded-2xl border border-border/50 bg-surface p-6 shadow-2xl">
+          <div className="w-full max-w-md rounded-2xl border border-border/50 bg-surface p-6 shadow-2xl max-h-[90dvh] overflow-y-auto">
             <div className="mb-6 flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-bold text-text">Detalle de Cierre</h2>
@@ -698,7 +698,7 @@ export default function DailyClosingsView() {
       {/* Sales Ticket Preview Modal */}
       {showPreview && selectedClosing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm modal-backdrop">
-          <div className="w-full max-w-lg rounded-2xl border border-border/50 bg-surface p-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="w-full max-w-lg rounded-2xl border border-border/50 bg-surface p-4 shadow-2xl max-h-[90dvh] overflow-y-auto">
             <div className="mb-4 flex items-center justify-between print-hide">
               <h2 className="text-lg font-bold text-text">Previsualización de Ticket</h2>
               <button

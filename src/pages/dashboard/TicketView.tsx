@@ -55,7 +55,7 @@ export default function TicketView({ ticketData, onClose, isPreticket = false }:
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" id="ticket-container">
-      <div className="bg-bg rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+      <div className="bg-bg rounded-2xl w-full max-w-md max-h-[90dvh] overflow-y-auto">
         <div className="p-4 border-b border-border flex items-center justify-between print-hide">
           <div>
             <h2 className="text-lg font-semibold text-text">{isPreticket || ticketData.isPreticket ? 'Preticket' : 'Ticket'}</h2>
