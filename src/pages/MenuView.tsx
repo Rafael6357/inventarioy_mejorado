@@ -77,13 +77,12 @@ export default function MenuView() {
     products
       .filter(p => p.is_active === true && p.is_individual === true)
       .forEach(product => {
-        const cat = categories.find(c => c.id === product.category);
         items.push({
           id: product.id,
           name: product.name,
           price: Number(product.price) || 0,
           category: product.category || 'uncategorized',
-          categoryName: cat?.name || 'Sin categoría',
+          categoryName: product.category || 'Sin categoría',
           is_recipe: false,
           stock: product.quantity || 0
         });
@@ -92,13 +91,12 @@ export default function MenuView() {
     recipes
       .filter(r => r.is_active === true)
       .forEach(recipe => {
-        const cat = categories.find(c => c.id === recipe.category);
         items.push({
           id: recipe.id,
           name: recipe.name,
           price: Number(recipe.selling_price) || 0,
           category: recipe.category || 'uncategorized',
-          categoryName: cat?.name || 'Sin categoría',
+          categoryName: recipe.category || 'Sin categoría',
           is_recipe: true,
           stock: undefined
         });
@@ -116,16 +114,13 @@ export default function MenuView() {
   }, [menuItems, searchTerm, selectedCategory]);
 
   const uniqueCategories = useMemo(() => {
-    const cats = new Set(menuItems.map(item => item.category));
-    const result = Array.from(cats).map(catId => {
-      const cat = categories.find(c => c.id === catId);
-      return {
-        id: catId,
-        name: cat?.name || 'Sin categoría'
-      };
-    });
+    const cats = new Set(menuItems.map(item => item.categoryName));
+    const result = Array.from(cats).map(catName => ({
+      id: catName,
+      name: catName
+    }));
     return result.sort((a, b) => a.name.localeCompare(b.name));
-  }, [menuItems, categories]);
+  }, [menuItems]);
 
   const menuTitle = `${businessName}-Menú`;
 
