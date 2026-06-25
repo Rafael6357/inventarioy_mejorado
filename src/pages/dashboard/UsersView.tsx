@@ -14,6 +14,7 @@ import { usePersistentFilters } from '../../lib/hooks/usePersistentFilters';
 
 const ITEMS_PER_PAGE = 10;
 const DEFAULT_SUBSCRIPTION_DAYS = 30 as const;
+const USERS_FILTER_DEFAULTS = { searchTerm: '', statusFilter: 'all', dateOrder: 'desc', page: 1, limit: ITEMS_PER_PAGE } as const;
 
 interface UserProfile {
   id: string;
@@ -63,7 +64,7 @@ export default function UsersView() {
     dateOrder: 'desc' | 'asc';
     page: number;
     limit: number;
-  }>('users', { searchTerm: '', statusFilter: 'all', dateOrder: 'desc', page: 1, limit: ITEMS_PER_PAGE });
+  }>('users', USERS_FILTER_DEFAULTS);
   const { searchTerm, statusFilter, dateOrder, page, limit } = filters;
   const setSearchTerm = (v: string) => setFilters({ searchTerm: v });
   const setStatusFilter = (v: string) => setFilters({ statusFilter: v });
@@ -81,6 +82,7 @@ export default function UsersView() {
   const [subscriptionDays, setSubscriptionDays] = useState<30 | 365>(DEFAULT_SUBSCRIPTION_DAYS);
   const isMountedRef = useRef(true);
   const fetchGeneration = useRef(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const staggerRef = useStaggerEnter([totalCount]);
   const totalCountUpRef = useCountUp(totalCount);
   const activeCountUpRef = useCountUp(profiles.filter(p => getEffectiveStatus(p) === 'active').length);
@@ -119,10 +121,15 @@ export default function UsersView() {
     if (!isMountedRef.current) return;
 
     const generation = ++fetchGeneration.current;
-    setLoading(true);
 
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
     const controller = new AbortController();
+    abortControllerRef.current = controller;
     const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+    setLoading(true);
 
     try {
       const from = (page - 1) * limit;
@@ -183,6 +190,9 @@ export default function UsersView() {
       }
     } finally {
       clearTimeout(timeoutId);
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
       if (isMountedRef.current && generation === fetchGeneration.current) {
         setLoading(false);
       }
@@ -292,7 +302,13 @@ export default function UsersView() {
       cleanPhone = '53' + cleanPhone;
     }
     const message = encodeURIComponent(
-      `Saludos usuario, gracias por registrarse en InventarioY a través de nuestra publicación, su sistema de gestión y control de inventario pensado para negocios cubanos como el suyo. Quien comunica es el desarrollador y estoy a su disposición para brindarle asesoría personalizada y resolver cualquier duda que pueda tener sobre la plataforma. ¿Le gustaría que le explique las funcionalidades principales para llevar el control adecuado de sus entradas y salidas de almacén, o sus recetas, productos vendidos, finanzas, margen? Nuestro sistema puede llevar de manera automática muchos cálculos, actualizaciones, procesos en su negocio, que un excel o de manera manual sería tedioso y muy complejo llevar a cabo.`
+      `Saludos, gracias por registrarse en InventarioY, su sistema de gestión pensado para negocios cubanos.
+
+Soy el desarrollador y estoy a su disposición para asesorarlo y resolver cualquier duda sobre la plataforma.
+
+¿Le gustaría que le explique las funcionalidades principales? (control de inventario, recetas, ventas, finanzas, etc.) Nuestro sistema automatiza muchos cálculos y procesos que en Excel serían tediosos y complejos.
+
+Además, lo invitamos a ver nuestro tutorial en YouTube donde explicamos paso a paso cómo usar todas las funcionalidades: https://youtu.be/DWl2cgeqcRA`
     );
     return `https://wa.me/${cleanPhone}?text=${message}`;
   };

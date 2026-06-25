@@ -41,15 +41,17 @@ export function usePersistentFilters<T extends Record<string, unknown>>(
 ): PersistentFiltersApi<T> {
   const userId = useAuthStore((s) => s.user?.id);
   const storageKey = getStorageKey(viewName, userId);
+  const defaultsRef = useRef(defaults);
+  defaultsRef.current = defaults;
   const [filters, setFiltersState] = useState<T>(() => loadFromStorage(storageKey, defaults));
   const lastKeyRef = useRef(storageKey);
 
   useEffect(() => {
     if (lastKeyRef.current !== storageKey) {
       lastKeyRef.current = storageKey;
-      setFiltersState(loadFromStorage(storageKey, defaults));
+      setFiltersState(loadFromStorage(storageKey, defaultsRef.current));
     }
-  }, [storageKey, defaults]);
+  }, [storageKey]);
 
   useEffect(() => {
     saveToStorage(storageKey, filters);
@@ -66,8 +68,8 @@ export function usePersistentFilters<T extends Record<string, unknown>>(
   }, []);
 
   const resetFilters = useCallback<FilterResetter>(() => {
-    setFiltersState(defaults);
-  }, [defaults]);
+    setFiltersState(defaultsRef.current);
+  }, []);
 
   return { filters, setFilters, resetFilters };
 }

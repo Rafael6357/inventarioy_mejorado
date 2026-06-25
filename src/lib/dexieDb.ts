@@ -70,23 +70,22 @@ db.version(1).stores({
   syncLog: '++id, status, created_at',
 });
 
+let _isCaching = false;
+
 export async function clearLocalData() {
-  await Promise.all([
-    db.products.clear(),
-    db.movements.clear(),
-    db.warehouses.clear(),
-    db.productWarehouse.clear(),
-    db.transitItems.clear(),
-    db.sales.clear(),
-    db.recipes.clear(),
-    db.pendingAccounts.clear(),
-    db.dailyClosings.clear(),
-    db.employees.clear(),
-    db.categories.clear(),
-    db.accessPins.clear(),
-    db.syncQueue.clear(),
-    db.syncLog.clear(),
-  ]);
+  const tables = [
+    db.products, db.movements, db.warehouses, db.productWarehouse,
+    db.transitItems, db.sales, db.recipes, db.pendingAccounts,
+    db.dailyClosings, db.employees, db.categories, db.accessPins,
+    db.syncQueue, db.syncLog,
+  ];
+  for (const table of tables) {
+    try {
+      await table.clear();
+    } catch (err) {
+      console.warn('[Dexie] Error clearing table:', err);
+    }
+  }
 }
 
 export async function cacheAllData(data: {
@@ -103,20 +102,38 @@ export async function cacheAllData(data: {
   categories?: Category[];
   accessPins?: AccessPin[];
 }) {
-  const ops: Promise<any>[] = [];
-  if (data.products) ops.push(db.products.bulkPut(data.products));
-  if (data.movements) ops.push(db.movements.bulkPut(data.movements));
-  if (data.warehouses) ops.push(db.warehouses.bulkPut(data.warehouses));
-  if (data.productWarehouse) ops.push(db.productWarehouse.bulkPut(data.productWarehouse));
-  if (data.transitItems) ops.push(db.transitItems.bulkPut(data.transitItems));
-  if (data.sales) ops.push(db.sales.bulkPut(data.sales));
-  if (data.recipes) ops.push(db.recipes.bulkPut(data.recipes));
-  if (data.pendingAccounts) ops.push(db.pendingAccounts.bulkPut(data.pendingAccounts));
-  if (data.dailyClosings) ops.push(db.dailyClosings.bulkPut(data.dailyClosings));
-  if (data.employees) ops.push(db.employees.bulkPut(data.employees));
-  if (data.categories) ops.push(db.categories.bulkPut(data.categories));
-  if (data.accessPins) ops.push(db.accessPins.bulkPut(data.accessPins));
-  await Promise.all(ops);
+  if (_isCaching) {
+    console.warn('[Dexie] cacheAllData ya en progreso, ignorando llamada concurrente');
+    return;
+  }
+  _isCaching = true;
+  try {
+    const entries: [string, any[] | undefined, Dexie.Table][] = [
+      ['products', data.products, db.products],
+      ['movements', data.movements, db.movements],
+      ['warehouses', data.warehouses, db.warehouses],
+      ['productWarehouse', data.productWarehouse, db.productWarehouse],
+      ['transitItems', data.transitItems, db.transitItems],
+      ['sales', data.sales, db.sales],
+      ['recipes', data.recipes, db.recipes],
+      ['pendingAccounts', data.pendingAccounts, db.pendingAccounts],
+      ['dailyClosings', data.dailyClosings, db.dailyClosings],
+      ['employees', data.employees, db.employees],
+      ['categories', data.categories, db.categories],
+      ['accessPins', data.accessPins, db.accessPins],
+    ];
+    for (const [name, items, table] of entries) {
+      if (items && items.length > 0) {
+        try {
+          await table.bulkPut(items);
+        } catch (err) {
+          console.warn(`[Dexie] Error caching ${name}:`, err);
+        }
+      }
+    }
+  } finally {
+    _isCaching = false;
+  }
 }
 
 export async function getCachedProducts(userId: string): Promise<Product[]> {
