@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from 'react';
-import { Search, AlertTriangle, ArrowDownToLine, ArrowUpFromLine, Trash2, Filter, Pencil, X, Settings2, Scale, ArrowUpDown, Printer, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, AlertTriangle, ArrowDownToLine, ArrowUpFromLine, Trash2, Filter, Pencil, X, Settings2, Scale, ArrowUpDown, Printer, ChevronLeft, ChevronRight, Package } from 'lucide-react';
 import { useDatabaseStore } from '../../store/dbStore';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -11,6 +11,7 @@ import { normalizeUnit, getCompatibleUnits, convertUnit, type UnitAbbrev } from 
 import { formatNumber } from '../../lib/formatNumber';
 import { useStaggerEnter } from '../../lib/animations/useStaggerEnter';
 import { usePersistentFilters } from '../../lib/hooks/usePersistentFilters';
+import EmptyState from '../../components/EmptyState';
 
 export default function StockView() {
   // Helper to get stock per warehouse
@@ -509,13 +510,14 @@ export default function StockView() {
         <div className="flex items-center gap-1">
           <button 
             onClick={() => scrollTable('left')}
+            aria-label="Desplazar tabla a la izquierda"
             className="flex-shrink-0 p-2 hover:bg-surface-hover rounded text-text-secondary hover:text-text transition-colors"
             title="Desplazar a la izquierda"
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
           
-          <div className="flex-1 overflow-x-auto table-scroll-hint" id="stock-table-container"
+          <div className="flex-1 overflow-x-auto table-scroll-hint" id="stock-table-container" role="region" aria-label="Tabla de inventario"
                ref={tableContainerRef}
                onScroll={(e) => {
                  const topScroll = document.getElementById('top-scrollbar');
@@ -524,7 +526,7 @@ export default function StockView() {
             <table className="w-full text-left text-sm text-text [&_tr]:divide-x [&_tr]:divide-border/50">
             <thead className="border-b border-border/50 bg-bg/50 text-xs uppercase text-text-secondary sticky top-0 z-10">
               <tr>
-                <th className="px-3 py-3 font-medium min-w-[120px] cursor-pointer hover:text-text" onClick={() => toggleSort('name')}>
+                <th className="px-3 py-3 font-medium min-w-[120px] cursor-pointer hover:text-text" onClick={() => toggleSort('name')} aria-sort={sortBy === 'name' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}>
                   <div className="flex items-center">Producto <SortIcon field="name" /></div>
                 </th>
                 <th className="px-3 py-3 font-medium min-w-[100px] hidden md:table-cell">Categoría</th>
@@ -552,8 +554,8 @@ export default function StockView() {
             <tbody ref={stockTbodyRef} className="divide-y divide-border">
               {filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={13} className="px-4 py-8 text-center text-text-secondary">
-                    No se encontraron productos.
+                  <td colSpan={13} className="px-4 py-8">
+                    <EmptyState icon={Package} title="No hay productos" description={products.length === 0 ? 'Agrega tu primer producto desde la sección Inventario.' : 'Ningún producto coincide con los filtros aplicados.'} />
                   </td>
                 </tr>
               ) : (

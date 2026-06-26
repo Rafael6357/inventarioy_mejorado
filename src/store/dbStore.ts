@@ -6,6 +6,7 @@ import { cacheAllData, getCachedProducts, getCachedMovements, getCachedWarehouse
 import { syncEngine } from '../lib/syncEngine';
 import { isDateClosed } from '../lib/dateUtils';
 import { calcularNomina } from '../utils/payrollCalculations';
+import { logger } from '../lib/logger';
 
 let _isFetchingAll = false;
 
@@ -406,7 +407,7 @@ const queryWithRetry = async <T>(
       if (attempt < maxRetries && isRetryable) {
         const backoff = Math.min(1000 * Math.pow(2, attempt), 8000);
         if (import.meta.env.DEV) {
-          console.warn(`⚠️ Reintentando consulta (${attempt + 1}/${maxRetries}) en ${backoff}ms...`);
+          logger.warn(`⚠️ Reintentando consulta (${attempt + 1}/${maxRetries}) en ${backoff}ms...`);
         }
         await new Promise(r => setTimeout(r, backoff));
         continue;
@@ -441,10 +442,10 @@ export const resetConnectionCooldown = () => {
 };
 
 export const forceRefreshData = async () => {
-  console.log('🔄 Forzando recarga de datos...');
+  logger.info('🔄 Forzando recarga de datos...');
   const { fetchAll } = useDatabaseStore.getState();
   await fetchAll();
-  console.log('✅ Datos recargados exitosamente');
+  logger.info('✅ Datos recargados exitosamente');
 };
 
 interface DatabaseState {
@@ -639,7 +640,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
 
   fetchAll: async (limit = 50) => {
     if (_isFetchingAll) {
-      console.log('fetchAll ya en progreso, ignorando...');
+      logger.info('fetchAll ya en progreso, ignorando...');
       return;
     }
     _isFetchingAll = true;
@@ -655,7 +656,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
 
     // Offline: restaurar desde caché Dexie
     if (!navigator.onLine) {
-      console.log('📥 Offline — restaurando desde caché local...');
+      logger.info('📥 Offline — restaurando desde caché local...');
       await restoreFromCache(user.id);
       set({ isLoading: false });
       _isFetchingAll = false;
@@ -665,7 +666,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
     try {
-      console.log('📥 Cargando datos principales...');
+      logger.info('📥 Cargando datos principales...');
       const [productsRes, movementsRes] = await Promise.all([
         queryWithRetry(() => supabase.from('products').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(limit)),
         queryWithRetry(() => supabase.from('movements').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(limit)),
@@ -673,7 +674,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       await delay(300);
 
       // Grupo 2: Ventas y Recetas
-      console.log('📥 Cargando ventas y recetas...');
+      logger.info('📥 Cargando ventas y recetas...');
       const [salesRes, recipesRes] = await Promise.all([
         queryWithRetry(() => supabase.from('sales').select('*, sale_items(*)').eq('user_id', user.id).order('created_at', { ascending: false }).limit(limit)),
         queryWithRetry(() => supabase.from('recipes').select('*, recipe_ingredients(*)').eq('user_id', user.id).order('created_at', { ascending: false }).limit(limit)),
@@ -681,7 +682,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       await delay(300);
 
       // Grupo 3: Empleados y Recursos Humanos
-      console.log('📥 Cargando empleados y RRHH...');
+      logger.info('📥 Cargando empleados y RRHH...');
       const [employeesRes, categoriesRes, hrDocsRes, departmentsRes] = await Promise.all([
         queryWithRetry(() => supabase.from('employees').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(limit)),
         queryWithRetry(() => supabase.from('categories').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(limit)),
@@ -691,7 +692,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       await delay(300);
 
       // Grupo 4: Cierres, Configuración y Otros
-      console.log('📥 Cargando cierres y configuración...');
+      logger.info('📥 Cargando cierres y configuración...');
       const [transitRes, dailyClosingsRes, pendingRes, accessPinsRes, actionLogsRes, payrollConfigRes, warehousesRes, productWarehouseRes] = await Promise.all([
         queryWithRetry(() => supabase.from('transit_items').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(limit)),
         queryWithRetry(() => supabase.from('daily_closings').select('*').eq('user_id', user.id).order('closing_date', { ascending: false }).limit(limit)),
@@ -748,7 +749,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
         productWarehouse: productWarehouseWithTransit,
         isLoading: false,
       });
-      console.log('✅ Datos cargados completamente');
+      logger.info('✅ Datos cargados completamente');
       cacheAllData({
         products: productsRes.data || [],
         movements: movementsRes.data || [],
@@ -767,7 +768,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       // Auto-crear almacén "Almacén" para usuarios nuevos (sin warehouses en Supabase)
       const warehousesData = warehousesRes.data || [];
       if (warehousesData.length === 0) {
-        console.log('⚠️ No hay warehouses — disparando fetchWarehouses para auto-crear el principal');
+        logger.info('⚠️ No hay warehouses — disparando fetchWarehouses para auto-crear el principal');
         await get().fetchWarehouses();
       } else if (!get().currentWarehouseId) {
         // Setear currentWarehouseId para usuarios existentes (que ya tienen warehouses)
@@ -777,7 +778,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
         }
       }
     } catch (error) {
-      console.error('Error en fetchAll — restaurando desde caché:', error);
+      logger.error('Error en fetchAll — restaurando desde caché:', error);
       await restoreFromCache(user.id);
       set({ isLoading: false });
     } finally {
@@ -838,7 +839,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
         hasMore: hasMoreProducts || hasMoreMovements || hasMoreSales || hasMoreLogs 
       };
     } catch (error) {
-      console.error('Error en fetchMore:', error);
+      logger.error('Error en fetchMore:', error);
       return { hasMore: false };
     }
   },
@@ -923,7 +924,7 @@ addProduct: async (product) => {
       );
 
       if (error) {
-        console.error('Error adding product:', error);
+        logger.error('Error adding product:', error);
         if (isNetworkError(error)) {
           await saveProductOffline();
           return;
@@ -952,7 +953,7 @@ addProduct: async (product) => {
         );
 
         if (movementError && import.meta.env.DEV) {
-          console.error('Error creating initial movement:', movementError);
+          logger.error('Error creating initial movement:', movementError);
         }
       }
 
@@ -975,7 +976,7 @@ addProduct: async (product) => {
 
       toast.success('Producto guardado exitosamente');
     } catch (error: any) {
-      console.error('Error en addProduct:', error);
+      logger.error('Error en addProduct:', error);
       throw new Error(error.message || 'Error al crear el producto');
     }
   },
@@ -1203,10 +1204,10 @@ addProduct: async (product) => {
       );
 
       if (movementError) {
-        console.error('Error addMovement:', movementError);
+        logger.error('Error addMovement:', movementError);
         // Error de red (503 de customFetch) → guardar offline en vez de fallar
         if (movementError.status === 503) {
-          console.warn('⚠️ Error de red en addMovement — guardando offline');
+          logger.warn('⚠️ Error de red en addMovement — guardando offline');
           await saveOffline();
           return;
         }
@@ -1220,10 +1221,10 @@ addProduct: async (product) => {
         const currentQty = pw ? Number(pw.quantity) : 0;
 
         if (movement.type === 'ENTRADA') {
-          console.log('🔄 ENTRADA: Actualizando quantity para ENTRADA...');
+          logger.info('🔄 ENTRADA: Actualizando quantity para ENTRADA...');
           const newQty = currentQty + Number(movement.quantity);
           await get().updateProductWarehouseQuantity(movement.product_id, movement.warehouse_id, newQty, true);
-          console.log('✅ ENTRADA: Quantity actualizado');
+          logger.info('✅ ENTRADA: Quantity actualizado');
 
           // Costo promedio ponderado sobre product.cost
           const unitCost = Number(movement.cost) || Number(product.cost);
@@ -1268,9 +1269,9 @@ addProduct: async (product) => {
             );
 
             if (transitError) {
-              console.error('❌ SALIDA: Error creando transit_item:', transitError);
+              logger.error('❌ SALIDA: Error creando transit_item:', transitError);
             } else if (newTransitItem) {
-              console.log('✅ SALIDA: transit_item creado');
+              logger.info('✅ SALIDA: transit_item creado');
               set((state) => ({
                 transitItems: [newTransitItem, ...state.transitItems],
                 products: state.products.map(p =>
@@ -1285,7 +1286,7 @@ addProduct: async (product) => {
               }));
             }
           } catch (err) {
-            console.error('❌ SALIDA: Error en transit_item:', err);
+            logger.error('❌ SALIDA: Error en transit_item:', err);
           }
         } else if (movement.type === 'MERMA') {
           await get().updateProductWarehouseQuantity(movement.product_id, movement.warehouse_id, Math.max(0, currentQty - Number(movement.quantity)), true);
@@ -1327,16 +1328,16 @@ addProduct: async (product) => {
         
         await get().updateProduct(movement.product_id, { quantity: newQuantity, cost: newCost });
       } else if (movement.type === 'SALIDA') {
-        console.log('🔄 SALIDA (sin warehouse): Actualizando quantity e in_transit...');
+        logger.info('🔄 SALIDA (sin warehouse): Actualizando quantity e in_transit...');
         if (Number(product.quantity) < Number(movement.quantity)) {
           throw new Error(`Stock insuficiente para ${product.name}: disponible ${product.quantity}, solicitado ${movement.quantity}`);
         }
         newQuantity = Number(product.quantity) - Number(movement.quantity);
         newInTransit = newInTransit + Number(movement.quantity);
         await get().updateProduct(movement.product_id, { quantity: newQuantity, in_transit: newInTransit });
-        console.log('✅ SALIDA (sin warehouse): quantity e in_transit actualizados');
+        logger.info('✅ SALIDA (sin warehouse): quantity e in_transit actualizados');
         
-        console.log('🔄 SALIDA (sin warehouse): Creando transit_item...');
+        logger.info('🔄 SALIDA (sin warehouse): Creando transit_item...');
         const { data: newTransitItem, error: transitError } = await queryWithRetry(() =>
           supabase
             .from('transit_items')
@@ -1354,9 +1355,9 @@ addProduct: async (product) => {
         );
 
         if (transitError) {
-          console.error('❌ SALIDA (sin warehouse): Error creando transit_item:', transitError);
+          logger.error('❌ SALIDA (sin warehouse): Error creando transit_item:', transitError);
         } else {
-          console.log('✅ SALIDA (sin warehouse): transit_item creado');
+          logger.info('✅ SALIDA (sin warehouse): transit_item creado');
           set((state) => ({ 
             transitItems: [newTransitItem, ...state.transitItems],
             products: state.products.map(p => 
@@ -1379,11 +1380,11 @@ addProduct: async (product) => {
       const errMsg = error?.message || '';
       const isNetworkErr = errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError') || errMsg.includes('net::ERR_') || errMsg.includes('TypeError');
       if (isNetworkErr) {
-        console.warn('⚠️ Error de red en addMovement — guardando offline:', error);
+        logger.warn('⚠️ Error de red en addMovement — guardando offline:', error);
         await saveOffline();
         return;
       }
-      console.error('Error en addMovement:', error);
+      logger.error('Error en addMovement:', error);
       throw new Error(error.message || 'Error al registrar el movimiento');
     }
   }),
@@ -1411,7 +1412,7 @@ addProduct: async (product) => {
         ),
       }));
     } catch (error: any) {
-      console.error('Error en justifyMovement:', error);
+      logger.error('Error en justifyMovement:', error);
       throw new Error(error.message || 'Error al justificar movimiento');
     }
   },
@@ -1430,7 +1431,7 @@ addProduct: async (product) => {
         .order('created_at', { ascending: true });
 
       if (error) {
-        console.error('Error fetching warehouses:', error);
+        logger.error('Error fetching warehouses:', error);
         return;
       }
 
@@ -1473,7 +1474,7 @@ addProduct: async (product) => {
       .select('*');
     
     if (error) {
-      console.error('Error fetching product_warehouse:', error);
+      logger.error('Error fetching product_warehouse:', error);
       return;
     }
     
@@ -1509,7 +1510,7 @@ addProduct: async (product) => {
     }
     
     if (created > 0) {
-      console.log(`🔧 Auto-heal product_warehouse: ${created} entradas creadas`);
+      logger.info(`🔧 Auto-heal product_warehouse: ${created} entradas creadas`);
       // Volver a fetch si se crearon nuevas
       const { data: newData } = await supabase.from('product_warehouse').select('*');
       set({ productWarehouse: newData as ProductWarehouse[] });
@@ -1672,7 +1673,7 @@ addProduct: async (product) => {
       );
 
       if (saleError) {
-        console.error('Error adding sale:', saleError);
+        logger.error('Error adding sale:', saleError);
         return { success: false, error: 'Error al registrar la venta' };
       }
 
@@ -1692,7 +1693,7 @@ addProduct: async (product) => {
       );
 
       if (itemsError) {
-        console.error('Error adding sale items:', itemsError);
+        logger.error('Error adding sale items:', itemsError);
       }
 
       for (const item of sale.items) {
@@ -1709,7 +1710,7 @@ addProduct: async (product) => {
       set((state) => ({ sales: [saleWithItems, ...state.sales] }));
       return { success: true };
     } catch (error: any) {
-      console.error('Error en addSale:', error);
+      logger.error('Error en addSale:', error);
       return { success: false, error: error.message || 'Error al registrar la venta' };
     }
   },
@@ -1818,7 +1819,7 @@ addProduct: async (product) => {
       newMovement = movementData;
 
       if (movementError) {
-        console.error('Error recording sale movement:', movementError);
+        logger.error('Error recording sale movement:', movementError);
         throw new Error('No se pudo registrar el movimiento de venta');
       }
 
@@ -1860,7 +1861,7 @@ addProduct: async (product) => {
 
       return { success: true };
     } catch (error: any) {
-      console.error('Error en consumeFromTransit:', error);
+      logger.error('Error en consumeFromTransit:', error);
       return { success: false, error: error.message || 'Error al consumir de tránsito' };
     }
   },
@@ -1968,7 +1969,7 @@ addProduct: async (product) => {
       .single();
 
     if (movementError) {
-      if (import.meta.env.DEV) console.error('Error registering return movement:', movementError);
+      if (import.meta.env.DEV) logger.error('Error registering return movement:', movementError);
     }
 
     set((state) => {
@@ -2060,7 +2061,7 @@ addProduct: async (product) => {
       .single();
 
     if (movementError) {
-      if (import.meta.env.DEV) console.error('Error registering waste movement:', movementError);
+      if (import.meta.env.DEV) logger.error('Error registering waste movement:', movementError);
     } else if (movementData) {
       set((state) => ({ movements: [movementData, ...state.movements] }));
     }
@@ -2152,7 +2153,7 @@ addProduct: async (product) => {
       .single();
 
     if (movementError) {
-      if (import.meta.env.DEV) console.error('Error registering consumption movement:', movementError);
+      if (import.meta.env.DEV) logger.error('Error registering consumption movement:', movementError);
     } else if (movementData) {
       set((state) => ({ movements: [movementData, ...state.movements] }));
     }
@@ -2234,14 +2235,14 @@ addProduct: async (product) => {
       );
 
       if (error) {
-        console.error('Error createPendingAccount:', error);
+        logger.error('Error createPendingAccount:', error);
         throw new Error(error.message || 'Error al crear la cuenta');
       }
 
       await get().getPendingAccounts();
       return { success: true, accountId: data.id };
     } catch (err: any) {
-      console.error('Error en createPendingAccount:', err);
+      logger.error('Error en createPendingAccount:', err);
       return { success: false, error: err.message || 'Error al crear la cuenta' };
     }
   },
@@ -2634,7 +2635,7 @@ deletePendingAccount: async (accountId: string) => {
     try {
       await get().getPendingAccounts();
     } catch (err) {
-      console.warn('[chargePendingAccount] Error recargando cuentas pendientes:', err);
+      logger.warn('[chargePendingAccount] Error recargando cuentas pendientes:', err);
     }
     return { success: true };
   },
@@ -2838,7 +2839,7 @@ deletePendingAccount: async (accountId: string) => {
     // Si está offline, no intentar cargar desde Supabase para evitar crash
     // Mantener los datos existentes en memoria
     if (!navigator.onLine) {
-      console.log('[getActionLogs] Offline: manteniendo datos existentes');
+      logger.info('[getActionLogs] Offline: manteniendo datos existentes');
       return;
     }
 
@@ -2853,7 +2854,7 @@ deletePendingAccount: async (accountId: string) => {
         set({ actionLogs: data });
       }
     } catch (err) {
-      console.warn('[getActionLogs] Error cargando logs:', err);
+      logger.warn('[getActionLogs] Error cargando logs:', err);
     }
   },
 
@@ -2928,7 +2929,7 @@ deletePendingAccount: async (accountId: string) => {
         recipes: [{ ...newRecipe, ingredients: recipe.ingredients }, ...state.recipes] 
       }));
     } catch (error: any) {
-      console.error('Error en addRecipe:', error);
+      logger.error('Error en addRecipe:', error);
       throw new Error(error.message || 'Error al crear la receta');
     }
   },
@@ -3021,13 +3022,13 @@ deletePendingAccount: async (accountId: string) => {
       );
 
       if (error) {
-        console.error('Error addEmployee:', error);
+        logger.error('Error addEmployee:', error);
         throw new Error(error.message || 'No se pudo agregar el empleado');
       }
 
       set((state) => ({ employees: [data, ...state.employees] }));
     } catch (error: any) {
-      console.error('Error en addEmployee:', error);
+      logger.error('Error en addEmployee:', error);
       throw new Error(error.message || 'Error al agregar empleado');
     }
   },
@@ -3073,7 +3074,7 @@ deletePendingAccount: async (accountId: string) => {
       .single();
 
     if (error) {
-      console.error('Error addDepartment:', error);
+      logger.error('Error addDepartment:', error);
       throw new Error(error.message || 'No se pudo agregar el departamento');
     }
 
@@ -3113,7 +3114,7 @@ deletePendingAccount: async (accountId: string) => {
       .single();
 
     if (error && error.code !== 'PGRST116') {
-      console.error('Error fetching payroll config:', error);
+      logger.error('Error fetching payroll config:', error);
       return;
     }
 
@@ -3244,7 +3245,7 @@ deletePendingAccount: async (accountId: string) => {
       .order('employee_name', { ascending: true });
 
     if (error) {
-      console.error('Error fetching payroll entries:', error);
+      logger.error('Error fetching payroll entries:', error);
       return;
     }
 
@@ -3277,7 +3278,7 @@ deletePendingAccount: async (accountId: string) => {
     const { data, error, count } = await query.range(offset, offset + pageSize - 1);
 
     if (error) {
-      console.error('Error fetching employees paginated:', error);
+      logger.error('Error fetching employees paginated:', error);
       return;
     }
 
@@ -3294,7 +3295,7 @@ deletePendingAccount: async (accountId: string) => {
 
     // Si está offline, retornar 0 para evitar crash
     if (!navigator.onLine) {
-      console.log('[getEmployeesCount] Offline: returning 0');
+      logger.info('[getEmployeesCount] Offline: returning 0');
       return 0;
     }
 
@@ -3315,13 +3316,13 @@ deletePendingAccount: async (accountId: string) => {
       const { count, error } = await query;
 
       if (error) {
-        console.error('Error counting employees:', error);
+        logger.error('Error counting employees:', error);
         return 0;
       }
 
       return count || 0;
     } catch (err) {
-      console.warn('[getEmployeesCount] Error:', err);
+      logger.warn('[getEmployeesCount] Error:', err);
       return 0;
     }
   },
@@ -3347,7 +3348,7 @@ deletePendingAccount: async (accountId: string) => {
       .range(offset, offset + pageSize - 1);
 
     if (error) {
-      console.error('Error fetching departments paginated:', error);
+      logger.error('Error fetching departments paginated:', error);
       return;
     }
 
@@ -3364,7 +3365,7 @@ deletePendingAccount: async (accountId: string) => {
 
     // Si está offline, retornar 0 para evitar crash
     if (!navigator.onLine) {
-      console.log('[getDepartmentsCount] Offline: returning 0');
+      logger.info('[getDepartmentsCount] Offline: returning 0');
       return 0;
     }
 
@@ -3381,13 +3382,13 @@ deletePendingAccount: async (accountId: string) => {
       const { count, error } = await query;
 
       if (error) {
-        console.error('Error counting departments:', error);
+        logger.error('Error counting departments:', error);
         return 0;
       }
 
       return count || 0;
     } catch (err) {
-      console.warn('[getDepartmentsCount] Error:', err);
+      logger.warn('[getDepartmentsCount] Error:', err);
       return 0;
     }
   },
@@ -3410,7 +3411,7 @@ deletePendingAccount: async (accountId: string) => {
       .range(offset, offset + pageSize - 1);
 
     if (error) {
-      console.error('Error fetching payroll entries paginated:', error);
+      logger.error('Error fetching payroll entries paginated:', error);
       return;
     }
 
@@ -3429,7 +3430,7 @@ deletePendingAccount: async (accountId: string) => {
 
     // Si está offline, retornar 0 para evitar crash
     if (!navigator.onLine) {
-      console.log('[getPayrollEntriesCount] Offline: returning 0');
+      logger.info('[getPayrollEntriesCount] Offline: returning 0');
       return 0;
     }
 
@@ -3442,13 +3443,13 @@ deletePendingAccount: async (accountId: string) => {
         .eq('year', year);
 
       if (error) {
-        console.error('Error counting payroll entries:', error);
+        logger.error('Error counting payroll entries:', error);
         return 0;
       }
 
       return count || 0;
     } catch (err) {
-      console.warn('[getPayrollEntriesCount] Error:', err);
+      logger.warn('[getPayrollEntriesCount] Error:', err);
       return 0;
     }
   },
@@ -3550,7 +3551,7 @@ deletePendingAccount: async (accountId: string) => {
 
       set((state) => ({ categories: [data, ...state.categories] }));
     } catch (error: any) {
-      console.error('Error en addCategory:', error);
+      logger.error('Error en addCategory:', error);
       throw new Error(error.message || 'Error al agregar categoría');
     }
   },
@@ -3612,7 +3613,7 @@ deletePendingAccount: async (accountId: string) => {
       );
 
       if (error) {
-        console.error('Error createDailyClosing:', error);
+        logger.error('Error createDailyClosing:', error);
         if (error.code === '23505') {
           return { success: false, error: 'Ya existe un cierre para esta fecha' };
         }
@@ -3622,7 +3623,7 @@ deletePendingAccount: async (accountId: string) => {
       set((state) => ({ dailyClosings: [data, ...state.dailyClosings] }));
       return { success: true };
     } catch (error: any) {
-      console.error('Error en createDailyClosing:', error);
+      logger.error('Error en createDailyClosing:', error);
       return { success: false, error: error.message || 'Error al registrar cierre de caja' };
     }
   },
@@ -3820,7 +3821,7 @@ deletePendingAccount: async (accountId: string) => {
   },
 
 forceRefreshData: async () => {
-    console.log('[forceRefreshData] Refreshing data from Supabase...');
+    logger.info('[forceRefreshData] Refreshing data from Supabase...');
     const { fetchAll } = useDatabaseStore.getState();
     await fetchAll();
   },

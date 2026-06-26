@@ -8,3 +8,5 @@ coverage/
 !.env.example
 .vercel
 .env*.local
+test-results/
+screenshots/

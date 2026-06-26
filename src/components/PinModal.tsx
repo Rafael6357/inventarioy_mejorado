@@ -4,6 +4,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { useDatabaseStore } from '../store/dbStore';
 import { useModalAnimation } from '../lib/animations/useModalAnimation';
+import { useFocusTrap } from '../lib/hooks/useFocusTrap';
 
 interface PinModalProps {
   isOpen: boolean;
@@ -22,6 +23,7 @@ export default function PinModal({ isOpen, moduleName, onSuccess, onCancel, isIn
   const [showPin, setShowPin] = useState(false);
   const { verifyPinForModule, verifyPinSimple } = useDatabaseStore();
   const { backdropRef, cardRef } = useModalAnimation(isOpen);
+  useFocusTrap(isOpen, cardRef);
 
   useEffect(() => {
     if (blocked && remainingTime > 0) {
@@ -92,7 +94,7 @@ export default function PinModal({ isOpen, moduleName, onSuccess, onCancel, isIn
 
   return (
     <div ref={backdropRef} className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm modal-backdrop">
-      <div ref={cardRef} className="w-full max-w-sm rounded-2xl border border-border/50 bg-surface p-6 shadow-2xl">
+      <div ref={cardRef} role="dialog" aria-modal="true" aria-label={isInitialVerification ? 'Identificación por PIN' : 'Verificar PIN'} className="w-full max-w-sm rounded-2xl border border-border/50 bg-surface p-6 shadow-2xl">
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="rounded-full bg-primary/20 p-2">
@@ -111,6 +113,7 @@ export default function PinModal({ isOpen, moduleName, onSuccess, onCancel, isIn
           </div>
           <button
             onClick={onCancel}
+            aria-label="Cerrar"
             className="rounded-full p-2 text-text-secondary hover:bg-surface-hover hover:text-text transition-colors"
           >
             <X className="h-5 w-5" />
@@ -132,6 +135,7 @@ export default function PinModal({ isOpen, moduleName, onSuccess, onCancel, isIn
                 }
               }}
               placeholder="0000"
+              aria-label="Ingrese su PIN de 4 dígitos"
               className="h-12 text-center text-2xl font-mono tracking-[0.5em] pr-12"
               style={{
                 WebkitTextSecurity: showPin ? 'none' : 'disc',
@@ -146,6 +150,7 @@ export default function PinModal({ isOpen, moduleName, onSuccess, onCancel, isIn
             <button
               type="button"
               onClick={() => setShowPin(!showPin)}
+              aria-label={showPin ? 'Ocultar PIN' : 'Mostrar PIN'}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary hover:text-text"
               disabled={blocked || isVerifying}
             >
@@ -154,15 +159,15 @@ export default function PinModal({ isOpen, moduleName, onSuccess, onCancel, isIn
           </div>
           
           {isVerifying && (
-            <p className="text-center text-sm text-text-secondary mb-2">Verificando PIN...</p>
+            <p className="text-center text-sm text-text-secondary mb-2" aria-live="polite">Verificando PIN...</p>
           )}
           
           {!isVerifying && error && (
-            <p className="text-center text-sm text-danger mb-2">{error}</p>
+            <p className="text-center text-sm text-danger mb-2" role="alert">{error}</p>
           )}
           
           {blocked && (
-            <p className="text-center text-sm text-warning">
+            <p className="text-center text-sm text-warning" aria-live="assertive">
               Desbloqueo en {remainingTime} segundos...
             </p>
           )}
@@ -174,6 +179,7 @@ export default function PinModal({ isOpen, moduleName, onSuccess, onCancel, isIn
               key={key}
               disabled={blocked || (key === '')}
               onClick={() => key === 'del' ? handleDelete() : key && handleNumberClick(key)}
+              aria-label={key === 'del' ? 'Borrar dígito' : key || undefined}
               className={`h-12 rounded-lg text-lg font-medium transition-colors ${
                 key === 'del'
                   ? 'bg-surface-hover text-danger hover:bg-danger/20'

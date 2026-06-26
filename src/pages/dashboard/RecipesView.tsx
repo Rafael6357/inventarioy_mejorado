@@ -18,6 +18,7 @@ import {
   UNIT_LABELS,
 } from '../../lib/unitConversion';
 import { usePersistentFilters } from '../../lib/hooks/usePersistentFilters';
+import EmptyState from '../../components/EmptyState';
 
 export default function RecipesView() {
   const { user } = useAuthStore();
@@ -395,9 +396,7 @@ export default function RecipesView() {
 
           <div className="space-y-4">
             {filteredRecipes.length === 0 ? (
-              <div className="py-12 text-center text-text-secondary">
-                No hay recetas registradas.
-              </div>
+              <EmptyState icon={UtensilsCrossed} title="No hay recetas" description={recipes.length === 0 ? 'Crea tu primera receta combinando productos del inventario.' : 'Ninguna receta coincide con la búsqueda.'} />
             ) : (
               filteredRecipes.map(recipe => {
                 // Calculate cost for display

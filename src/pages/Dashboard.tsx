@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { Link, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
@@ -33,22 +33,23 @@ import SubscriptionBanner from '../components/SubscriptionBanner';
 import SyncStatus from '../components/SyncStatus';
 import OfflineBanner from '../components/OfflineBanner';
 import PinModal from '../components/PinModal';
-import StockView from './dashboard/StockView';
-import InventoryView from './dashboard/InventoryView';
-import TransitView from './dashboard/TransitView';
-import MovementsView from './dashboard/MovementsView';
-import SalesView from './dashboard/SalesView';
-import HRView from './dashboard/HRView';
-import RecipesView from './dashboard/RecipesView';
-import AnalysisView from './dashboard/AnalysisView';
-import ChartsView from './dashboard/ChartsView';
-import ConsumptionView from './dashboard/ConsumptionView';
-import FilteredCenterView from './dashboard/FilteredCenterView';
-import SettingsView from './dashboard/SettingsView';
-import ActionLogsView from './dashboard/ActionLogsView';
-import UsersView from './dashboard/UsersView';
-import DailyClosingsView from './dashboard/DailyClosingsView';
+const StockView = lazy(() => import('./dashboard/StockView'));
+const InventoryView = lazy(() => import('./dashboard/InventoryView'));
+const TransitView = lazy(() => import('./dashboard/TransitView'));
+const MovementsView = lazy(() => import('./dashboard/MovementsView'));
+const SalesView = lazy(() => import('./dashboard/SalesView'));
+const HRView = lazy(() => import('./dashboard/HRView'));
+const RecipesView = lazy(() => import('./dashboard/RecipesView'));
+const AnalysisView = lazy(() => import('./dashboard/AnalysisView'));
+const ChartsView = lazy(() => import('./dashboard/ChartsView'));
+const ConsumptionView = lazy(() => import('./dashboard/ConsumptionView'));
+const FilteredCenterView = lazy(() => import('./dashboard/FilteredCenterView'));
+const SettingsView = lazy(() => import('./dashboard/SettingsView'));
+const ActionLogsView = lazy(() => import('./dashboard/ActionLogsView'));
+const UsersView = lazy(() => import('./dashboard/UsersView'));
+const DailyClosingsView = lazy(() => import('./dashboard/DailyClosingsView'));
 import PhoneModal from '../components/PhoneModal';
+import { TableSkeleton } from '../components/Skeleton';
 import { syncEngine } from '../lib/syncEngine';
 
 export default function Dashboard() {
@@ -369,8 +370,9 @@ export default function Dashboard() {
         }`}
       >
         <div className="flex h-16 items-center justify-between px-4 border-b border-border/50">
-          <div className="flex items-center gap-3">
-            <InventarioYLogo size="lg" />
+          <div className="flex items-center gap-2">
+            <InventarioYLogo size="md" variant="image" />
+            <InventarioYLogo size="md" variant="text" />
           </div>
           <button
             onClick={() => {
@@ -461,7 +463,7 @@ export default function Dashboard() {
       <div className="flex flex-1 flex-col overflow-hidden bg-transparent">
         <header className="flex h-16 items-center justify-between border-b border-border/50 bg-surface/80 backdrop-blur-xl px-4 lg:hidden">
           <div className="flex items-center gap-2">
-            <InventarioYLogo size="lg" />
+            <InventarioYLogo size="lg" variant="image" />
             <SyncStatus />
           </div>
           <button
@@ -488,25 +490,27 @@ export default function Dashboard() {
             </div>
           )}
           <div className="w-full">
-            <Routes>
-              <Route path="/" element={<StockView />} />
-              <Route path="/inventory" element={<InventoryView />} />
-              <Route path="/movements" element={<MovementsView />} />
-              <Route path="/transit" element={<TransitView />} />
-              <Route path="/sales" element={<SalesView />} />
-              <Route path="/closings" element={<DailyClosingsView />} />
-              <Route path="/hr" element={<HRView />} />
-              <Route path="/recipes" element={<RecipesView />} />
-              <Route path="/consumption" element={<ConsumptionView />} />
-              <Route path="/analysis" element={<AnalysisView />} />
-              <Route path="/charts" element={<ChartsView />} />
-              <Route path="/filtered" element={<FilteredCenterView />} />
-              <Route path="/settings" element={<SettingsView />} />
-              <Route path="/action-logs" element={<ActionLogsView />} />
-              {user?.email === import.meta.env.VITE_ADMIN_EMAIL && (
-                <Route path="/users" element={<UsersView />} />
-              )}
-            </Routes>
+            <Suspense fallback={<div className="p-6"><TableSkeleton rows={8} cols={6} /></div>}>
+              <Routes>
+                <Route path="/" element={<StockView />} />
+                <Route path="/inventory" element={<InventoryView />} />
+                <Route path="/movements" element={<MovementsView />} />
+                <Route path="/transit" element={<TransitView />} />
+                <Route path="/sales" element={<SalesView />} />
+                <Route path="/closings" element={<DailyClosingsView />} />
+                <Route path="/hr" element={<HRView />} />
+                <Route path="/recipes" element={<RecipesView />} />
+                <Route path="/consumption" element={<ConsumptionView />} />
+                <Route path="/analysis" element={<AnalysisView />} />
+                <Route path="/charts" element={<ChartsView />} />
+                <Route path="/filtered" element={<FilteredCenterView />} />
+                <Route path="/settings" element={<SettingsView />} />
+                <Route path="/action-logs" element={<ActionLogsView />} />
+                {user?.email === import.meta.env.VITE_ADMIN_EMAIL && (
+                  <Route path="/users" element={<UsersView />} />
+                )}
+              </Routes>
+            </Suspense>
           </div>
         </main>
 

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
-import { Search, Filter, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, Calendar, ChevronLeft, ChevronRight, TrendingDown, Settings2, Printer, X, Loader2 } from 'lucide-react';
+import { Search, Filter, ArrowDownToLine, ArrowUpFromLine, AlertTriangle, Calendar, ChevronLeft, ChevronRight, TrendingDown, Settings2, Printer, X, Loader2, History } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
@@ -8,6 +8,7 @@ import { exportToExcel } from '../../lib/utils';
 import { formatNumber } from '../../lib/formatNumber';
 import { useStaggerEnter } from '../../lib/animations/useStaggerEnter';
 import { usePersistentFilters } from '../../lib/hooks/usePersistentFilters';
+import EmptyState from '../../components/EmptyState';
 
 export default function MovementsView() {
   const { movements, products, fetchMore, warehouses, currentWarehouseId } = useDatabaseStore();
@@ -256,8 +257,8 @@ if (endDate) {
             <tbody ref={movementsTbodyRef} className="divide-y divide-border">
               {paginatedMovements.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-text-secondary">
-                    No se encontraron movimientos.
+                  <td colSpan={8} className="px-4 py-8">
+                    <EmptyState icon={History} title="No hay movimientos" description={movements.length === 0 ? 'Los movimientos aparecerán cuando realices entradas o salidas de inventario.' : 'Ningún movimiento coincide con los filtros aplicados.'} />
                   </td>
                 </tr>
               ) : (

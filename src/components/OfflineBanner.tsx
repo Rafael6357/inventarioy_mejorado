@@ -72,25 +72,26 @@ export default function OfflineBanner() {
 
   return (
     <>
-      <div className={`fixed bottom-0 left-0 right-0 z-[100] border-t ${bgColor} backdrop-blur-xl`}>
+      <div role="status" aria-live="polite" className={`fixed bottom-0 left-0 right-0 z-[100] border-t ${bgColor} backdrop-blur-xl`}>
         <div className="flex items-center justify-center gap-4 px-4 py-3 max-w-7xl mx-auto">
           <div className="flex items-center gap-3">
             {isOffline ? (
-              <WifiOff className={`h-4 w-4 flex-shrink-0 ${iconColor}`} />
+              <WifiOff className={`h-4 w-4 flex-shrink-0 ${iconColor}`} aria-hidden="true" />
             ) : isSyncing ? (
-              <RefreshCw className={`h-4 w-4 flex-shrink-0 animate-spin ${iconColor}`} />
+              <RefreshCw className={`h-4 w-4 flex-shrink-0 animate-spin ${iconColor}`} aria-hidden="true" />
             ) : (
-              <CloudOff className={`h-4 w-4 flex-shrink-0 ${iconColor}`} />
+              <CloudOff className={`h-4 w-4 flex-shrink-0 ${iconColor}`} aria-hidden="true" />
             )}
             <span className={`text-sm ${textColor}`}>{message}</span>
           </div>
           {syncQueueCount > 0 && (
             <button
               onClick={() => setShowModal(true)}
+              aria-label="Abrir detalles de sincronización"
               className={`inline-flex items-center gap-1.5 ${isOffline ? 'text-danger/80 hover:text-danger' : isSyncing ? 'text-primary/80 hover:text-primary' : 'text-warning/80 hover:text-warning'} text-xs font-semibold uppercase tracking-wider transition-colors`}
             >
               Ver detalles
-              <ArrowRight className="h-3 w-3" />
+              <ArrowRight className="h-3 w-3" aria-hidden="true" />
             </button>
           )}
         </div>

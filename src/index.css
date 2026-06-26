@@ -21,6 +21,16 @@
   :root {
     color-scheme: dark;
   }
+
+  [data-theme="light"] {
+    color-scheme: light;
+    --color-bg: #f5f5f5;
+    --color-surface: #ffffff;
+    --color-surface-hover: #f0f0f0;
+    --color-text: #1a1a1a;
+    --color-text-secondary: #71717a;
+    --color-border: #e4e4e7;
+  }
   
   body {
     @apply bg-bg text-text antialiased min-h-screen relative font-sans;
@@ -34,9 +44,15 @@
   ::-webkit-scrollbar-track {
     background: #0a0a0a;
   }
+  [data-theme="light"] ::-webkit-scrollbar-track {
+    background: #e4e4e7;
+  }
   ::-webkit-scrollbar-thumb {
     background: #333333;
     border-radius: 4px;
+  }
+  [data-theme="light"] ::-webkit-scrollbar-thumb {
+    background: #a1a1aa;
   }
   ::-webkit-scrollbar-thumb:hover {
     background: #FFC107;
@@ -58,6 +74,10 @@
     content: "";
     @apply fixed inset-0 pointer-events-none z-[-1];
     background: radial-gradient(circle at top right, rgba(255, 193, 7, 0.08) 0%, transparent 70%);
+  }
+
+  [data-theme="light"] body::before {
+    opacity: 0.5;
   }
 
   body::after {
@@ -115,6 +135,9 @@
     filter: invert(0.7);
     cursor: pointer;
     padding: 2px;
+  }
+  [data-theme="light"] input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.2);
   }
 
   /* Prevent body scroll behind modal overlays on iOS */

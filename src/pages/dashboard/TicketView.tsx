@@ -161,6 +161,15 @@ export default function TicketView({ ticketData, onClose, isPreticket = false }:
   );
 }
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 export function printTicket(ticketData: TicketData) {
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('es-ES', {
@@ -177,12 +186,23 @@ export function printTicket(ticketData: TicketData) {
     return '$' + amount.toFixed(2);
   };
 
+  const safe = {
+    businessName: escapeHtml(ticketData.businessName || 'Mi Negocio'),
+    employeeName: escapeHtml(ticketData.employeeName || 'Dueño'),
+    ticketMessage: escapeHtml(ticketData.ticketMessage || '¡Gracias por su visita!'),
+    items: ticketData.items.map(item => ({
+      quantity: item.quantity,
+      name: escapeHtml(item.name),
+      subtotal: item.subtotal,
+    })),
+  };
+
   const ticketHtml = `
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="UTF-8">
-      <title>Ticket - ${ticketData.businessName}</title>
+      <title>Ticket - ${safe.businessName}</title>
       <style>
         body {
           font-family: 'Courier New', monospace;
@@ -236,15 +256,15 @@ export function printTicket(ticketData: TicketData) {
     </head>
     <body>
       <div class="header">
-        <h1>${ticketData.businessName || 'Mi Negocio'}</h1>
+        <h1>${safe.businessName}</h1>
         <div class="divider"></div>
       </div>
       
       <div>${formatDate(ticketData.date)}</div>
-      <div>Cajero: ${ticketData.employeeName || 'Dueño'}</div>
+      <div>Cajero: ${safe.employeeName}</div>
       <div class="divider"></div>
       
-      ${ticketData.items.map(item => `
+      ${safe.items.map(item => `
         <div class="item">
           <span>${item.quantity}x ${item.name}</span>
           <span>${formatCurrency(item.subtotal)}</span>
@@ -261,7 +281,7 @@ export function printTicket(ticketData: TicketData) {
       <div class="divider"></div>
       
       <div class="footer">
-        <p>${ticketData.ticketMessage || '¡Gracias por su visita!'}</p>
+        <p>${safe.ticketMessage}</p>
         <div class="divider"></div>
       </div>
     </body>

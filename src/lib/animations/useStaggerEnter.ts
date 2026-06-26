@@ -1,10 +1,14 @@
 import { useEffect, useRef } from 'react';
 import gsap from 'gsap';
+import { useReducedMotion } from './useReducedMotion';
 
 export function useStaggerEnter<T extends HTMLElement = HTMLDivElement>(deps: any[] = []) {
   const ref = useRef<T>(null);
+  const reduced = useReducedMotion();
 
   useEffect(() => {
+    if (reduced) return;
+
     const el = ref.current;
     if (!el) return;
 
@@ -22,7 +26,7 @@ export function useStaggerEnter<T extends HTMLElement = HTMLDivElement>(deps: an
     );
 
     return () => { tl.kill(); };
-  }, deps);
+  }, [...deps, reduced]);
 
   return ref;
 }

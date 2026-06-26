@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { clearLocalData } from '../lib/dexieDb';
 import { useDatabaseStore } from './dbStore';
+import { encryptCredentials, decryptCredentials } from '../lib/cryptoUtils';
+import { logger } from '../lib/logger';
 
 const checkRealInternetConnection = async (): Promise<boolean> => {
   try {
@@ -50,6 +52,7 @@ interface AuthState {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   register: (email: string, password: string, name: string, businessName: string, phone?: string) => Promise<{ success: boolean; error?: string }>;
+  forgotPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   updateSubscription: (updates: Partial<User['subscription']>) => void;
   fetchUser: () => Promise<boolean>;
@@ -161,11 +164,11 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   initialize: async () => {
     if (_isInitializing) {
-      console.log('initialize ya está en progreso, ignorando...');
+      logger.info('initialize ya está en progreso, ignorando...');
       return;
     }
     _isInitializing = true;
-    console.log('Inicializando autenticación...');
+    logger.info('Inicializando autenticación...');
 
     // Solo modo online - sin SQLite
     const savedUserData = localStorage.getItem('inventarioy_user');
@@ -199,7 +202,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         // No hay sesión activa, intentar auto-login con credenciales guardadas
         if (navigator.onLine && savedCredentials) {
           try {
-            const creds = JSON.parse(atob(savedCredentials));
+            const creds = await decryptCredentials(savedCredentials);
             const { error: signInError } = await supabase.auth.signInWithPassword({
               email: creds.email,
               password: creds.password,
@@ -210,7 +213,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
               await get().fetchUser();
             } else {
               // Credenciales expiradas o inválidas
-              console.warn('Credenciales expiradas, guardando sesión actual temporalmente');
+              logger.warn('Credenciales expiradas, guardando sesión actual temporalmente');
               // Mantener los datos del usuario temporalmente hasta que se requiera recargar
               if (savedUserData) {
                 const userData = JSON.parse(savedUserData);
@@ -220,7 +223,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
               }
             }
           } catch (autoLoginErr) {
-            console.warn('Login automático falló:', autoLoginErr);
+            logger.warn('Login automático falló:', autoLoginErr);
             // Mantener sesión si hay datos guardados
             if (savedUserData) {
               const userData = JSON.parse(savedUserData);
@@ -241,14 +244,14 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       }
 
       if (!_authListenerSubscription) {
-        console.log('Creando listener de autenticación...');
+        logger.info('Creando listener de autenticación...');
         _authListenerSubscription = supabase.auth.onAuthStateChange(async (event, session) => {
-          console.log('Auth state change:', event);
+          logger.info('Auth state change:', event);
           if (event === 'SIGNED_IN' && session?.user) {
             await get().fetchUser();
           } else if (event === 'SIGNED_OUT') {
             if (!navigator.onLine) {
-              console.log('[Auth] SIGNED_OUT ignorado — modo offline');
+              logger.info('[Auth] SIGNED_OUT ignorado — modo offline');
               return;
             }
             set({ user: null, isAuthenticated: false, isLoading: false });
@@ -257,7 +260,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       }
     } catch (err: any) {
       if (err?.message === 'AuthTimeout') {
-        console.warn('Timeout en getSession');
+        logger.warn('Timeout en getSession');
         if (savedUserData) {
           try {
             const userData = JSON.parse(savedUserData);
@@ -269,7 +272,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
           set({ isLoading: false });
         }
       } else if (err?.message?.includes('429') || err?.status === 429) {
-        console.warn('Rate limit alcanzado en autenticación, reintentando en 5 segundos...');
+        logger.warn('Rate limit alcanzado en autenticación, reintentando en 5 segundos...');
         await new Promise(r => setTimeout(r, 5000));
         try {
           const { data: { session } } = await supabase.auth.getSession();
@@ -282,7 +285,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
           set({ isLoading: false });
         }
       } else if (import.meta.env.DEV) {
-        console.error('Error en initialize:', err);
+        logger.error('Error en initialize:', err);
         set({ isLoading: false });
       } else {
         set({ isLoading: false });
@@ -293,17 +296,17 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 
   fetchUser: async () => {
-    console.log('fetchUser llamado...');
+    logger.info('fetchUser llamado...');
     try {
       const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
       
       if (authError) {
-        console.error('Error en getUser:', authError);
+        logger.error('Error en getUser:', authError);
         return false;
       }
       
       if (!authUser) {
-        console.log('No hay usuario autenticado');
+        logger.info('No hay usuario autenticado');
         return false;
       }
 
@@ -328,7 +331,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
           profile = result.data;
           break;
         } catch (dbErr: any) {
-          console.error('Error de base de datos en fetchUser:', dbErr);
+          logger.error('Error de base de datos en fetchUser:', dbErr);
           retries++;
           if (retries >= maxRetries) throw dbErr;
           await new Promise(r => setTimeout(r, 500));
@@ -336,7 +339,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       }
 
       if (!profile) {
-        console.warn('No se pudo obtener el perfil después de retries');
+        logger.warn('No se pudo obtener el perfil después de retries');
         set({ isLoading: false });
         return false;
       }
@@ -370,7 +373,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         themePreference: (profile?.theme_preference as 'light' | 'dark' | 'system') || 'dark',
       };
 
-      console.log('Usuario cargado:', user.email, 'role:', user.role, 'subscriptionActive:', user.isSubscriptionActive);
+      logger.info('Usuario cargado', { email: user.email, role: user.role, subscriptionActive: user.isSubscriptionActive });
       
       // Guardar usuario en localStorage para persistencia de sesión
       if (typeof window !== 'undefined') {
@@ -380,7 +383,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       set({ user, isAuthenticated: true, isLoading: false });
       return true;
     } catch (err) {
-      console.error('Error en fetchUser:', err);
+      logger.error('Error en fetchUser:', err);
       set({ isLoading: false });
       return false;
     }
@@ -402,8 +405,8 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     }
 
     if (data.user) {
-      // Guardar credenciales para sesión persistente
-      const credentials = btoa(JSON.stringify({ email, password }));
+      // Guardar credenciales cifradas para sesión persistente
+      const credentials = await encryptCredentials(email, password);
       localStorage.setItem('saved_credentials', credentials);
       localStorage.setItem('saved_email', email);
 
@@ -450,7 +453,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       });
 
       if (profileError) {
-        if (import.meta.env.DEV) console.error('Error al crear perfil:', profileError);
+        if (import.meta.env.DEV) logger.error('Error al crear perfil:', profileError);
       }
 
       return { success: true };
@@ -459,8 +462,25 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     return { success: false, error: 'Error desconocido al registrar' };
   },
 
+  forgotPassword: async (email: string) => {
+    const isOnline = navigator.onLine && await checkRealInternetConnection();
+    if (!isOnline) {
+      return { success: false, error: 'Sin conexión a internet. Intenta cuando tengas internet.' };
+    }
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+
+    if (error) {
+      return { success: false, error: translateError(error.message) };
+    }
+
+    return { success: true };
+  },
+
   logout: async () => {
-    console.log('Logout llamado...');
+    logger.info('Logout llamado...');
     try {
       // Código SQLite eliminado
 
@@ -470,7 +490,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       _isInitializing = false;
       _authListenerSubscription = null;
       set({ user: null, isAuthenticated: false, isLoading: false });
-      console.log('Estado limpiado');
+      logger.info('Estado limpiado');
 
       // Resetear Zustand store de base de datos para evitar que datos del usuario anterior
       // queden en memoria y se filtren al siguiente login
@@ -509,22 +529,22 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         syncProgress: null,
         isLoading: true,
       });
-      console.log('Zustand dbStore reseteado');
+      logger.info('Zustand dbStore reseteado');
 
       await supabase.auth.signOut();
-      console.log('SignOut exitoso');
+      logger.info('SignOut exitoso');
 
       try {
         await clearLocalData();
-        console.log('IndexedDB limpiado');
+        logger.info('IndexedDB limpiado');
       } catch (dbErr) {
-        console.warn('Error limpiando IndexedDB:', dbErr);
+        logger.warn('Error limpiando IndexedDB:', dbErr);
       }
     } catch (err) {
-      console.error('Error en logout:', err);
+      logger.error('Error en logout:', err);
     } finally {
       // Forzar redirección
-      console.log('Redireccionando...');
+      logger.info('Redireccionando...');
       window.location.href = '/';
     }
   },

@@ -1,4 +1,4 @@
-import React, { Component, type ReactNode } from 'react';
+import { Component, type ReactNode } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 interface Props {
@@ -8,6 +8,24 @@ interface Props {
 interface State {
   hasError: boolean;
   error: Error | null;
+}
+
+function saveErrorToStorage(error: Error, info?: React.ErrorInfo) {
+  try {
+    const errors = JSON.parse(localStorage.getItem('app_errors') || '[]');
+    errors.push({
+      timestamp: new Date().toISOString(),
+      message: error.message,
+      stack: error.stack,
+      componentStack: info?.componentStack,
+      url: window.location.href,
+      userAgent: navigator.userAgent,
+    });
+    if (errors.length > 50) errors.shift();
+    localStorage.setItem('app_errors', JSON.stringify(errors));
+  } catch {
+    // localStorage lleno o corrupto — ignorar
+  }
 }
 
 export default class ErrorBoundary extends Component<Props, State> {
@@ -21,7 +39,7 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error('[ErrorBoundary] Error capturado:', error, info);
+    saveErrorToStorage(error, info);
   }
 
   render() {

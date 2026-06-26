@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Sparkles, Loader2, Eye, EyeOff, ChevronDown } from 'lucide-react';
 import { Button } from '../components/ui/button';
@@ -33,8 +33,25 @@ export default function Register() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [acceptTerms, setAcceptTerms] = useState(false);
   const register = useAuthStore((state) => state.register);
   const navigate = useNavigate();
+
+  const passwordStrength = useMemo(() => {
+    if (!password) return { score: 0, label: '', color: '', width: '0%' };
+    let score = 0;
+    if (password.length >= 6) score += 1;
+    if (password.length >= 10) score += 1;
+    if (/[A-Z]/.test(password)) score += 1;
+    if (/[0-9]/.test(password)) score += 1;
+    if (/[^A-Za-z0-9]/.test(password)) score += 1;
+
+    if (score <= 1) return { score, label: 'Débil', color: 'bg-danger', width: '20%' };
+    if (score <= 2) return { score, label: 'Débil', color: 'bg-danger', width: '40%' };
+    if (score <= 3) return { score, label: 'Media', color: 'bg-warning', width: '60%' };
+    if (score === 4) return { score, label: 'Fuerte', color: 'bg-success', width: '80%' };
+    return { score, label: 'Muy fuerte', color: 'bg-success', width: '100%' };
+  }, [password]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,6 +66,12 @@ export default function Register() {
 
     if (password !== confirmPassword) {
       setError('Las contraseñas no coinciden');
+      setIsLoading(false);
+      return;
+    }
+
+    if (!acceptTerms) {
+      setError('Debes aceptar los términos y condiciones');
       setIsLoading(false);
       return;
     }
@@ -200,6 +223,16 @@ export default function Register() {
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
+              {password && (
+                <div className="mt-2 space-y-1">
+                  <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-surface-hover">
+                    <div className={`h-full rounded-full transition-all duration-300 ${passwordStrength.color}`} style={{ width: passwordStrength.width }} />
+                  </div>
+                  <p className={`text-xs ${passwordStrength.score <= 2 ? 'text-danger' : passwordStrength.score <= 3 ? 'text-warning' : 'text-success'}`}>
+                    {passwordStrength.label}
+                  </p>
+                </div>
+              )}
             </div>
             <div>
               <label htmlFor="confirmPassword" className="block text-sm font-medium text-text-secondary mb-1">
@@ -225,6 +258,25 @@ export default function Register() {
               </div>
             </div>
           </div>
+
+          <label className="flex items-start gap-2 cursor-pointer group">
+            <input
+              type="checkbox"
+              checked={acceptTerms}
+              onChange={(e) => setAcceptTerms(e.target.checked)}
+              className="mt-1 h-4 w-4 shrink-0 rounded border-border bg-bg text-primary focus:ring-primary cursor-pointer"
+            />
+            <span className="text-xs text-text-secondary group-hover:text-text transition-colors">
+              Acepto los{' '}
+              <a href="/terms" target="_blank" className="text-primary hover:underline" onClick={(e) => e.stopPropagation()}>
+                Términos y Condiciones
+              </a>{' '}
+              y la{' '}
+              <a href="/privacy" target="_blank" className="text-primary hover:underline" onClick={(e) => e.stopPropagation()}>
+                Política de Privacidad
+              </a>
+            </span>
+          </label>
 
           <div className="flex justify-center">
             <Button type="submit" className="px-8" disabled={isLoading}>
