@@ -189,16 +189,22 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     // === OPTIMIZACIÓN OFFLINE ===
     // Si no hay conexión, restaurar sesión guardada inmediatamente sin timeout
     if (!navigator.onLine) {
-      logger.info('📴 Modo offline — restaurando sesión guardada');
+      logger.info('📴 Modo offline — restaurando sesión guardada', { 
+        hasSavedUserData: !!savedUserData,
+        hasSavedCredentials: !!savedCredentials
+      });
       if (savedUserData) {
         try {
           const userData = JSON.parse(savedUserData);
           set({ user: userData, isAuthenticated: true, isLoading: false });
+          logger.info('✅ Sesión restaurada offline', { email: userData.email });
         } catch {
           set({ isLoading: false });
+          logger.warn('Error parseando savedUserData');
         }
       } else {
         set({ isLoading: false });
+        logger.info('❌ No hay savedUserData para restaurar');
       }
       _isInitializing = false;
       return;
@@ -301,6 +307,21 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
           }
         } catch {
           set({ isLoading: false });
+        }
+      } else if (err?.message?.includes('fetch') || err?.message?.includes('network') || err?.message?.includes('NetworkError') || err?.name === 'TypeError') {
+        // Error de red (posible caso donde navigator.onLine = true pero no hay internet real)
+        logger.warn('Error de red en getSession, restaurando sesión guardada:', err.message);
+        if (savedUserData) {
+          try {
+            const userData = JSON.parse(savedUserData);
+            set({ user: userData, isAuthenticated: true, isLoading: false });
+            logger.info('✅ Sesión restaurada tras error de red', { email: userData.email });
+          } catch {
+            set({ isLoading: false });
+          }
+        } else {
+          set({ isLoading: false });
+          logger.info('❌ No hay savedUserData para restaurar tras error de red');
         }
       } else if (import.meta.env.DEV) {
         logger.error('Error en initialize:', err);

@@ -1,5 +1,5 @@
 import { Package, ShoppingCart, ChefHat, Sparkles, ChevronDown, CheckCircle2, Loader2, Users, Instagram, Facebook, Phone, MapPin, DollarSign, Headphones, MessageCircle, Menu, X, LogIn, UserPlus, ClipboardList, TrendingUp, Store, BarChart3, Database, Activity, Star, Quote, Play } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
@@ -9,10 +9,29 @@ import TutorialPromptModal, { shouldShowTutorialPrompt } from '../components/Tut
 import { supabase } from '../lib/supabase';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { useAuthStore } from '../store/authStore';
 
 gsap.registerPlugin(ScrollTrigger);
 
 export default function Landing() {
+  const navigate = useNavigate();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuthStore();
+
+  // Redirigir si ya está autenticado
+  useEffect(() => {
+    if (!authLoading && isAuthenticated && user) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, user, authLoading, navigate]);
+
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-bg">
+        <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showTutorialPrompt, setShowTutorialPrompt] = useState(() => shouldShowTutorialPrompt());

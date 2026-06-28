@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { useAuthStore } from '../store/authStore';
@@ -14,7 +14,22 @@ export default function Login() {
   const [subscriptionExpired, setSubscriptionExpired] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
-  const { login, user } = useAuthStore();
+  const { login, user, isAuthenticated, isLoading: authLoading } = useAuthStore();
+
+  // Redirigir si ya está autenticado (restauración de sesión offline)
+  useEffect(() => {
+    if (!authLoading && isAuthenticated && user) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, user, authLoading, navigate]);
+
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-bg">
+        <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
