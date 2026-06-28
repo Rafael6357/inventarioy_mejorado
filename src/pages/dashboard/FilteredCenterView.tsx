@@ -122,7 +122,7 @@ export default function FilteredCenterView() {
         <div>
           <h1 className="text-2xl font-bold text-text">Centro Filtrado</h1>
           <p className="text-sm text-text-secondary">
-            Búsqueda avanzada y filtros combinados para tu inventario
+            Búsqueda avanzada y filtros combinados para su inventario
           </p>
         </div>
         <Button

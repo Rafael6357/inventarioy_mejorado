@@ -229,7 +229,7 @@ export default function InventoryView() {
     if (lastMovementForProduct && newDateMs < new Date(lastMovementForProduct.date).getTime()) {
       const proceed = await new Promise<boolean>((resolve) => {
         toast.warning(
-          'Estás registrando un movimiento con hora anterior al último registrado. ¿Continuar?',
+          'Está registrando un movimiento con hora anterior al último registrado. ¿Continuar?',
           {
             duration: 15000,
             action: {

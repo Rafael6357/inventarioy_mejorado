@@ -50,7 +50,7 @@ export default function ResetPassword() {
         ? 'El enlace ha expirado. Solicita uno nuevo.'
         : updateError.message === 'Invalid token'
         ? 'El enlace no es válido. Solicita uno nuevo.'
-        : 'Error al actualizar la contraseña. Intenta de nuevo.'
+        : 'Error al actualizar la contraseña. Intente de nuevo.'
       );
       return;
     }
@@ -119,7 +119,7 @@ export default function ResetPassword() {
           </div>
           <h2 className="text-2xl font-bold text-text">Nueva contraseña</h2>
           <p className="mt-2 text-sm text-text-secondary">
-            Ingresa tu nueva contraseña
+            Ingrese su nueva contraseña
           </p>
         </div>
 

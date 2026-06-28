@@ -1,13 +1,30 @@
 import { useState, useEffect } from 'react';
-import { WifiOff, CloudOff, RefreshCw, ArrowRight } from 'lucide-react';
+import { WifiOff, CloudOff, RefreshCw, ArrowRight, Clock } from 'lucide-react';
 import { syncEngine } from '../lib/syncEngine';
 import { useDatabaseStore } from '../store/dbStore';
 import SyncQueueModal from './SyncQueueModal';
+
+function formatLastSynced(isoString: string | null): string {
+  if (!isoString) return 'Nunca';
+  const date = new Date(isoString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return 'Justo ahora';
+  if (diffMins < 60) return `Hace ${diffMins} min`;
+  if (diffHours < 24) return `Hace ${diffHours} h`;
+  if (diffDays < 7) return `Hace ${diffDays} día${diffDays !== 1 ? 's' : ''}`;
+  return date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
 
 export default function OfflineBanner() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [syncActive, setSyncActive] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [lastSynced, setLastSynced] = useState<string | null>(() => localStorage.getItem('lastSyncedAt'));
   const syncQueueCount = useDatabaseStore((s) => s.syncQueueCount);
   const refreshSyncQueueCount = useDatabaseStore((s) => s.refreshSyncQueueCount);
 
@@ -16,9 +33,18 @@ export default function OfflineBanner() {
     const goOffline = () => setIsOnline(false);
     window.addEventListener('online', goOnline);
     window.addEventListener('offline', goOffline);
+    // Listen for storage changes (updates from other tabs or fetchAll)
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'lastSyncedAt') setLastSynced(e.newValue);
+    };
+    window.addEventListener('storage', onStorage);
+    // Also poll periodically in case storage event doesn't fire in same tab
+    const interval = setInterval(() => setLastSynced(localStorage.getItem('lastSyncedAt')), 5000);
     return () => {
       window.removeEventListener('online', goOnline);
       window.removeEventListener('offline', goOffline);
+      window.removeEventListener('storage', onStorage);
+      clearInterval(interval);
     };
   }, [refreshSyncQueueCount]);
 
@@ -84,7 +110,14 @@ export default function OfflineBanner() {
             )}
             <span className={`text-sm ${textColor}`}>{message}</span>
           </div>
-          {syncQueueCount > 0 && (
+          <div className="flex items-center gap-4">
+            {lastSynced && (
+              <span className="flex items-center gap-1.5 text-xs text-text-muted">
+                <Clock className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
+                Última sincronización: {formatLastSynced(lastSynced)}
+              </span>
+            )}
+            {syncQueueCount > 0 && (
             <button
               onClick={() => setShowModal(true)}
               aria-label="Abrir detalles de sincronización"
@@ -94,6 +127,7 @@ export default function OfflineBanner() {
               <ArrowRight className="h-3 w-3" aria-hidden="true" />
             </button>
           )}
+        </div>
         </div>
       </div>
 

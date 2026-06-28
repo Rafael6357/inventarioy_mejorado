@@ -149,7 +149,7 @@ export default function MenuView() {
         <div className="text-center px-4 relative z-10">
           <AlertCircle className="h-12 w-12 text-danger mx-auto mb-3 drop-shadow-[0_0_10px_rgba(239,68,68,0.5)]" />
           <p className="text-text font-medium">{error}</p>
-          <p className="text-text-secondary text-sm mt-2">Escanea el código QR de tu negocio para ver el menú.</p>
+          <p className="text-text-secondary text-sm mt-2">Escanea el código QR de su negocio para ver el menú.</p>
         </div>
       </div>
     );

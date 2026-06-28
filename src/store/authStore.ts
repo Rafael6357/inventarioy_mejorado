@@ -145,13 +145,13 @@ const translateError = (message: string): string => {
     return 'Contraseña incorrecta';
   }
   if (message.includes('not confirmed')) {
-    return 'Correo electrónico no confirmado. Revisa tu bandeja de entrada';
+    return 'Correo electrónico no confirmado. Revise su bandeja de entrada';
   }
   if (message.includes('rate limit') || message.includes('too many')) {
     return 'Demasiadas solicitudes. Por favor, espera un momento';
   }
   if (message.includes('network') || message.includes('fetch')) {
-    return 'Error de conexión. Verifica tu internet';
+    return 'Error de conexión. Verifique su internet';
   }
 
   return message;
@@ -184,6 +184,24 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       }
     } else {
       set({ isLoading: true });
+    }
+
+    // === OPTIMIZACIÓN OFFLINE ===
+    // Si no hay conexión, restaurar sesión guardada inmediatamente sin timeout
+    if (!navigator.onLine) {
+      logger.info('📴 Modo offline — restaurando sesión guardada');
+      if (savedUserData) {
+        try {
+          const userData = JSON.parse(savedUserData);
+          set({ user: userData, isAuthenticated: true, isLoading: false });
+        } catch {
+          set({ isLoading: false });
+        }
+      } else {
+        set({ isLoading: false });
+      }
+      _isInitializing = false;
+      return;
     }
 
     try {
@@ -414,7 +432,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       if (!userLoaded) {
         localStorage.removeItem('saved_credentials');
         localStorage.removeItem('saved_email');
-        return { success: false, error: 'Error al cargar los datos del usuario. Intenta de nuevo.' };
+        return { success: false, error: 'Error al cargar los datos del usuario. Intente de nuevo.' };
       }
       return { success: true };
     }
@@ -465,7 +483,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   forgotPassword: async (email: string) => {
     const isOnline = navigator.onLine && await checkRealInternetConnection();
     if (!isOnline) {
-      return { success: false, error: 'Sin conexión a internet. Intenta cuando tengas internet.' };
+      return { success: false, error: 'Sin conexión a internet. Intente cuando tenga internet.' };
     }
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {

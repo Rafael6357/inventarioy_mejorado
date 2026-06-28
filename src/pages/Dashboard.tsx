@@ -34,6 +34,7 @@ import SyncStatus from '../components/SyncStatus';
 import OfflineBanner from '../components/OfflineBanner';
 import PinModal from '../components/PinModal';
 import ThemeToggle from '../components/ThemeToggle';
+import InstallButton from '../components/InstallButton';
 import Breadcrumbs from '../components/Breadcrumbs';
 const StockView = lazy(() => import('./dashboard/StockView'));
 const InventoryView = lazy(() => import('./dashboard/InventoryView'));
@@ -459,6 +460,9 @@ export default function Dashboard() {
             )}
             <div className="mb-2">
               <ThemeToggle />
+            </div>
+            <div className="mb-2">
+              <InstallButton />
             </div>
             <button
               onClick={handleLogout}

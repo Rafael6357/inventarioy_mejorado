@@ -99,7 +99,7 @@ export default function AccessPage() {
 
       if (pinsError) {
         console.error('Error loading pins:', pinsError);
-        toast.error('Error al cargar los PINs. Intenta de nuevo.');
+        toast.error('Error al cargar los PINs. Intente de nuevo.');
         setIsLoading(false);
         return;
       }
@@ -130,12 +130,12 @@ export default function AccessPage() {
         toast.success('¡Acceso exitoso!');
         navigate('/dashboard');
       } else {
-        toast.error('PIN incorrecto. Verifica tu PIN e intenta de nuevo.');
+        toast.error('PIN incorrecto. Verifique su PIN e intente de nuevo.');
         setPin('');
       }
     } catch (err) {
       console.error('Error verifying PIN:', err);
-      toast.error('Error al verificar el PIN. Intenta de nuevo.');
+      toast.error('Error al verificar el PIN. Intente de nuevo.');
     } finally {
       setIsLoading(false);
     }
@@ -161,7 +161,7 @@ export default function AccessPage() {
             Acceso por PIN
           </h1>
           <p className="text-text-secondary text-center mb-6">
-            Ingresa el código de tu negocio y tu PIN para acceder
+            Ingrese el código de su negocio y su PIN para acceder
           </p>
 
           <div className="space-y-4">

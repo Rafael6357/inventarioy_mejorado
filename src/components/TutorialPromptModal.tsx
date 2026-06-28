@@ -61,7 +61,7 @@ export default function TutorialPromptModal({ isOpen, onClose, onAccept }: Tutor
               ¿Quieres aprender a usar la App?
             </h2>
             <p className="text-sm text-text-secondary mt-1">
-              Descubre cómo sacarle el máximo rendimiento a tu negocio en Cuba con InventarioY
+              Descubra cómo sacarle el máximo rendimiento a su negocio en Cuba con InventarioY
             </p>
           </div>
         </div>

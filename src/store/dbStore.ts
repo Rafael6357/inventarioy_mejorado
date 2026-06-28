@@ -750,6 +750,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
         isLoading: false,
       });
       logger.info('✅ Datos cargados completamente');
+      localStorage.setItem('lastSyncedAt', new Date().toISOString());
       cacheAllData({
         products: productsRes.data || [],
         movements: movementsRes.data || [],

@@ -83,7 +83,7 @@ export function Modal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
       <div
         ref={cardRef}
         role="dialog"
@@ -91,7 +91,7 @@ export function Modal({
         aria-label={title || undefined}
         aria-describedby={description ? 'modal-description' : undefined}
         className={cn(
-          "w-full rounded-2xl border border-border/50 bg-surface p-6 shadow-2xl mx-4",
+          "w-full rounded-2xl border border-border/50 bg-surface p-6 shadow-2xl mx-4 max-h-[90vh] overflow-y-auto",
           sizeClasses[size],
           className
         )}

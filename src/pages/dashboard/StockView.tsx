@@ -555,7 +555,7 @@ export default function StockView() {
               {filteredProducts.length === 0 ? (
                 <tr>
                   <td colSpan={13} className="px-4 py-8">
-                    <EmptyState icon={Package} title="No hay productos" description={products.length === 0 ? 'Agrega tu primer producto desde la sección Inventario.' : 'Ningún producto coincide con los filtros aplicados.'} />
+                    <EmptyState icon={Package} title="No hay productos" description={products.length === 0 ? 'Agregue su primer producto desde la sección Inventario.' : 'Ningún producto coincide con los filtros aplicados.'} />
                   </td>
                 </tr>
               ) : (
@@ -716,8 +716,8 @@ export default function StockView() {
               </div>
               <h2 className="text-xl font-bold text-text">¿Eliminar producto?</h2>
               <p className="mt-2 text-sm text-text-secondary">
-                Estás a punto de eliminar <span className="font-bold text-text">"{productToDelete.name}"</span>. 
-                El producto se ocultará del inventario actual y del punto de venta, pero se mantendrá en el historial para no afectar tus reportes pasados.
+                Está a punto de eliminar <span className="font-bold text-text">"{productToDelete.name}"</span>. 
+                El producto se ocultará del inventario actual y del punto de venta, pero se mantendrá en el historial para no afectar sus reportes pasados.
               </p>
             </div>
 

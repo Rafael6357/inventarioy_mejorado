@@ -31,7 +31,7 @@ export default function PhoneModal({ isOpen, onClose }: PhoneModalProps) {
 
   const handleSave = async () => {
     if (!phone.trim()) {
-      toast.error('Por favor ingresa un número de teléfono');
+      toast.error('Por favor ingrese un número de teléfono');
       return;
     }
 
@@ -86,8 +86,8 @@ export default function PhoneModal({ isOpen, onClose }: PhoneModalProps) {
 
         <div className="p-6 space-y-4">
           <p className="text-sm text-text-secondary leading-relaxed">
-            Para mejorar la comunicación y recibir notificaciones importantes sobre tu negocio, 
-            por favor ingresa tu número de teléfono.
+            Para mejorar la comunicación y recibir notificaciones importantes sobre su negocio, 
+            por favor ingrese su número de teléfono.
           </p>
           
           <div>

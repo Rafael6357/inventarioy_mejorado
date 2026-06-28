@@ -168,11 +168,11 @@ export default function SettingsView() {
       if (error) {
         let errorMessage = 'Error al guardar la configuración';
         if (error.message.includes('row-level security')) {
-          errorMessage = 'No tienes permisos para modificar estos datos';
+          errorMessage = 'No tiene permisos para modificar estos datos';
         } else if (error.message.includes('duplicate')) {
           errorMessage = 'Ya existe un registro con estos datos';
         } else if (error.message.includes('network') || error.message.includes('fetch')) {
-          errorMessage = 'Error de conexión. Verifica tu internet';
+          errorMessage = 'Error de conexión. Verifique su internet';
         }
         console.error('Error guardado:', errorMessage, error);
         toast.error(errorMessage);
@@ -212,7 +212,7 @@ export default function SettingsView() {
         <div>
           <h1 className="text-2xl font-bold text-text">Configuración</h1>
           <p className="text-sm text-text-secondary">
-            Administra tu cuenta, preferencias y sistema
+            Administre su cuenta, preferencias y sistema
           </p>
         </div>
 

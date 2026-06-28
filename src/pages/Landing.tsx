@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { Button } from '../components/ui/button';
+import InstallButton from '../components/InstallButton';
 import InventarioYLogo from '../components/InventarioYLogo';
 import TutorialPromptModal, { shouldShowTutorialPrompt } from '../components/TutorialPromptModal';
 import { supabase } from '../lib/supabase';
@@ -99,6 +100,7 @@ export default function Landing() {
           </button>
 
           <div className="hidden md:flex items-center gap-4">
+            <InstallButton />
             <Link to="/login">
               <Button variant="outline" className="hidden sm:inline-flex">Acceder</Button>
             </Link>
@@ -172,10 +174,10 @@ export default function Landing() {
                 7 Días de Prueba Gratis
               </div>
               <h1 className="hero-fade text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
-                Gestiona tu inventario <span className="text-gradient">fácil y potente</span>
+                Gestione su inventario <span className="text-gradient">fácil y potente</span>
               </h1>
               <p className="hero-fade mx-auto max-w-2xl text-lg text-text-secondary sm:text-xl">
-                La solución integral para restaurantes, cafeterías y comercios en Cuba. Controla tu stock, ventas, recetas y personal en un solo lugar.
+                La solución integral para restaurantes, cafeterías y comercios en Cuba. Controle su stock, ventas, recetas y personal en un solo lugar.
               </p>
               <div className="hero-fade flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 pt-2 sm:pt-4">
                 <Link to="/register">
@@ -295,7 +297,7 @@ export default function Landing() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-text">Privacidad garantizada</p>
-                  <p className="text-xs text-text-secondary">Tus datos son tuyos</p>
+                  <p className="text-xs text-text-secondary">Sus datos son suyos</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 fade-up" style={{ transitionDelay: '200ms' }}>
@@ -342,7 +344,7 @@ export default function Landing() {
         <section id="features" className="py-24 bg-surface/30">
           <div className="container mx-auto px-4">
             <div className="text-center mb-16 fade-up">
-              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">Todo lo que necesitas para crecer</h2>
+              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">Todo lo que necesita para crecer</h2>
               <p className="text-text-secondary max-w-2xl mx-auto">Herramientas profesionales diseñadas específicamente para PYMES, restaurantes y comercios.</p>
             </div>
             
@@ -425,7 +427,7 @@ export default function Landing() {
           <div className="container mx-auto px-4">
             <div className="text-center mb-16 fade-up">
               <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">Lo que dicen nuestros usuarios</h2>
-              <p className="text-text-secondary max-w-2xl mx-auto">Dueños de negocios como el tuyo ya confían en InventarioY</p>
+              <p className="text-text-secondary max-w-2xl mx-auto">Dueños de negocios como el suyo ya confían en InventarioY</p>
             </div>
             <div className="grid gap-6 md:grid-cols-3">
               {[
@@ -562,19 +564,19 @@ export default function Landing() {
               {[
                 {
                   q: "¿Cómo funciona la prueba gratis?",
-                  a: "Al registrarte, obtienes automáticamente 7 días de acceso completo a todas las funciones del Plan Profesional."
+                  a: "Al registrarse, obtiene automáticamente 7 días de acceso completo a todas las funciones del Plan Profesional."
                 },
                 {
                   q: "¿Necesito instalar algún software?",
-                  a: "No, InventarioY es 100% basado en la nube. Puedes acceder desde cualquier dispositivo con conexión a internet."
+                  a: "No, InventarioY es 100% basado en la nube. Puede acceder desde cualquier dispositivo con conexión a internet."
                 },
                 {
                   q: "¿Puedo tener múltiples usuarios?",
-                  a: "Sí, puedes compartir tus credenciales con tu gerente o encargado. El sistema está diseñado para que el dueño y su equipo de confianza lo utilicen."
+                  a: "Sí, puede compartir sus credenciales con su gerente o encargado. El sistema está diseñado para que el dueño y su equipo de confianza lo utilicen."
                 },
                 {
                   q: "¿Cómo se realiza el pago?",
-                  a: "El pago se realiza de forma manual y directa con nuestro equipo local. Una vez realizado el pago, activaremos tu suscripción en el sistema."
+                  a: "El pago se realiza de forma manual y directa con nuestro equipo local. Una vez realizado el pago, activaremos su suscripción en el sistema."
                 }
               ].map((faq, idx) => {
                 const isOpen = openFaq === idx;

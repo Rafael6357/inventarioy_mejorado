@@ -20,7 +20,7 @@ export default function ForgotPassword() {
     setIsLoading(true);
 
     if (!email) {
-      setError('Ingresa tu correo electrónico');
+      setError('Ingrese su correo electrónico');
       setIsLoading(false);
       return;
     }
@@ -35,7 +35,7 @@ export default function ForgotPassword() {
 
     setIsLoading(false);
     setSuccess(true);
-    toast.success('Si el correo existe, recibirás un enlace para restablecer tu contraseña');
+    toast.success('Si el correo existe, recibirá un enlace para restablecer su contraseña');
   };
 
   return (
@@ -49,7 +49,7 @@ export default function ForgotPassword() {
           </div>
           <h2 className="text-2xl font-bold text-text">Restablecer contraseña</h2>
           <p className="mt-2 text-sm text-text-secondary">
-            Ingresa tu correo y te enviaremos un enlace para crear una nueva contraseña
+            Ingrese su correo y le enviaremos un enlace para crear una nueva contraseña
           </p>
         </div>
 
@@ -105,11 +105,11 @@ export default function ForgotPassword() {
                 ¡Correo enviado!
               </p>
               <p className="text-sm text-text-secondary">
-                Revisa tu bandeja de entrada (y spam) en <strong>{email}</strong>. El enlace expira en 1 hora.
+                Revise su bandeja de entrada (y spam) en <strong>{email}</strong>. El enlace expira en 1 hora.
               </p>
             </div>
             <p className="text-sm text-text-secondary">
-              ¿No recibiste el correo? <Link to="/forgot-password" className="font-medium text-primary hover:underline">Intenta de nuevo</Link>
+              ¿No recibió el correo? <Link to="/forgot-password" className="font-medium text-primary hover:underline">Intente de nuevo</Link>
             </p>
           </div>
         )}

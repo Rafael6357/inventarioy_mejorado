@@ -61,7 +61,7 @@ export default function Login() {
           </div>
           <h2 className="text-2xl font-bold text-text">Bienvenido de nuevo</h2>
           <p className="mt-2 text-sm text-text-secondary">
-            Ingresa a tu cuenta para gestionar tu inventario
+            Ingrese a su cuenta para gestionar su inventario
           </p>
         </div>
 
@@ -75,8 +75,8 @@ export default function Login() {
           {subscriptionExpired && (
             <div className="rounded-xl bg-warning/10 p-4 border border-warning/30">
               <p className="text-sm text-danger font-medium mb-3">
-                Tu período de prueba ha vencido. 
-                Contacta al +53 54523884 para renovar tu Plan Profesional y seguir usando la app.
+                Su período de prueba ha vencido. 
+                Contacte al +53 54523884 para renovar su Plan Profesional y seguir usando la app.
               </p>
               <div className="flex flex-col gap-2">
                 <a 
@@ -152,7 +152,7 @@ export default function Login() {
 
           <p className="text-center text-sm text-text-secondary">
             <Link to="/forgot-password" className="font-medium text-primary hover:underline">
-              ¿Olvidaste tu contraseña?
+              ¿Olvidó su contraseña?
             </Link>
           </p>
         </form>
@@ -164,7 +164,7 @@ export default function Login() {
         </p>
 
         <p className="text-center text-sm text-text-secondary">
-          ¿No tienes una cuenta?{' '}
+          ¿No tiene una cuenta?{' '}
           <Link to="/register" className="font-medium text-primary hover:underline">
             Regístrate aquí
           </Link>

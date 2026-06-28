@@ -81,7 +81,7 @@ export default function Register() {
     setIsLoading(false);
 
     if (result.success) {
-      toast.success('Revisa tu correo electrónico para confirmar tu cuenta antes de iniciar sesión');
+      toast.success('Revise su correo electrónico para confirmar su cuenta antes de iniciar sesión');
       navigate('/login');
     } else {
       setError(result.error || 'Error al registrar');
@@ -95,7 +95,7 @@ export default function Register() {
           <div className="mb-4">
             <InventarioYLogo size="lg" variant="image" />
           </div>
-          <h2 className="text-2xl font-bold text-text text-gradient hero-glow">Crea tu cuenta</h2>
+          <h2 className="text-2xl font-bold text-text text-gradient hero-glow">Cree su cuenta</h2>
           <div className="mt-2 inline-flex items-center rounded-full border border-primary/50 bg-primary/10 px-3 py-1 text-xs font-medium text-primary shadow-[0_0_15px_rgba(255,193,7,0.2)]">
             <Sparkles className="mr-2 h-3 w-3 drop-shadow-[0_0_5px_rgba(255,193,7,0.8)]" />
             Empieza con 7 días gratis
@@ -112,7 +112,7 @@ export default function Register() {
           <div className="space-y-4">
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-text-secondary mb-1">
-                Tu Nombre
+                Su Nombre
               </label>
               <input
                 id="name"
@@ -291,7 +291,7 @@ export default function Register() {
         </form>
 
         <p className="text-center text-sm text-text-secondary">
-          ¿Ya tienes una cuenta?{' '}
+          ¿Ya tiene una cuenta?{' '}
           <Link to="/login" className="font-medium text-primary hover:underline">
             Inicia sesión
           </Link>

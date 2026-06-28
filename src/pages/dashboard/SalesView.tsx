@@ -235,7 +235,7 @@ export default function SalesView() {
       }
     } catch (error: any) {
       console.error('Error en operación:', error);
-      toast.error('Error de conexión. Intenta de nuevo.');
+                    toast.error('Error de conexión. Intente de nuevo.');
     } finally {
       setLoading(false);
     }
@@ -652,7 +652,7 @@ export default function SalesView() {
       setPaymentError(null);
       setPaymentWarning(null);
       setSalePaymentMethod({ efectivo: 0, transferencia: 0, usd: 0, eur: 0 });
-      toast.error('Tiempo de espera agotado. Intenta de nuevo.');
+      toast.error('Tiempo de espera agotado. Intente de nuevo.');
     }, 15000);
 
     try {
@@ -1782,7 +1782,7 @@ setShowTicket(true);
                     }
                   } catch (error: any) {
                     console.error('Error:', error);
-                    toast.error('Error de conexión. Intenta de nuevo.');
+      toast.error('Error de conexión. Intente de nuevo.');
                   } finally {
                     setIsCreatingPending(false);
                   }

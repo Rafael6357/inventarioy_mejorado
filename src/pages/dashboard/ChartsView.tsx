@@ -62,7 +62,7 @@ export default function ChartsView() {
       <div>
         <h1 className="text-2xl font-bold text-text">Gráficos y Visualizaciones</h1>
         <p className="text-sm text-text-secondary">
-          Representación visual del rendimiento de tu negocio
+          Representación visual del rendimiento de su negocio
         </p>
       </div>
 

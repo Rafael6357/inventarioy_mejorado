@@ -183,7 +183,7 @@ export default function UsersView() {
         || error?.message?.includes('timeout')
         || error?.message?.includes('Timeout');
       if (isTimeout) {
-        toast.error('La consulta tardó demasiado. Intenta de nuevo.');
+        toast.error('La consulta tardó demasiado. Intente de nuevo.');
       } else {
         console.error('Error fetching profiles:', error);
         toast.error('Error al cargar los usuarios');
@@ -225,7 +225,7 @@ export default function UsersView() {
         || error?.message?.includes('timeout')
         || error?.message?.includes('Timeout');
       if (isTimeout) {
-        toast.error('La consulta tardó demasiado. Intenta de nuevo.');
+        toast.error('La consulta tardó demasiado. Intente de nuevo.');
       } else {
         console.error('Error fetching payments:', error);
         toast.error('Error al cargar los pagos');
@@ -449,7 +449,7 @@ Además, lo invitamos a ver nuestro tutorial en YouTube donde explicamos paso a 
 
   const handleDeletePayment = async (paymentId: string) => {
     if (!isMountedRef.current) return;
-    const confirmed = window.confirm('¿Estás seguro de eliminar este registro de pago?');
+    const confirmed = window.confirm('¿Está seguro de eliminar este registro de pago?');
     if (!confirmed) return;
 
     const { error } = await supabase
@@ -544,7 +544,7 @@ Además, lo invitamos a ver nuestro tutorial en YouTube donde explicamos paso a 
         <div className="text-center">
           <ShieldCheck className="mx-auto h-12 w-12 text-danger mb-4" />
           <h2 className="text-2xl font-bold text-text">Acceso Denegado</h2>
-          <p className="mt-2 text-text-secondary">No tienes permisos para ver este módulo.</p>
+          <p className="mt-2 text-text-secondary">No tiene permisos para ver este módulo.</p>
         </div>
       </div>
     );
@@ -883,7 +883,7 @@ Además, lo invitamos a ver nuestro tutorial en YouTube donde explicamos paso a 
                         setConfirmDialog({
                           show: true,
                           title: 'Cancelar Suscripción',
-                          message: '¿Estás seguro de cancelar la suscripción de este usuario? Esta acción no se puede deshacer.',
+                            message: '¿Está seguro de cancelar la suscripción de este usuario? Esta acción no se puede deshacer.',
                           confirmText: 'Sí, cancelar',
                           cancelText: 'No',
                           variant: 'danger',

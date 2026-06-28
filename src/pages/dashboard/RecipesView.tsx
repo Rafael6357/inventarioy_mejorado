@@ -396,7 +396,7 @@ export default function RecipesView() {
 
           <div className="space-y-4">
             {filteredRecipes.length === 0 ? (
-              <EmptyState icon={UtensilsCrossed} title="No hay recetas" description={recipes.length === 0 ? 'Crea tu primera receta combinando productos del inventario.' : 'Ninguna receta coincide con la búsqueda.'} />
+              <EmptyState icon={UtensilsCrossed} title="No hay recetas" description={recipes.length === 0 ? 'Cree su primera receta combinando productos del inventario.' : 'Ninguna receta coincide con la búsqueda.'} />
             ) : (
               filteredRecipes.map(recipe => {
                 // Calculate cost for display

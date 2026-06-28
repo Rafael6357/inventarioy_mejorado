@@ -50,7 +50,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             <AlertTriangle className="mx-auto h-12 w-12 text-danger mb-4" />
             <h2 className="text-2xl font-bold text-text mb-2">Algo salió mal</h2>
             <p className="text-text-secondary mb-6">
-              Ocurrió un error inesperado. Por favor, intenta recargar la página.
+              Ocurrió un error inesperado. Por favor, intente recargar la página.
             </p>
             <button
               onClick={() => window.location.reload()}
