@@ -33,6 +33,8 @@ import SubscriptionBanner from '../components/SubscriptionBanner';
 import SyncStatus from '../components/SyncStatus';
 import OfflineBanner from '../components/OfflineBanner';
 import PinModal from '../components/PinModal';
+import ThemeToggle from '../components/ThemeToggle';
+import Breadcrumbs from '../components/Breadcrumbs';
 const StockView = lazy(() => import('./dashboard/StockView'));
 const InventoryView = lazy(() => import('./dashboard/InventoryView'));
 const TransitView = lazy(() => import('./dashboard/TransitView'));
@@ -343,6 +345,12 @@ export default function Dashboard() {
 
   return (
     <div className={`flex h-screen overflow-hidden bg-bg ${bannerPadding}`}>
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:px-4 focus:py-2 focus:bg-primary focus:text-bg focus:rounded-lg focus:text-sm focus:font-medium focus:outline-none"
+      >
+        Saltar al contenido
+      </a>
       <SubscriptionBanner />
       <OfflineBanner />
       {isMobileMenuOpen && (
@@ -449,6 +457,9 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
+            <div className="mb-2">
+              <ThemeToggle />
+            </div>
             <button
               onClick={handleLogout}
               className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-danger hover:bg-danger/10 transition-colors"
@@ -474,7 +485,7 @@ export default function Dashboard() {
           </button>
         </header>
 
-        <main className="flex-1 overflow-y-auto bg-transparent p-4 md:p-6 lg:p-8">
+        <main id="main-content" className="flex-1 overflow-y-auto bg-transparent p-4 md:p-6 lg:p-8">
           {!user?.phone && (
             <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -490,6 +501,7 @@ export default function Dashboard() {
             </div>
           )}
           <div className="w-full">
+            <Breadcrumbs />
             <Suspense fallback={<div className="p-6"><TableSkeleton rows={8} cols={6} /></div>}>
               <Routes>
                 <Route path="/" element={<StockView />} />

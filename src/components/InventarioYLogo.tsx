@@ -19,6 +19,7 @@ export default function InventarioY({ className = '', size = 'md', variant = 'te
       <img
         src="/logo.svg"
         alt="InventarioY"
+        loading="lazy"
         className={`${sizeClasses[size].image} ${className}`}
       />
     );
