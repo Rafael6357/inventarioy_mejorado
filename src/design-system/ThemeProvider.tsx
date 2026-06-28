@@ -14,7 +14,6 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const user = useAuthStore(state => state.user);
-  const fetchUser = useAuthStore(state => state.fetchUser);
   
   const [theme, setThemeState] = useState<Theme>('system');
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('dark');
@@ -55,19 +54,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!user || theme === 'system') return;
-    const prefs = localStorage.getItem('theme-preference');
-    if (prefs && prefs === theme) {
-      supabase.from('profiles').update({ theme_preference: theme }).eq('id', user.id);
-      fetchUser();
-    }
-  }, [theme, user]);
+    supabase.from('profiles').update({ theme_preference: theme }).eq('id', user.id);
+  }, [theme]);
 
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);
     localStorage.setItem('theme-preference', newTheme);
     if (user) {
       supabase.from('profiles').update({ theme_preference: newTheme }).eq('id', user.id);
-      fetchUser();
     }
   };
 
