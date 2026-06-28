@@ -54,23 +54,13 @@ export default function Landing() {
     });
   }, []);
 
-  if (authLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-bg">
-        <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
   // Animaciones con GSAP ScrollTrigger
   useEffect(() => {
     const ctx = gsap.context(() => {
-      // Hero entrance: stagger in
       const heroTl = gsap.timeline({ defaults: { ease: 'power3.out' } });
       heroTl.fromTo('.hero-fade', { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.5, stagger: 0.15 });
       heroTl.from('.dashboard-mockup', { opacity: 0, y: 40, duration: 0.7, ease: 'expo.out' }, '-=0.15');
 
-      // Scroll reveals: each .fade-up animates once when scrolled into view
       document.querySelectorAll('.fade-up').forEach((el) => {
         ScrollTrigger.create({
           trigger: el,
@@ -85,6 +75,14 @@ export default function Landing() {
 
     return () => ctx.revert();
   }, []);
+
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-bg">
+        <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-bg text-text selection:bg-primary/30">
