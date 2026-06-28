@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from './authStore';
 import { toast } from 'sonner';
-import { cacheAllData, getCachedProducts, getCachedMovements, getCachedWarehouses, getCachedTransitItems, getCachedSales, getCachedRecipes, getCachedEmployees, getCachedCategories, getCachedPendingAccounts, getCachedDailyClosings, getCachedAccessPins, getCachedProductWarehouse, getSyncQueueCount, addToSyncQueue } from '../lib/dexieDb';
+import { db, cacheAllData, getCachedProducts, getCachedMovements, getCachedWarehouses, getCachedTransitItems, getCachedSales, getCachedRecipes, getCachedEmployees, getCachedCategories, getCachedPendingAccounts, getCachedDailyClosings, getCachedAccessPins, getCachedProductWarehouse, getSyncQueueCount, addToSyncQueue } from '../lib/dexieDb';
 import { syncEngine } from '../lib/syncEngine';
 import { isDateClosed } from '../lib/dateUtils';
 import { calcularNomina } from '../utils/payrollCalculations';
@@ -3828,6 +3828,166 @@ forceRefreshData: async () => {
   },
 }));
 
+async function replayPendingSyncQueue(set: any, get: any) {
+  const pendingItems = await db.syncQueue.where('status').equals('pending').toArray();
+  if (pendingItems.length === 0) return;
+
+  for (const item of pendingItems) {
+    const p = item.payload as any;
+    switch (item.operation) {
+      case 'addProduct':
+        if (p.product) {
+          set((state: any) => ({
+            products: state.products.some((x: any) => x.id === p.product.id) ? state.products : [p.product, ...state.products],
+            movements: p.movement && !state.movements.some((m: any) => m.id === p.movement.id) ? [p.movement, ...state.movements] : state.movements,
+          }));
+        }
+        break;
+      case 'updateProduct':
+        set((state: any) => ({
+          products: state.products.map((x: any) => x.id === p.id ? { ...x, ...p.updates } : x),
+        }));
+        break;
+      case 'deleteProduct':
+        set((state: any) => ({
+          products: state.products.filter((x: any) => x.id !== p.id),
+        }));
+        break;
+      case 'addMovement':
+        set((state: any) => ({
+          movements: state.movements.some((m: any) => m.id === p.id) ? state.movements : [p, ...state.movements],
+        }));
+        break;
+      case 'addSale':
+        if (p.sale) {
+          const saleWithItems = { ...p.sale, items: p.sale_items || [] };
+          set((state: any) => ({
+            sales: state.sales.some((s: any) => s.id === saleWithItems.id) ? state.sales : [saleWithItems, ...state.sales],
+          }));
+          if (p.itemsToConsume && Array.isArray(p.itemsToConsume)) {
+            for (const ci of p.itemsToConsume) {
+              set((state: any) => {
+                let remainingLocal = ci.qtyNeeded;
+                let consumedLocal = 0;
+                const updatedTransitItems = state.transitItems
+                  .filter((t: any) => t.product_id === ci.productId && t.remaining > 0)
+                  .sort((a: any, b: any) => new Date(a.sent_date).getTime() - new Date(b.sent_date).getTime())
+                  .map((t: any) => {
+                    if (remainingLocal <= 0) return t;
+                    const toConsume = Math.min(t.remaining, remainingLocal);
+                    remainingLocal -= toConsume;
+                    consumedLocal += toConsume;
+                    return { ...t, remaining: t.remaining - toConsume, consumed: (t.consumed || 0) + toConsume };
+                  });
+                const newInTransit = Math.max(0, Number(state.products.find((pr: any) => pr.id === ci.productId)?.in_transit || 0) - consumedLocal);
+                return {
+                  transitItems: updatedTransitItems,
+                  products: state.products.map((pr: any) => pr.id === ci.productId ? { ...pr, in_transit: newInTransit } : pr),
+                };
+              });
+            }
+          }
+        }
+        break;
+      case 'addRecipe':
+        if (p.recipe) {
+          const recipeWithIngredients = { ...p.recipe, ingredients: p.ingredients || [] };
+          set((state: any) => ({
+            recipes: state.recipes.some((r: any) => r.id === recipeWithIngredients.id) ? state.recipes : [recipeWithIngredients, ...state.recipes],
+          }));
+        }
+        break;
+      case 'updateRecipe':
+        set((state: any) => ({
+          recipes: state.recipes.map((r: any) => r.id === p.id ? { ...r, ...p.updates } : r),
+        }));
+        break;
+      case 'deleteRecipe':
+        set((state: any) => ({
+          recipes: state.recipes.filter((r: any) => r.id !== p.id),
+        }));
+        break;
+      case 'createPendingAccount':
+        set((state: any) => ({
+          pendingAccounts: state.pendingAccounts.some((a: any) => a.id === p.id) ? state.pendingAccounts : [p, ...state.pendingAccounts],
+        }));
+        break;
+      case 'updatePendingAccountItems':
+        set((state: any) => ({
+          pendingAccounts: state.pendingAccounts.map((a: any) => a.id === p.accountId ? { ...a, items: p.items, updated_at: new Date().toISOString() } : a),
+        }));
+        break;
+      case 'togglePendingAccountType':
+        set((state: any) => ({
+          pendingAccounts: state.pendingAccounts.map((a: any) => a.id === p.accountId ? { ...a, is_account_house: p.is_account_house, total_amount: p.is_account_house ? 0 : a.items?.reduce((sum: number, i: any) => sum + i.subtotal, 0) || 0 } : a),
+        }));
+        break;
+      case 'deletePendingAccount':
+        set((state: any) => ({
+          pendingAccounts: state.pendingAccounts.filter((a: any) => a.id !== p.accountId),
+          transitItems: p.transitRestores?.length ? state.transitItems.map((t: any) => {
+            const restore = p.transitRestores.find((r: any) => r.transitItemId === t.id);
+            return restore ? { ...t, remaining: t.remaining + restore.quantity } : t;
+          }) : state.transitItems,
+        }));
+        break;
+      case 'markPendingAccountPaid':
+        set((state: any) => ({
+          pendingAccounts: state.pendingAccounts.filter((a: any) => a.id !== p.accountId),
+        }));
+        break;
+      case 'createDailyClosing':
+        set((state: any) => ({
+          dailyClosings: state.dailyClosings.some((d: any) => d.id === p.id) ? state.dailyClosings : [p, ...state.dailyClosings],
+        }));
+        break;
+      case 'cancelTransit':
+        set((state: any) => {
+          const transitItem = state.transitItems.find((t: any) => t.id === p.transitItemId);
+          if (!transitItem) return state;
+          const product = state.products.find((pr: any) => pr.id === p.productId);
+          const newRemaining = transitItem.remaining - p.quantity;
+          const newInTransit = Math.max(0, Number(product?.in_transit || 0) - p.quantity);
+          const newQty = Number(product?.quantity || 0) + p.quantity;
+          return {
+            transitItems: state.transitItems.map((t: any) => t.id === p.transitItemId ? { ...t, remaining: newRemaining } : t).filter((t: any) => t.remaining > 0),
+            products: state.products.map((pr: any) => pr.id === p.productId ? { ...pr, in_transit: newInTransit, quantity: newQty } : pr),
+            productWarehouse: state.productWarehouse.map((pw: any) =>
+              pw.product_id === p.productId && pw.warehouse_id === transitItem.warehouse_id
+                ? { ...pw, quantity: Number(pw.quantity) + p.quantity } : pw
+            ),
+          };
+        });
+        break;
+      case 'registerWasteFromTransit':
+        set((state: any) => {
+          const transitItem = state.transitItems.find((t: any) => t.id === p.transitItemId);
+          if (!transitItem) return state;
+          const newRemaining = transitItem.remaining - p.quantity;
+          const newInTransit = Math.max(0, Number(state.products.find((pr: any) => pr.id === p.productId)?.in_transit || 0) - p.quantity);
+          return {
+            transitItems: state.transitItems.map((t: any) => t.id === p.transitItemId ? { ...t, remaining: newRemaining } : t).filter((t: any) => t.remaining > 0),
+            products: state.products.map((pr: any) => pr.id === p.productId ? { ...pr, in_transit: newInTransit } : pr),
+          };
+        });
+        break;
+      case 'registerManualConsumption':
+        set((state: any) => {
+          const transitItem = state.transitItems.find((t: any) => t.id === p.transitItemId);
+          if (!transitItem) return state;
+          const newRemaining = transitItem.remaining - p.quantity;
+          const newConsumed = (transitItem.consumed || 0) + p.quantity;
+          const newInTransit = Math.max(0, Number(state.products.find((pr: any) => pr.id === p.productId)?.in_transit || 0) - p.quantity);
+          return {
+            transitItems: state.transitItems.map((t: any) => t.id === p.transitItemId ? { ...t, remaining: newRemaining, consumed: newConsumed } : t).filter((t: any) => t.remaining > 0),
+            products: state.products.map((pr: any) => pr.id === p.productId ? { ...pr, in_transit: newInTransit } : pr),
+          };
+        });
+        break;
+    }
+  }
+}
+
 async function restoreFromCache(userId: string) {
   const [products, movements, warehouses, transitAll, sales, recipes, employees, categories, pendingAccounts, dailyClosings, accessPins, productWarehouse] = await Promise.all([
     getCachedProducts(userId),
@@ -3841,7 +4001,7 @@ async function restoreFromCache(userId: string) {
     getCachedPendingAccounts(userId),
     getCachedDailyClosings(userId),
     getCachedAccessPins(userId),
-    getCachedProductWarehouse(userId),
+    getCachedProductWarehouse(),
   ]);
 
   const transitItems = transitAll.filter(t => t.remaining > 0);
@@ -3881,4 +4041,6 @@ async function restoreFromCache(userId: string) {
     currentWarehouseId,
     isLoading: false,
   });
+
+  await replayPendingSyncQueue(useDatabaseStore.setState, useDatabaseStore.getState);
 }

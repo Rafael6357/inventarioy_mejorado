@@ -36,7 +36,7 @@ export interface SyncLog {
   error?: string;
 }
 
-const db = new Dexie('InventarioYLocal') as Dexie & {
+export const db = new Dexie('InventarioYLocal') as Dexie & {
   products: EntityTable<Product, 'id'>;
   movements: EntityTable<Movement, 'id'>;
   warehouses: EntityTable<Warehouse, 'id'>;
@@ -180,8 +180,8 @@ export async function getCachedAccessPins(userId: string): Promise<AccessPin[]> 
   return db.accessPins.where('user_id').equals(userId).toArray();
 }
 
-export async function getCachedProductWarehouse(userId: string): Promise<ProductWarehouse[]> {
-  return db.productWarehouse.where('user_id').equals(userId).toArray();
+export async function getCachedProductWarehouse(): Promise<ProductWarehouse[]> {
+  return db.productWarehouse.toArray();
 }
 
 export function addToSyncQueue(item: Omit<SyncQueueItem, 'id' | 'created_at' | 'status' | 'retries'>) {
