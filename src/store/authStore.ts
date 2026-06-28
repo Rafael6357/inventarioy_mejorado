@@ -4,6 +4,7 @@ import { clearLocalData } from '../lib/dexieDb';
 import { useDatabaseStore } from './dbStore';
 import { encryptCredentials, decryptCredentials } from '../lib/cryptoUtils';
 import { logger } from '../lib/logger';
+import { syncEngine } from '../lib/syncEngine';
 
 const checkRealInternetConnection = async (): Promise<boolean> => {
   try {
@@ -520,11 +521,13 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   logout: async () => {
     logger.info('Logout llamado...');
+    syncEngine.stop(); // Detener el motor de sincronización inmediatamente
     try {
       // Código SQLite eliminado
 
       localStorage.removeItem('saved_credentials');
       localStorage.removeItem('saved_email');
+      localStorage.removeItem('inventarioy_user'); // Asegurar limpieza de sesión
 
       _isInitializing = false;
       _authListenerSubscription = null;
@@ -582,6 +585,8 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     } catch (err) {
       logger.error('Error en logout:', err);
     } finally {
+      // Reactivar el motor de sincronización para el próximo usuario
+      syncEngine.start();
       // Forzar redirección
       logger.info('Redireccionando...');
       window.location.href = '/';

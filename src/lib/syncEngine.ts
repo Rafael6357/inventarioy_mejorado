@@ -9,9 +9,19 @@ type SyncListener = (event: SyncEvent, data?: any) => void;
 
 class SyncEngine {
   private processing = false;
+  private active = true;
   private listeners: Set<SyncListener> = new Set();
   private totalItems = 0;
   private processedItems = 0;
+
+  stop() {
+    this.active = false;
+    this.processing = false;
+  }
+
+  start() {
+    this.active = true;
+  }
 
   onEvent(listener: SyncListener) {
     this.listeners.add(listener);
@@ -27,7 +37,7 @@ class SyncEngine {
   }
 
   async processQueue() {
-    if (this.processing) return;
+    if (this.processing || !this.active) return;
     this.processing = true;
 
     try {
