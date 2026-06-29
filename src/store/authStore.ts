@@ -430,93 +430,113 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 
   login: async (email: string, password: string) => {
-    const isOnline = navigator.onLine && await checkRealInternetConnection();
-    if (!isOnline) {
-      return { success: false, error: 'Sin conexión a internet. Inicia sesión cuando tengas internet.' };
-    }
-
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      return { success: false, error: translateError(error.message) };
-    }
-
-    if (data.user) {
-      // Guardar credenciales cifradas para sesión persistente
-      const credentials = await encryptCredentials(email, password);
-      localStorage.setItem('saved_credentials', credentials);
-      localStorage.setItem('saved_email', email);
-
-      const userLoaded = await get().fetchUser();
-      if (!userLoaded) {
-        localStorage.removeItem('saved_credentials');
-        localStorage.removeItem('saved_email');
-        return { success: false, error: 'Error al cargar los datos del usuario. Intente de nuevo.' };
+    try {
+      const isOnline = navigator.onLine && await checkRealInternetConnection();
+      if (!isOnline) {
+        return { success: false, error: 'Sin conexión a internet. Inicia sesión cuando tengas internet.' };
       }
-      return { success: true };
-    }
 
-    return { success: false, error: 'Error desconocido al iniciar sesión' };
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        return { success: false, error: translateError(error.message ?? String(error)) };
+      }
+
+      if (data.user) {
+        // Guardar credenciales cifradas para sesión persistente
+        const credentials = await encryptCredentials(email, password);
+        localStorage.setItem('saved_credentials', credentials);
+        localStorage.setItem('saved_email', email);
+
+        const userLoaded = await get().fetchUser();
+        if (!userLoaded) {
+          localStorage.removeItem('saved_credentials');
+          localStorage.removeItem('saved_email');
+          return { success: false, error: 'Error al cargar los datos del usuario. Intente de nuevo.' };
+        }
+        return { success: true };
+      }
+
+      return { success: false, error: 'Error desconocido al iniciar sesión' };
+    } catch (err) {
+      logger.error('Error inesperado en login:', err);
+      return { success: false, error: 'Sin conexión a internet. Verifique su red e intente de nuevo.' };
+    }
   },
 
   register: async (email: string, password: string, name: string, businessName: string, phone?: string) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
+    try {
+      const isOnline = navigator.onLine && await checkRealInternetConnection();
+      if (!isOnline) {
+        return { success: false, error: 'Sin conexión a internet. Intente cuando tenga internet.' };
+      }
+
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name,
+            business_name: businessName,
+            phone: phone || '',
+          },
+        },
+      });
+
+      if (error) {
+        return { success: false, error: translateError(error.message ?? String(error)) };
+      }
+
+      if (data?.user) {
+        const { error: profileError } = await supabase.from('profiles').upsert({
+          id: data.user.id,
+          email,
           name,
           business_name: businessName,
           phone: phone || '',
-        },
-      },
-    });
+          role: 'user',
+          subscription_status: 'trialing',
+          trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          theme_preference: 'dark',
+        });
 
-    if (error) {
-      return { success: false, error: translateError(error.message) };
-    }
+        if (profileError) {
+          if (import.meta.env.DEV) logger.error('Error al crear perfil:', profileError);
+        }
 
-    if (data.user) {
-      const { error: profileError } = await supabase.from('profiles').upsert({
-        id: data.user.id,
-        email,
-        name,
-        business_name: businessName,
-        phone: phone || '',
-        role: 'user',
-        subscription_status: 'trialing',
-        trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        theme_preference: 'dark',
-      });
-
-      if (profileError) {
-        if (import.meta.env.DEV) logger.error('Error al crear perfil:', profileError);
+        return { success: true };
       }
 
-      return { success: true };
+      return { success: false, error: 'Error desconocido al registrar' };
+    } catch (err) {
+      logger.error('Error inesperado en register:', err);
+      return { success: false, error: 'Sin conexión a internet. Verifique su red e intente de nuevo.' };
     }
-
-    return { success: false, error: 'Error desconocido al registrar' };
   },
 
   forgotPassword: async (email: string) => {
-    const isOnline = navigator.onLine && await checkRealInternetConnection();
-    if (!isOnline) {
-      return { success: false, error: 'Sin conexión a internet. Intente cuando tenga internet.' };
+    try {
+      const isOnline = navigator.onLine && await checkRealInternetConnection();
+      if (!isOnline) {
+        return { success: false, error: 'Sin conexión a internet. Intente cuando tenga internet.' };
+      }
+
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) {
+        return { success: false, error: translateError(error.message ?? String(error)) };
+      }
+
+      return { success: true };
+    } catch (err) {
+      logger.error('Error inesperado en forgotPassword:', err);
+      return { success: false, error: 'Sin conexión a internet. Verifique su red e intente de nuevo.' };
     }
-
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-
-    if (error) {
-      return { success: false, error: translateError(error.message) };
-    }
-
-    return { success: true };
   },
 
   logout: async () => {

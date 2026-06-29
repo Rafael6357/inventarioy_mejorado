@@ -19,23 +19,28 @@ export default function ForgotPassword() {
     setError('');
     setIsLoading(true);
 
-    if (!email) {
-      setError('Ingrese su correo electrónico');
+    try {
+      if (!email) {
+        setError('Ingrese su correo electrónico');
+        setIsLoading(false);
+        return;
+      }
+
+      const result = await forgotPassword(email);
+
+      if (!result.success) {
+        setIsLoading(false);
+        setError(String(result.error || 'Error al enviar el correo'));
+        return;
+      }
+
       setIsLoading(false);
-      return;
-    }
-
-    const result = await forgotPassword(email);
-
-    if (!result.success) {
+      setSuccess(true);
+      toast.success('Si el correo existe, recibirá un enlace para restablecer su contraseña');
+    } catch {
       setIsLoading(false);
-      setError(result.error || 'Error al enviar el correo');
-      return;
+      setError('Ocurrió un error inesperado. Verifique su conexión a internet e intente de nuevo.');
     }
-
-    setIsLoading(false);
-    setSuccess(true);
-    toast.success('Si el correo existe, recibirá un enlace para restablecer su contraseña');
   };
 
   return (

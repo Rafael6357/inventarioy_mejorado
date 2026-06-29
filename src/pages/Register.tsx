@@ -58,33 +58,38 @@ export default function Register() {
     setError('');
     setIsLoading(true);
 
-    if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres');
+    try {
+      if (password.length < 6) {
+        setError('La contraseña debe tener al menos 6 caracteres');
+        setIsLoading(false);
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        setError('Las contraseñas no coinciden');
+        setIsLoading(false);
+        return;
+      }
+
+      if (!acceptTerms) {
+        setError('Debes aceptar los términos y condiciones');
+        setIsLoading(false);
+        return;
+      }
+
+      const fullPhone = `${selectedCountry.dial} ${phoneNumber}`;
+      const result = await register(email, password, name, businessName, fullPhone);
       setIsLoading(false);
-      return;
-    }
 
-    if (password !== confirmPassword) {
-      setError('Las contraseñas no coinciden');
+      if (result.success) {
+        toast.success('Revise su correo electrónico para confirmar su cuenta antes de iniciar sesión');
+        navigate('/login');
+      } else {
+        setError(String(result.error || 'Error al registrar'));
+      }
+    } catch {
       setIsLoading(false);
-      return;
-    }
-
-    if (!acceptTerms) {
-      setError('Debes aceptar los términos y condiciones');
-      setIsLoading(false);
-      return;
-    }
-
-    const fullPhone = `${selectedCountry.dial} ${phoneNumber}`;
-    const result = await register(email, password, name, businessName, fullPhone);
-    setIsLoading(false);
-
-    if (result.success) {
-      toast.success('Revise su correo electrónico para confirmar su cuenta antes de iniciar sesión');
-      navigate('/login');
-    } else {
-      setError(result.error || 'Error al registrar');
+      setError('Ocurrió un error inesperado. Verifique su conexión a internet e intente de nuevo.');
     }
   };
 

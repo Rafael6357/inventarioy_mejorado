@@ -36,33 +36,38 @@ export default function Login() {
     setError('');
     setIsLoading(true);
 
-    if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres');
-      setIsLoading(false);
-      return;
-    }
+    try {
+      if (password.length < 6) {
+        setError('La contraseña debe tener al menos 6 caracteres');
+        setIsLoading(false);
+        return;
+      }
 
-    const result = await login(email, password);
-    
-    if (!result.success) {
-      setIsLoading(false);
-      setError(result.error || 'Error al iniciar sesión');
-      return;
-    }
+      const result = await login(email, password);
+      
+      if (!result.success) {
+        setIsLoading(false);
+        setError(String(result.error || 'Error al iniciar sesión'));
+        return;
+      }
 
-    await new Promise(r => setTimeout(r, 500));
-    
-    const currentUser = useAuthStore.getState().user;
-    
-    if (currentUser && !currentUser.isSubscriptionActive) {
-      setIsLoading(false);
-      setSubscriptionExpired(true);
-      return;
-    }
+      await new Promise(r => setTimeout(r, 500));
+      
+      const currentUser = useAuthStore.getState().user;
+      
+      if (currentUser && !currentUser.isSubscriptionActive) {
+        setIsLoading(false);
+        setSubscriptionExpired(true);
+        return;
+      }
 
-    setIsLoading(false);
-    toast.success('Sesión iniciada correctamente');
-    navigate('/dashboard');
+      setIsLoading(false);
+      toast.success('Sesión iniciada correctamente');
+      navigate('/dashboard');
+    } catch {
+      setIsLoading(false);
+      setError('Ocurrió un error inesperado. Verifique su conexión a internet e intente de nuevo.');
+    }
   };
 
   return (
