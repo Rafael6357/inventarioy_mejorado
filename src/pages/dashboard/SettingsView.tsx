@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { useDatabaseStore } from '../../store/dbStore';
-import { Settings, Save, User, Shield, Printer, MessageSquare, DollarSign, QrCode, Copy, ExternalLink, Download, Sparkles, Lock, ShoppingCart } from 'lucide-react';
+import { Settings, Save, User, Shield, Printer, MessageSquare, DollarSign, QrCode, Copy, ExternalLink, Download, Sparkles, Lock, ShoppingCart, WifiOff } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
@@ -12,9 +12,11 @@ import { Switch } from '../../components/ui/switch';
 import AccessPinsConfig from '../../components/AccessPinsConfig';
 import SyncQueuePanel from '../../components/SyncQueuePanel';
 import QRCode from 'react-qr-code';
+import { useOfflineAction } from '../../hooks/useOfflineDisabled';
 
 export default function SettingsView() {
   const { user, fetchUser } = useAuthStore();
+  const { disabled: isOffline, message: offlineMessage } = useOfflineAction('guardar configuración del perfil');
   
   const [formData, setFormData] = useState({
     name: user?.name || '',
@@ -342,9 +344,10 @@ export default function SettingsView() {
               </div>
 
               <div className="pt-2">
-                <Button type="submit" size="sm" className="gap-2" disabled={isSaving || isSubmitting}>
+                <Button type="submit" size="sm" className="gap-2" disabled={isOffline || isSaving || isSubmitting} title={isOffline ? offlineMessage : undefined}>
                   <Save className="h-3 w-3" />
                   {isSaving ? 'Guardando...' : 'Guardar'}
+                  {isOffline && <WifiOff className="h-3 w-3 ml-1 opacity-60" />}
                 </Button>
               </div>
             </form>

@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { validateNumber, getNumberFromString, exportToExcel } from '../../lib/utils';
 import { useStaggerEnter } from '../../lib/animations/useStaggerEnter';
 import { usePersistentFilters } from '../../lib/hooks/usePersistentFilters';
+import { useIsOffline } from '../../hooks/useOfflineDisabled';
 
 const DOC_TYPE_LABELS: Record<string, string> = {
   MANUAL: 'Manual',
@@ -49,6 +50,7 @@ function EmployeeDocumentsPanel({ employeeId, employeeName }: { employeeId: stri
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isOffline = useIsOffline();
 
   const docs = employeeDocuments.filter(d => d.employee_id === employeeId);
 
@@ -96,10 +98,12 @@ function EmployeeDocumentsPanel({ employeeId, employeeName }: { employeeId: stri
           variant={showUploadForm ? 'ghost' : 'outline'}
           onClick={() => setShowUploadForm(!showUploadForm)}
           className="h-8 gap-1.5 text-xs"
-          title={showUploadForm ? 'Cerrar panel de subida' : 'Subir un documento para este empleado'}
+          title={isOffline ? 'Requiere conexión para subir documentos' : (showUploadForm ? 'Cerrar panel de subida' : 'Subir un documento para este empleado')}
+          disabled={isOffline}
         >
           {showUploadForm ? <X className="h-3.5 w-3.5" /> : <Upload className="h-3.5 w-3.5" />}
           {showUploadForm ? 'Cancelar' : 'Subir documento'}
+          {isOffline && <span className="text-[10px] opacity-70">(offline)</span>}
         </Button>
       </div>
 
@@ -163,12 +167,13 @@ function EmployeeDocumentsPanel({ employeeId, employeeName }: { employeeId: stri
 
           <Button
             onClick={handleUpload}
-            disabled={!selectedFile || isUploading}
+            disabled={!selectedFile || isUploading || isOffline}
             className="w-full gap-2"
             size="sm"
-            title="Subir el documento seleccionado"
+            title={isOffline ? 'Requiere conexión para subir documentos' : 'Subir el documento seleccionado'}
           >
             {isUploading ? 'Subiendo...' : <><Upload className="h-4 w-4" /> Subir documento</>}
+            {isOffline && <span className="text-[10px] opacity-70">(offline)</span>}
           </Button>
         </div>
       )}
@@ -214,13 +219,14 @@ function EmployeeDocumentsPanel({ employeeId, employeeName }: { employeeId: stri
                   >
                     <Download className="h-4 w-4" />
                   </a>
-                  <button
-                    onClick={() => handleDelete(doc)}
-                    className="flex items-center justify-center h-8 w-8 rounded-lg text-text-secondary hover:text-danger hover:bg-danger/10 transition-colors opacity-0 group-hover:opacity-100"
-                    title="Eliminar"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+<button
+                      onClick={() => handleDelete(doc)}
+                      disabled={isOffline}
+                      className={`flex items-center justify-center h-8 w-8 rounded-lg text-text-secondary hover:text-danger hover:bg-danger/10 transition-colors opacity-0 group-hover:opacity-100 ${isOffline ? 'opacity-30 cursor-not-allowed' : ''}`}
+                      title={isOffline ? 'Requiere conexión para eliminar documentos' : 'Eliminar'}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                 </div>
               </div>
             );

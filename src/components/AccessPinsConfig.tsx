@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Lock, Plus, X, Pencil, Trash2, CheckCircle, XCircle, Eye, EyeOff } from 'lucide-react';
+import { Lock, Plus, X, Pencil, Trash2, CheckCircle, XCircle, Eye, EyeOff, WifiOff } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { useDatabaseStore, ROLE_LABELS, ROLE_MODULES } from '../store/dbStore';
 import { toast } from 'sonner';
+import { useOfflineAction } from '../hooks/useOfflineDisabled';
 
 const MODULE_TRANSLATIONS: Record<string, string> = {
   sales: 'Ventas',
@@ -26,6 +27,7 @@ const translateModules = (modules: string[]): string => {
 
 export default function AccessPinsConfig() {
   const { accessPins, saveAccessPin, toggleAccessPin, deleteAccessPin } = useDatabaseStore();
+  const { disabled: isOffline, message: offlineMessage } = useOfflineAction('gestionar PINs de acceso');
   const [showModal, setShowModal] = useState(false);
   const [editingPin, setEditingPin] = useState<string | null>(null);
   const [selectedRole, setSelectedRole] = useState('');
@@ -166,9 +168,12 @@ export default function AccessPinsConfig() {
         <Button
           onClick={() => handleOpenModal()}
           className="gap-2 w-full sm:w-auto"
+          disabled={isOffline}
+          title={isOffline ? offlineMessage : undefined}
         >
           <Plus className="h-4 w-4" />
           Agregar Nuevo PIN
+          {isOffline && <WifiOff className="h-3 w-3 ml-1 opacity-60" />}
         </Button>
       </div>
 
@@ -214,14 +219,19 @@ export default function AccessPinsConfig() {
                   size="sm"
                   className="h-8 text-sm px-3"
                   onClick={() => handleToggle(pin.id, pin.is_active)}
+                  disabled={isOffline}
+                  title={isOffline ? offlineMessage : undefined}
                 >
                   {pin.is_active ? 'Desactivar' : 'Activar'}
+                  {isOffline && <WifiOff className="h-3 w-3 ml-1 opacity-60" />}
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
                   className="h-8 text-danger hover:text-danger px-2"
                   onClick={() => handleDelete(pin.id)}
+                  disabled={isOffline}
+                  title={isOffline ? offlineMessage : undefined}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -352,9 +362,11 @@ export default function AccessPinsConfig() {
               <Button
                 className="flex-1"
                 onClick={handleSavePin}
-                disabled={pinValue.length !== 4 || pinValue !== confirmPin || !selectedRole}
+                disabled={isOffline || pinValue.length !== 4 || pinValue !== confirmPin || !selectedRole}
+                title={isOffline ? offlineMessage : undefined}
               >
                 Guardar PIN
+                {isOffline && <WifiOff className="h-3 w-3 ml-1 opacity-60" />}
               </Button>
             </div>
           </div>
