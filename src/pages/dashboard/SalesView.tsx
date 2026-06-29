@@ -8,6 +8,7 @@ import { NumberInput } from '../../components/ui/NumberInput';
 import { toast } from 'sonner';
 import { validateNumber, getNumberFromString, exportToExcel } from '../../lib/utils';
 import { isDateClosed } from '../../lib/dateUtils';
+import { syncEngine } from '../../lib/syncEngine';
 import TicketView from './TicketView';
 
 type PaymentField = 'efectivo' | 'transferencia' | 'usd' | 'eur';
@@ -47,7 +48,7 @@ function showPaymentClampWarning(raw: number, clamped: number) {
 
 export default function SalesView() {
   const { user } = useAuthStore();
-  const { products, recipes, employees, sales, dailyClosings, pendingAccounts, addSale, createDailyClosing, getDailyClosings, createPendingAccount, addItemsToPendingAccount, chargePendingAccount, getPendingAccounts, togglePendingAccountType, updatePendingAccountItems, logAction, forceRefreshData } = useDatabaseStore();
+  const { products, recipes, employees, sales, dailyClosings, pendingAccounts, addSale, createDailyClosing, getDailyClosings, createPendingAccount, addItemsToPendingAccount, chargePendingAccount, getPendingAccounts, togglePendingAccountType, updatePendingAccountItems, logAction, forceRefreshData, syncQueueCount, refreshSyncQueueCount } = useDatabaseStore();
   
   const activeProducts = products.filter(p => p.is_active !== false);
 
@@ -76,13 +77,31 @@ export default function SalesView() {
   const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
-    // Código offline eliminado - modo online únicamente
+    setPendingSyncCount(syncQueueCount);
+  }, [syncQueueCount]);
+
+  useEffect(() => {
+    refreshSyncQueueCount();
+    const interval = setInterval(() => {
+      if (navigator.onLine) {
+        refreshSyncQueueCount();
+      }
+    }, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleManualSync = async () => {
     setIsSyncing(true);
     try {
-      // Sincronización online - sin código offline
+      if (navigator.onLine) {
+        await syncEngine.processQueue();
+        await refreshSyncQueueCount();
+        toast.success('Sincronización completada');
+      } else {
+        toast.warning('No hay conexión a internet');
+      }
+    } catch (err) {
+      toast.error('Error al sincronizar');
     } finally {
       setIsSyncing(false);
     }
@@ -608,12 +627,13 @@ export default function SalesView() {
 
     // Validar método de pago si no es cuenta casa
     if (!isAccountHouse) {
+      const roundedTotal = Math.round(total * 100) / 100;
       const usdConverted = user?.usdEnabled ? salePaymentMethod.usd * (user?.usdRate || 0) : 0;
       const eurConverted = user?.eurEnabled ? salePaymentMethod.eur * (user?.eurRate || 0) : 0;
-      const totalPaid = salePaymentMethod.efectivo + (user?.cupTransferEnabled ? salePaymentMethod.transferencia : 0) + usdConverted + eurConverted;
+      const totalPaid = Math.round((salePaymentMethod.efectivo + (user?.cupTransferEnabled ? salePaymentMethod.transferencia : 0) + usdConverted + eurConverted) * 100) / 100;
       
-      if (totalPaid < total) {
-        const missingAmount = total - totalPaid;
+      if (totalPaid < roundedTotal) {
+        const missingAmount = Math.round((roundedTotal - totalPaid) * 100) / 100;
         if (totalPaid === 0) {
           setPaymentError('Debe especificar el desglose de pago para procesar la venta');
         } else {
@@ -625,8 +645,8 @@ export default function SalesView() {
       }
       
       // Detectar sobrepago
-      if (totalPaid > total) {
-        const overpaidAmount = totalPaid - total;
+      if (totalPaid > roundedTotal) {
+        const overpaidAmount = Math.round((totalPaid - roundedTotal) * 100) / 100;
         setPaymentWarning(`Sobrepago: $${overpaidAmount.toFixed(2)} CUP de vuelto`);
       } else {
         setPaymentWarning(null);
@@ -1886,12 +1906,12 @@ setShowTicket(true);
                   <span className="font-mono text-text">${((Number(user?.usdEnabled ? chargeBreakdown.usd : 0) || 0) * (Number(user?.usdRate) || 0) + (Number(user?.eurEnabled ? chargeBreakdown.eur : 0) || 0) * (Number(user?.eurRate) || 0) + (Number(chargeBreakdown.efectivo) || 0) + (Number(user?.cupTransferEnabled ? chargeBreakdown.transferencia : 0) || 0)).toFixed(2)}</span>
                 </div>
                 {(() => {
-                  const totalPaid = (Number(user?.usdEnabled ? chargeBreakdown.usd : 0) || 0) * (Number(user?.usdRate) || 0)
+                  const totalPaid = Math.round(((Number(user?.usdEnabled ? chargeBreakdown.usd : 0) || 0) * (Number(user?.usdRate) || 0)
                     + (Number(user?.eurEnabled ? chargeBreakdown.eur : 0) || 0) * (Number(user?.eurRate) || 0)
                     + (Number(chargeBreakdown.efectivo) || 0)
-                    + (Number(user?.cupTransferEnabled ? chargeBreakdown.transferencia : 0) || 0);
-                  const accountTotal = selectedAccountForCharge?.total_amount || 0;
-                  const excedente = totalPaid - accountTotal;
+                    + (Number(user?.cupTransferEnabled ? chargeBreakdown.transferencia : 0) || 0)) * 100) / 100;
+                  const accountTotal = Math.round((selectedAccountForCharge?.total_amount || 0) * 100) / 100;
+                  const excedente = Math.round((totalPaid - accountTotal) * 100) / 100;
                   if (excedente > 0.01) {
                     return (
                       <p className="text-xs text-warning mt-2 flex items-start gap-1.5">
@@ -1925,11 +1945,11 @@ setShowTicket(true);
                   setIsProcessingCharge(true);
                   
                   try {
-                    const totalPaid = chargeBreakdown.efectivo + 
+                    const totalPaid = Math.round((chargeBreakdown.efectivo + 
                       (user?.cupTransferEnabled ? chargeBreakdown.transferencia : 0) + 
                       (user?.usdEnabled ? chargeBreakdown.usd * (user?.usdRate || 0) : 0) +
-                      (user?.eurEnabled ? chargeBreakdown.eur * (user?.eurRate || 0) : 0);
-                    const accountTotal = selectedAccountForCharge.total_amount || 0;
+                      (user?.eurEnabled ? chargeBreakdown.eur * (user?.eurRate || 0) : 0)) * 100) / 100;
+                    const accountTotal = Math.round((selectedAccountForCharge.total_amount || 0) * 100) / 100;
                     if (totalPaid < accountTotal) {
                       toast.error('El total pagado es menor al total de la cuenta');
                       setIsProcessingCharge(false);
