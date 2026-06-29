@@ -10,9 +10,11 @@ export type SyncOperation =
   | 'addMovement'
   | 'addSale'
   | 'cancelTransit' | 'registerWasteFromTransit' | 'registerManualConsumption'
-  | 'createPendingAccount' | 'chargePendingAccount' | 'deletePendingAccount'
+  | 'createPendingAccount' | 'deletePendingAccount'
   | 'markPendingAccountPaid'
-  | 'addItemsToPendingAccount' | 'updatePendingAccountItems' | 'togglePendingAccountType'
+  | 'addItemsToPendingAccount' | 'updatePendingAccountItems' | 'togglePendingAccountType' | 'updatePendingAccount'
+  | 'justifyMovement'
+  | 'updateAccessPinAttempts'
   | 'createDailyClosing'
   | 'addRecipe' | 'updateRecipe' | 'deleteRecipe';
 
@@ -178,6 +180,14 @@ export async function getCachedDailyClosings(userId: string): Promise<DailyClosi
 
 export async function getCachedAccessPins(userId: string): Promise<AccessPin[]> {
   return db.accessPins.where('user_id').equals(userId).toArray();
+}
+
+export async function cacheAccessPins(userId: string, pins: AccessPin[]): Promise<void> {
+  try {
+    await db.accessPins.bulkPut(pins);
+  } catch (err) {
+    console.warn('[Dexie] Error caching accessPins:', err);
+  }
 }
 
 export async function getCachedProductWarehouse(): Promise<ProductWarehouse[]> {

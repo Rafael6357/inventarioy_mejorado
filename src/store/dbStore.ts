@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from './authStore';
 import { toast } from 'sonner';
-import { db, cacheAllData, getCachedProducts, getCachedMovements, getCachedWarehouses, getCachedTransitItems, getCachedSales, getCachedRecipes, getCachedEmployees, getCachedCategories, getCachedPendingAccounts, getCachedDailyClosings, getCachedAccessPins, getCachedProductWarehouse, getSyncQueueCount, addToSyncQueue } from '../lib/dexieDb';
+import { db, cacheAllData, getCachedProducts, getCachedMovements, getCachedWarehouses, getCachedTransitItems, getCachedSales, getCachedRecipes, getCachedEmployees, getCachedCategories, getCachedPendingAccounts, getCachedDailyClosings, getCachedAccessPins, getCachedProductWarehouse, getSyncQueueCount, addToSyncQueue, cacheAccessPins } from '../lib/dexieDb';
 import { syncEngine } from '../lib/syncEngine';
 import { isDateClosed } from '../lib/dateUtils';
 import { calcularNomina } from '../utils/payrollCalculations';
@@ -1391,6 +1391,20 @@ addProduct: async (product) => {
   }),
 
   justifyMovement: async (id, justification) => {
+    if (!navigator.onLine) {
+      set((state) => ({
+        movements: state.movements.map(m =>
+          m.id === id ? { ...m, status: 'JUSTIFICADO', justification, justification_date: new Date().toISOString() } : m
+        ),
+      }));
+      await addToSyncQueue({
+        operation: 'justifyMovement', table: 'movements',
+        payload: { id, justification },
+      });
+      get().refreshSyncQueueCount();
+      return;
+    }
+
     try {
       const { error } = await queryWithRetry(() =>
         supabase
@@ -2216,7 +2230,7 @@ addProduct: async (product) => {
         payload: { id, user_id: user.id, client_name: clientName, items: [], total_amount: 0, is_account_house: false, sale_type: 'SALON', status: 'pending', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
       });
       get().refreshSyncQueueCount();
-      return { success: true, accountId: id };
+      return;
     }
 
     try {
@@ -2340,6 +2354,20 @@ addProduct: async (product) => {
   },
 
   updatePendingAccount: async (accountId: string, updates: Partial<PendingAccount>) => {
+    if (!navigator.onLine) {
+      set((state) => ({
+        pendingAccounts: state.pendingAccounts.map(a =>
+          a.id === accountId ? { ...a, ...updates, updated_at: new Date().toISOString() } : a
+        ),
+      }));
+      await addToSyncQueue({
+        operation: 'updatePendingAccount', table: 'pending_accounts',
+        payload: { accountId, updates },
+      });
+      get().refreshSyncQueueCount();
+      return { success: true };
+    }
+
     const { error } = await supabase
       .from('pending_accounts')
       .update({ ...updates, updated_at: new Date().toISOString() })
@@ -2738,11 +2766,26 @@ deletePendingAccount: async (accountId: string) => {
       
       const newAttempts = existingPin.failed_attempts + 1;
       if (newAttempts >= 3) {
-        const blockedUntil = new Date(Date.now() + 5 * 60 * 1000);
-        await supabase.from('access_pins').update({ failed_attempts: newAttempts, blocked_until: blockedUntil.toISOString() }).eq('id', existingPin.id);
+        const blockedUntil = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+        if (navigator.onLine) {
+          await supabase.from('access_pins').update({ failed_attempts: newAttempts, blocked_until: blockedUntil }).eq('id', existingPin.id);
+        } else {
+          await addToSyncQueue({ operation: 'updateAccessPinAttempts', table: 'access_pins', payload: { pinId: existingPin.id, failed_attempts: newAttempts, blocked_until: blockedUntil } });
+        }
+        set((state) => ({
+          accessPins: state.accessPins.map(p => p.id === existingPin.id ? { ...p, failed_attempts: newAttempts, blocked_until: blockedUntil } : p),
+        }));
+        await cacheAccessPins(user.id, get().accessPins);
         return { success: false, error: 'PIN bloqueado por 3 intentos fallidos', blocked: true, remainingTime: 300 };
       } else {
-        await supabase.from('access_pins').update({ failed_attempts: newAttempts }).eq('id', existingPin.id);
+        if (navigator.onLine) {
+          await supabase.from('access_pins').update({ failed_attempts: newAttempts }).eq('id', existingPin.id);
+        } else {
+          await addToSyncQueue({ operation: 'updateAccessPinAttempts', table: 'access_pins', payload: { pinId: existingPin.id, failed_attempts: newAttempts } });
+        }
+        set((state) => ({
+          accessPins: state.accessPins.map(p => p.id === existingPin.id ? { ...p, failed_attempts: newAttempts } : p),
+        }));
       }
       return { success: false, error: `PIN incorrecto. Intentos: ${newAttempts}/3` };
     }
@@ -2754,12 +2797,26 @@ deletePendingAccount: async (accountId: string) => {
         const remaining = Math.ceil((blockedUntil.getTime() - now.getTime()) / 1000);
         return { success: false, error: 'PIN bloqueado', blocked: true, remainingTime: remaining };
       } else {
-        await supabase.from('access_pins').update({ blocked_until: null, failed_attempts: 0 }).eq('id', userPin.id);
+        if (navigator.onLine) {
+          await supabase.from('access_pins').update({ blocked_until: null, failed_attempts: 0 }).eq('id', userPin.id);
+        } else {
+          await addToSyncQueue({ operation: 'updateAccessPinAttempts', table: 'access_pins', payload: { pinId: userPin.id, blocked_until: null, failed_attempts: 0 } });
+        }
+        set((state) => ({
+          accessPins: state.accessPins.map(p => p.id === userPin.id ? { ...p, blocked_until: null, failed_attempts: 0 } : p),
+        }));
       }
     }
 
     if (userPin.failed_attempts > 0) {
-      await supabase.from('access_pins').update({ failed_attempts: 0, blocked_until: null }).eq('id', userPin.id);
+      if (navigator.onLine) {
+        await supabase.from('access_pins').update({ failed_attempts: 0, blocked_until: null }).eq('id', userPin.id);
+      } else {
+        await addToSyncQueue({ operation: 'updateAccessPinAttempts', table: 'access_pins', payload: { pinId: userPin.id, failed_attempts: 0, blocked_until: null } });
+      }
+      set((state) => ({
+        accessPins: state.accessPins.map(p => p.id === userPin.id ? { ...p, failed_attempts: 0, blocked_until: null } : p),
+      }));
     }
 
     set({ verifiedRole: userPin.role, verifiedRoleName: userPin.pin_name });
@@ -2781,11 +2838,26 @@ deletePendingAccount: async (accountId: string) => {
       
       const newAttempts = anyPin.failed_attempts + 1;
       if (newAttempts >= 3) {
-        const blockedUntil = new Date(Date.now() + 5 * 60 * 1000);
-        await supabase.from('access_pins').update({ failed_attempts: newAttempts, blocked_until: blockedUntil.toISOString() }).eq('id', anyPin.id);
+        const blockedUntil = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+        if (navigator.onLine) {
+          await supabase.from('access_pins').update({ failed_attempts: newAttempts, blocked_until: blockedUntil }).eq('id', anyPin.id);
+        } else {
+          await addToSyncQueue({ operation: 'updateAccessPinAttempts', table: 'access_pins', payload: { pinId: anyPin.id, failed_attempts: newAttempts, blocked_until: blockedUntil } });
+        }
+        set((state) => ({
+          accessPins: state.accessPins.map(p => p.id === anyPin.id ? { ...p, failed_attempts: newAttempts, blocked_until: blockedUntil } : p),
+        }));
+        await cacheAccessPins(user.id, get().accessPins);
         return { success: false, error: 'PIN bloqueado por 3 intentos fallidos', blocked: true, remainingTime: 300 };
       } else {
-        await supabase.from('access_pins').update({ failed_attempts: newAttempts }).eq('id', anyPin.id);
+        if (navigator.onLine) {
+          await supabase.from('access_pins').update({ failed_attempts: newAttempts }).eq('id', anyPin.id);
+        } else {
+          await addToSyncQueue({ operation: 'updateAccessPinAttempts', table: 'access_pins', payload: { pinId: anyPin.id, failed_attempts: newAttempts } });
+        }
+        set((state) => ({
+          accessPins: state.accessPins.map(p => p.id === anyPin.id ? { ...p, failed_attempts: newAttempts } : p),
+        }));
       }
       return { success: false, error: `PIN incorrecto. Intentos: ${newAttempts}/3` };
     }
@@ -2797,12 +2869,26 @@ deletePendingAccount: async (accountId: string) => {
         const remaining = Math.ceil((blockedUntil.getTime() - now.getTime()) / 1000);
         return { success: false, error: 'PIN bloqueado', blocked: true, remainingTime: remaining };
       } else {
-        await supabase.from('access_pins').update({ blocked_until: null, failed_attempts: 0 }).eq('id', userPin.id);
+        if (navigator.onLine) {
+          await supabase.from('access_pins').update({ blocked_until: null, failed_attempts: 0 }).eq('id', userPin.id);
+        } else {
+          await addToSyncQueue({ operation: 'updateAccessPinAttempts', table: 'access_pins', payload: { pinId: userPin.id, blocked_until: null, failed_attempts: 0 } });
+        }
+        set((state) => ({
+          accessPins: state.accessPins.map(p => p.id === userPin.id ? { ...p, blocked_until: null, failed_attempts: 0 } : p),
+        }));
       }
     }
 
     if (userPin.failed_attempts > 0) {
-      await supabase.from('access_pins').update({ failed_attempts: 0, blocked_until: null }).eq('id', userPin.id);
+      if (navigator.onLine) {
+        await supabase.from('access_pins').update({ failed_attempts: 0, blocked_until: null }).eq('id', userPin.id);
+      } else {
+        await addToSyncQueue({ operation: 'updateAccessPinAttempts', table: 'access_pins', payload: { pinId: userPin.id, failed_attempts: 0, blocked_until: null } });
+      }
+      set((state) => ({
+        accessPins: state.accessPins.map(p => p.id === userPin.id ? { ...p, failed_attempts: 0, blocked_until: null } : p),
+      }));
     }
 
     set({ verifiedRole: userPin.role, verifiedRoleName: userPin.pin_name });
@@ -3850,7 +3936,7 @@ async function replayPendingSyncQueue(set: any, get: any) {
         break;
       case 'deleteProduct':
         set((state: any) => ({
-          products: state.products.filter((x: any) => x.id !== p.id),
+          products: state.products.map((x: any) => x.id === p.id ? { ...x, is_active: false } : x),
         }));
         break;
       case 'addMovement':
@@ -3910,6 +3996,31 @@ async function replayPendingSyncQueue(set: any, get: any) {
       case 'createPendingAccount':
         set((state: any) => ({
           pendingAccounts: state.pendingAccounts.some((a: any) => a.id === p.id) ? state.pendingAccounts : [p, ...state.pendingAccounts],
+        }));
+        break;
+      case 'justifyMovement':
+        set((state: any) => ({
+          movements: state.movements.map((m: any) =>
+            m.id === p.id ? { ...m, status: 'JUSTIFICADO', justification: p.justification, justification_date: new Date().toISOString() } : m
+          ),
+        }));
+        break;
+      case 'updatePendingAccount':
+        set((state: any) => ({
+          pendingAccounts: state.pendingAccounts.map((a: any) =>
+            a.id === p.accountId ? { ...a, ...p.updates, updated_at: new Date().toISOString() } : a
+          ),
+        }));
+        break;
+      case 'addItemsToPendingAccount':
+        set((state: any) => ({
+          pendingAccounts: state.pendingAccounts.map((a: any) => {
+            if (a.id !== p.accountId) return a;
+            const newItems = (p.items || []).map((i: any) => ({ ...i, added_at: i.added_at || new Date().toISOString() }));
+            const allItems = [...(a.items || []), ...newItems];
+            const newTotal = p.isAccountHouse ? 0 : allItems.reduce((sum: number, i: any) => sum + (i.subtotal || 0), 0);
+            return { ...a, items: allItems, total_amount: newTotal, is_account_house: p.isAccountHouse, sale_type: p.saleType, updated_at: new Date().toISOString() };
+          }),
         }));
         break;
       case 'updatePendingAccountItems':
@@ -3983,6 +4094,13 @@ async function replayPendingSyncQueue(set: any, get: any) {
             products: state.products.map((pr: any) => pr.id === p.productId ? { ...pr, in_transit: newInTransit } : pr),
           };
         });
+        break;
+      case 'updateAccessPinAttempts':
+        set((state: any) => ({
+          accessPins: state.accessPins.map((pin: any) =>
+            pin.id === p.pinId ? { ...pin, ...(p.failed_attempts !== undefined && { failed_attempts: p.failed_attempts }), ...(p.blocked_until !== undefined && { blocked_until: p.blocked_until }) } : pin
+          ),
+        }));
         break;
     }
   }

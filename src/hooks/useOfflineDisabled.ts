@@ -16,11 +16,13 @@ export function useIsOffline(): boolean {
 export function useOfflineAction(actionName: string = 'esta acción') {
   const isOffline = useIsOffline();
   const [showHint, setShowHint] = useState(false);
-  
-  if (isOffline) {
-    setShowHint(true);
-  }
-  
+
+  useEffect(() => {
+    if (isOffline) {
+      setShowHint(true);
+    }
+  }, [isOffline]);
+
   return {
     disabled: isOffline,
     message: isOffline ? `Requiere conexión a internet para ${actionName}` : undefined,

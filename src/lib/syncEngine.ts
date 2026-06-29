@@ -468,6 +468,34 @@ class SyncEngine {
             await store.logAction('accounts', 'TOGGLE_TIPO', { accountId, is_account_house }).catch(() => {});
             break;
           }
+          case 'justifyMovement': {
+            const { id, justification } = item.payload;
+            const { error } = await supabase.from('movements')
+              .update({ status: 'JUSTIFICADO', justification, justification_date: new Date().toISOString() })
+              .eq('id', id);
+            if (error) throw error;
+            await store.logAction('movements', 'JUSTIFICAR', { id, justification }).catch(() => {});
+            break;
+          }
+          case 'updatePendingAccount': {
+            const { accountId, updates } = item.payload;
+            const { error } = await supabase.from('pending_accounts')
+              .update({ ...updates, updated_at: new Date().toISOString() })
+              .eq('id', accountId);
+            if (error) throw error;
+            await store.logAction('accounts', 'ACTUALIZAR', { accountId }).catch(() => {});
+            break;
+          }
+          case 'updateAccessPinAttempts': {
+            const { pinId, failed_attempts, blocked_until } = item.payload;
+            const updateData: Record<string, any> = {};
+            if (failed_attempts !== undefined) updateData.failed_attempts = failed_attempts;
+            if (blocked_until !== undefined) updateData.blocked_until = blocked_until;
+            if (Object.keys(updateData).length === 0) break;
+            const { error } = await supabase.from('access_pins').update(updateData).eq('id', pinId);
+            if (error) throw error;
+            break;
+          }
           default:
             console.warn(`Sync: operacion desconocida ${item.operation}`);
             return false;
