@@ -45,17 +45,17 @@ class SyncEngine {
 
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        console.warn('[Sync] no hay sesión activa');
+        const user = (await import('../store/authStore')).useAuthStore.getState().user;
+        if (!user) {
+          return;
+        }
         if (navigator.onLine) {
-          console.log('[Sync] intentando refrescar sesión...');
           const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
           if (refreshErr || !refreshed?.session) {
-            console.error('[Sync] no se pudo refrescar la sesión:', refreshErr);
+            console.warn('[Sync] no se pudo refrescar la sesión:', refreshErr);
             return;
           }
-          console.log('[Sync] sesión refrescada exitosamente');
         } else {
-          console.warn('[Sync] offline y sin sesión, abortando sincronización hasta tener conexión');
           return;
         }
       }
