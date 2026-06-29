@@ -3918,36 +3918,112 @@ async function replayPendingSyncQueue(set: any, get: any) {
   const pendingItems = await db.syncQueue.where('status').equals('pending').toArray();
   if (pendingItems.length === 0) return;
 
+  if (pendingItems.length > 500) {
+    logger.warn(`[replayPendingSyncQueue] Queue size is ${pendingItems.length}, exceeding limit of 500. Notifying user.`);
+    toast.error('La cola de sincronización offline es demasiado grande. Por favor, sincroniza online cuanto antes.');
+  }
+
+  logger.info(`[replayPendingSyncQueue] Replaying ${pendingItems.length} pending items...`);
+
   for (const item of pendingItems) {
+    logger.info(`[replayPendingSyncQueue] Processing operation: ${item.operation}`);
     const p = item.payload as any;
     switch (item.operation) {
       case 'addProduct':
         if (p.product) {
-          set((state: any) => ({
-            products: state.products.some((x: any) => x.id === p.product.id) ? state.products : [p.product, ...state.products],
-            movements: p.movement && !state.movements.some((m: any) => m.id === p.movement.id) ? [p.movement, ...state.movements] : state.movements,
-          }));
+          set((state: any) => {
+            const updatedProducts = state.products.some((x: any) => x.id === p.product.id) ? state.products : [p.product, ...state.products];
+            const updatedMovements = p.movement && !state.movements.some((m: any) => m.id === p.movement.id) ? [p.movement, ...state.movements] : state.movements;
+            
+            const newState = {
+              ...state,
+              products: updatedProducts,
+              movements: updatedMovements,
+            };
+            
+            if (p.productWarehouse && Array.isArray(p.productWarehouse)) {
+              newState.productWarehouse = [...state.productWarehouse, ...p.productWarehouse];
+            }
+            return newState;
+          });
         }
         break;
       case 'updateProduct':
         set((state: any) => ({
+          ...state,
           products: state.products.map((x: any) => x.id === p.id ? { ...x, ...p.updates } : x),
         }));
         break;
       case 'deleteProduct':
         set((state: any) => ({
+          ...state,
           products: state.products.map((x: any) => x.id === p.id ? { ...x, is_active: false } : x),
         }));
         break;
       case 'addMovement':
-        set((state: any) => ({
-          movements: state.movements.some((m: any) => m.id === p.id) ? state.movements : [p, ...state.movements],
-        }));
+        set((state: any) => {
+          if (state.movements.some((m: any) => m.id === p.id)) return state;
+          const newMovement = { ...p } as any;
+          let newState = { ...state, movements: [newMovement, ...state.movements] };
+
+          if (newMovement.type === 'SALIDA') {
+            const transitId = crypto.randomUUID();
+            const transitItem = {
+              id: transitId,
+              user_id: newMovement.user_id,
+              product_id: newMovement.product_id,
+              quantity: Number(newMovement.quantity),
+              consumed: 0,
+              remaining: Number(newMovement.quantity),
+              reason: newMovement.reason || 'Enviado a cocina/preparacion',
+              sent_date: newMovement.date || new Date().toISOString(),
+              created_at: newMovement.created_at || new Date().toISOString(),
+              warehouse_id: newMovement.warehouse_id || null,
+            } as any;
+
+            if (newMovement.warehouse_id) {
+              const pw = state.productWarehouse.find((pw: any) => pw.product_id === newMovement.product_id && pw.warehouse_id === newMovement.warehouse_id);
+              const currentQty = pw ? Number(pw.quantity) : 0;
+              let newQty = Math.max(0, currentQty - Number(newMovement.quantity));
+
+              newState = {
+                ...newState,
+                productWarehouse: state.productWarehouse.map((pw: any) =>
+                  pw.product_id === newMovement.product_id && pw.warehouse_id === newMovement.warehouse_id
+                    ? { ...pw, quantity: newQty }
+                    : pw
+                ),
+                transitItems: [transitItem, ...state.transitItems],
+                products: state.products.map((pr: any) =>
+                  pr.id === newMovement.product_id
+                    ? { ...pr, quantity: Math.max(0, newQty), in_transit: Number(pr.in_transit || 0) + Number(newMovement.quantity) }
+                    : pr
+                ),
+              };
+            } else {
+              const product = state.products.find((pr: any) => pr.id === newMovement.product_id);
+              let newQuantity = Math.max(0, Number(product?.quantity || 0) - Number(newMovement.quantity));
+              let newInTransit = Number(product?.in_transit || 0) + Number(newMovement.quantity);
+
+              newState = {
+                ...newState,
+                transitItems: [transitItem, ...state.transitItems],
+                products: state.products.map((pr: any) =>
+                  pr.id === newMovement.product_id
+                    ? { ...pr, quantity: newQuantity, in_transit: newInTransit }
+                    : pr
+                ),
+              };
+            }
+          }
+          return newState;
+        });
         break;
       case 'addSale':
         if (p.sale) {
           const saleWithItems = { ...p.sale, items: p.sale_items || [] };
           set((state: any) => ({
+            ...state,
             sales: state.sales.some((s: any) => s.id === saleWithItems.id) ? state.sales : [saleWithItems, ...state.sales],
           }));
           if (p.itemsToConsume && Array.isArray(p.itemsToConsume)) {
@@ -3967,6 +4043,7 @@ async function replayPendingSyncQueue(set: any, get: any) {
                   });
                 const newInTransit = Math.max(0, Number(state.products.find((pr: any) => pr.id === ci.productId)?.in_transit || 0) - consumedLocal);
                 return {
+                  ...state,
                   transitItems: updatedTransitItems,
                   products: state.products.map((pr: any) => pr.id === ci.productId ? { ...pr, in_transit: newInTransit } : pr),
                 };
@@ -3979,12 +4056,14 @@ async function replayPendingSyncQueue(set: any, get: any) {
         if (p.recipe) {
           const recipeWithIngredients = { ...p.recipe, ingredients: p.ingredients || [] };
           set((state: any) => ({
+            ...state,
             recipes: state.recipes.some((r: any) => r.id === recipeWithIngredients.id) ? state.recipes : [recipeWithIngredients, ...state.recipes],
           }));
         }
         break;
       case 'updateRecipe':
         set((state: any) => ({
+          ...state,
           recipes: state.recipes.map((r: any) => r.id === p.id ? { ...r, ...p.updates } : r),
         }));
         break;
