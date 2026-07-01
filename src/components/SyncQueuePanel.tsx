@@ -7,27 +7,8 @@ import {
 import { getPendingSyncItems, getSyncQueueCount, type SyncQueueItem } from '../lib/dexieDb';
 import { syncEngine } from '../lib/syncEngine';
 import { useDatabaseStore } from '../store/dbStore';
-
-const operationLabels: Record<string, string> = {
-  addProduct: 'Agregar producto',
-  updateProduct: 'Actualizar producto',
-  deleteProduct: 'Eliminar producto',
-  addMovement: 'Registrar movimiento',
-  addSale: 'Registrar venta',
-  cancelTransit: 'Cancelar tránsito',
-  registerWasteFromTransit: 'Registrar merma',
-  registerManualConsumption: 'Registrar consumo',
-  createPendingAccount: 'Crear cuenta pendiente',
-  chargePendingAccount: 'Cobrar cuenta pendiente',
-  deletePendingAccount: 'Eliminar cuenta pendiente',
-  addItemsToPendingAccount: 'Agregar items a cuenta',
-  updatePendingAccountItems: 'Actualizar items de cuenta',
-  togglePendingAccountType: 'Cambiar tipo de cuenta',
-  createDailyClosing: 'Crear cierre de caja',
-  addRecipe: 'Agregar receta',
-  updateRecipe: 'Actualizar receta',
-  deleteRecipe: 'Eliminar receta',
-};
+import { useIsOnline } from '../hooks/useIsOnline';
+import { OPERATION_LABELS } from '../lib/constants';
 
 const operationIcons: Record<string, React.ReactNode> = {
   addProduct: <Package className="h-4 w-4" />,
@@ -48,7 +29,7 @@ const operationIcons: Record<string, React.ReactNode> = {
 
 function formatDate(iso: string) {
   const d = new Date(iso);
-  return d.toLocaleString('es-AR', {
+  return d.toLocaleString('es-ES', {
     day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
   });
 }
@@ -60,6 +41,7 @@ export default function SyncQueuePanel() {
   const syncQueueCount = useDatabaseStore((s) => s.syncQueueCount);
   const syncStatus = useDatabaseStore((s) => s.syncStatus);
   const refreshSyncQueueCount = useDatabaseStore((s) => s.refreshSyncQueueCount);
+  const isOnline = useIsOnline();
 
   const loadItems = async () => {
     setLoading(true);
@@ -104,7 +86,7 @@ export default function SyncQueuePanel() {
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          {navigator.onLine ? (
+          {isOnline ? (
             <div className="p-2 rounded-lg bg-success/10">
               <Wifi className="h-5 w-5 text-success" />
             </div>
@@ -173,7 +155,7 @@ export default function SyncQueuePanel() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-text truncate">
-                    {operationLabels[item.operation] || item.operation}
+                    {OPERATION_LABELS[item.operation] || item.operation}
                   </p>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-[11px] text-text-secondary">{formatDate(item.created_at)}</span>

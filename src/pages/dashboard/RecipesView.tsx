@@ -27,7 +27,7 @@ export default function RecipesView() {
   const canEdit = (): boolean => {
     if (!accessPins || accessPins.length === 0) return true;
     const activePin = accessPins.find(p => p.is_active);
-    return activePin && ['owner', 'economist'].includes(activePin.role);
+    return !!activePin && ['owner', 'economist'].includes(activePin.role);
   };
   
   const activeProducts = products.filter(p => p.is_active !== false);

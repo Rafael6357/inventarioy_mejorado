@@ -1,16 +1,15 @@
-import { Sun, Moon, Monitor } from 'lucide-react';
+import { Sun, Moon } from 'lucide-react';
 import { useTheme } from '../design-system/ThemeProvider';
 
 const modes = [
   { value: 'light' as const, icon: Sun, label: 'Claro' },
   { value: 'dark' as const, icon: Moon, label: 'Oscuro' },
-  { value: 'system' as const, icon: Monitor, label: 'Sistema' },
 ];
 
 export default function ThemeToggle() {
   const { theme, setTheme } = useTheme();
 
-  const nextMode = theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light';
+  const nextMode = theme === 'light' ? 'dark' : 'light';
   const { icon: NextIcon, label: nextLabel } = modes.find(m => m.value === nextMode)!;
 
   return (

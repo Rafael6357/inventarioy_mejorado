@@ -16,7 +16,7 @@ import {
   UnitAbbrev,
   UNIT_LABELS,
 } from '../../lib/unitConversion';
-import { validateNumber } from '../../lib/utils';
+import { validateNumber, normalizeStr } from '../../lib/utils';
 import { useRealTimeClock } from '../../lib/hooks/useRealTimeClock';
 
 const DEFAULT_CATEGORIES = [
@@ -43,7 +43,6 @@ export default function InventoryView() {
   const [isCustomCategory, setIsCustomCategory] = useState(false);
   const [customCategory, setCustomCategory] = useState('');
 
-  const normalizeStr = (str: string) => str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
   const existingCategories = Array.from(
     new Set(
       activeProducts
@@ -267,11 +266,11 @@ export default function InventoryView() {
         quantity: quantityInBase,
         unit: baseUnit,
         cost: movementCost,
-        reason: movement.reason || null,
-        note: isConsumoDirecto ? (movement.note || null) : null,
+        reason: movement.reason || undefined,
+        note: isConsumoDirecto ? (movement.note ?? undefined) : undefined,
         status: isAnomaly ? 'ANOMALIA' : 'NORMAL',
         date: convertToUTC(movement.date),
-        warehouse_id: movement.warehouse_id || currentWarehouseId || null,
+        warehouse_id: movement.warehouse_id || currentWarehouseId || undefined,
       };
 
       await addMovement(movementData);
@@ -280,8 +279,8 @@ export default function InventoryView() {
         product_name: product.name,
         quantity: movement.quantity,
         unit: movement.displayUnit,
-        reason: movement.reason,
-        note: movement.note
+        reason: movement.reason || undefined,
+        note: movement.note || undefined
       });
       
       saveLastUsedUnit(movement.product_id, movement.displayUnit);
@@ -556,11 +555,6 @@ export default function InventoryView() {
                       ? productWarehouse.find(pw => pw.product_id === p.id && pw.warehouse_id === activeWarehouseId)
                       : null;
                     
-                    const computedInTransit = activeWarehouseId
-                      ? transitItems
-                        .filter(t => t.product_id === p.id && t.warehouse_id === activeWarehouseId)
-                        .reduce((sum, t) => sum + t.remaining, 0)
-                      : 0;
                     const availableStock = warehouseStock 
                       ? Number(warehouseStock.quantity)
                       : 0;

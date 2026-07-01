@@ -20,6 +20,8 @@ export function useOfflineAction(actionName: string = 'esta acción') {
   useEffect(() => {
     if (isOffline) {
       setShowHint(true);
+    } else {
+      setShowHint(false);
     }
   }, [isOffline]);
 

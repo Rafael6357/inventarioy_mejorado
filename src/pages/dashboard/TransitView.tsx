@@ -20,6 +20,7 @@ import { formatQuantity } from '../../lib/formatNumber';
 import { useStaggerEnter } from '../../lib/animations/useStaggerEnter';
 import { useCountUp } from '../../lib/animations/useCountUp';
 import { usePersistentFilters } from '../../lib/hooks/usePersistentFilters';
+import TransitActionModal from '../../components/TransitActionModal';
 
 export default function TransitView() {
   const { transitItems, products, cancelTransit, registerWasteFromTransit, registerManualConsumption, logAction, warehouses, currentWarehouseId, setCurrentWarehouse } = useDatabaseStore();
@@ -569,351 +570,75 @@ const handleWaste = async () => {
           )}
       </div>
 
-      {cancelModal && getProduct(cancelModal.item.product_id) && (() => {
-        const product = getProduct(cancelModal.item.product_id);
-        const baseUnit = product ? normalizeUnit(product.unit) : 'u';
-        const compatibleUnits = getCompatibleUnits(baseUnit);
-        
-        const currentQuantityInBase = convertUnit(cancelModal.quantity, cancelModal.unit, baseUnit);
-        const maxInCurrentUnit = convertUnit(cancelModal.item.remaining, baseUnit, cancelModal.unit);
-        
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm modal-backdrop">
-            <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl max-h-[90dvh] overflow-y-auto">
-              <div className="mb-6 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-danger/10">
-                    <RotateCcw className="h-5 w-5 text-danger" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-bold text-text">Devolver al Stock</h2>
-                    <p className="text-xs text-text-secondary">{product?.name}</p>
-                  </div>
-                </div>
-                <button onClick={() => setCancelModal(null)} className="rounded-full p-2 text-text-secondary hover:bg-surface-hover hover:text-text transition-colors">
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
+      {cancelModal && getProduct(cancelModal.item.product_id) && (
+        <TransitActionModal
+          type="cancel"
+          item={cancelModal.item}
+          productName={getProduct(cancelModal.item.product_id)!.name}
+          productUnit={getProduct(cancelModal.item.product_id)!.unit}
+          quantity={cancelModal.quantity}
+          unit={cancelModal.unit}
+          reason={cancelModal.reason}
+          isProcessing={isCancelling}
+          icon={<RotateCcw className="h-5 w-5 text-danger" />}
+          title="Devolver al Stock"
+          iconBgColor="bg-danger/10"
+          onQuantityChange={(v) => setCancelModal(prev => prev ? { ...prev, quantity: v } : prev)}
+          onUnitChange={(u) => setCancelModal(prev => prev ? { ...prev, unit: u } : prev)}
+          onReasonChange={(r) => setCancelModal(prev => prev ? { ...prev, reason: r } : prev)}
+          onConfirm={handleCancel}
+          onCancel={() => setCancelModal(null)}
+          confirmLabel="Devolver"
+          reasonPlaceholder="Ej: Producto en mal estado, cancelación de producción..."
+        />
+      )}
 
-              <div className="mb-4 space-y-4">
-                <div className="rounded-xl bg-bg/50 border border-border p-4">
-                  <div className="flex items-center gap-2 mb-3 text-sm text-text-secondary">
-                    <AlertTriangle className="h-4 w-4 text-warning" />
-                    Disponible: <span className="font-bold text-text">{cancelModal.item.remaining} {baseUnit}</span>
-                  </div>
+      {wasteModal && getProduct(wasteModal.item.product_id) && (
+        <TransitActionModal
+          type="waste"
+          item={wasteModal.item}
+          productName={getProduct(wasteModal.item.product_id)!.name}
+          productUnit={getProduct(wasteModal.item.product_id)!.unit}
+          quantity={wasteModal.quantity}
+          unit={wasteModal.unit}
+          reason={wasteModal.reason}
+          isProcessing={isWasting}
+          icon={<AlertTriangle className="h-5 w-5 text-warning" />}
+          title="Registrar Merma"
+          iconBgColor="bg-warning/10"
+          onQuantityChange={(v) => setWasteModal(prev => prev ? { ...prev, quantity: v } : prev)}
+          onUnitChange={(u) => setWasteModal(prev => prev ? { ...prev, unit: u } : prev)}
+          onReasonChange={(r) => setWasteModal(prev => prev ? { ...prev, reason: r } : prev)}
+          onConfirm={handleWaste}
+          onCancel={() => setWasteModal(null)}
+          confirmLabel="Registrar Merma"
+          reasonPlaceholder="Ej: Producto vencido, derrame..."
+        />
+      )}
 
-                  <div className="flex gap-2 mb-3">
-                    <div className="flex-1">
-                      <label className="text-xs font-medium text-text-secondary">Cantidad *</label>
-                      <NumberInput
-                        min={0.0001}
-                        max={maxInCurrentUnit}
-                        step="0.01"
-                        value={cancelModal.quantity}
-                        onValueChange={(v) => setCancelModal(prev => ({ ...prev, quantity: v }))}
-                      />
-                    </div>
-                    <div className="w-32">
-                      <label className="text-xs font-medium text-text-secondary">Unidad</label>
-                      <select
-                        value={cancelModal.unit}
-                        onChange={(e) => {
-                          const newUnit = e.target.value as UnitAbbrev;
-                          const convertedQty = convertUnit(cancelModal.quantity, cancelModal.unit, newUnit);
-                          setCancelModal(prev => ({ ...prev, quantity: convertedQty, unit: newUnit }));
-                          saveLastUsedUnit(cancelModal.item.product_id, newUnit);
-                        }}
-                        disabled={compatibleUnits.length <= 1}
-                        className="w-full rounded-lg border border-border bg-bg px-2 py-2 text-sm text-text disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {compatibleUnits.map((u) => (
-                          <option key={u} value={u}>{UNIT_LABELS[u]}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {currentQuantityInBase > cancelModal.item.remaining && (
-                    <p className="text-xs text-danger mt-2">
-                      La cantidad excede el disponible ({cancelModal.item.remaining} {baseUnit})
-                    </p>
-                  )}
-
-                  <div className="flex gap-2 mt-2">
-                    {[0.25, 0.5, 1].map((pct, i) => {
-                      const qtyInUnit = convertUnit(cancelModal.item.remaining * pct, baseUnit, cancelModal.unit);
-                      return (
-                        <button
-                          key={pct}
-                          onClick={() => setCancelModal(prev => ({ ...prev, quantity: qtyInUnit }))}
-                          className="flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text-secondary hover:border-primary hover:text-primary transition-colors"
-                        >
-                          {i === 2 ? '100%' : `${i === 0 ? 25 : 50}%`}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-text-secondary">Motivo *</label>
-                  <textarea
-                    className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                    rows={2}
-                    placeholder="Ej: Producto en mal estado, cancelación de producción..."
-                    value={cancelModal.reason}
-                    onChange={(e) => setCancelModal(prev => ({ ...prev, reason: e.target.value }))}
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-3">
-                <Button variant="outline" onClick={() => setCancelModal(null)} className="flex-1" disabled={isCancelling}>
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={handleCancel}
-                  className="flex-1 gap-2"
-                  disabled={isCancelling || !cancelModal.reason.trim() || currentQuantityInBase > cancelModal.item.remaining || currentQuantityInBase <= 0}
-                >
-                  {isCancelling ? 'Devolviendo...' : <><RotateCcw className="h-4 w-4" /> Devolver</>}
-                </Button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-      {wasteModal && getProduct(wasteModal.item.product_id) && (() => {
-        const product = getProduct(wasteModal.item.product_id);
-        const baseUnit = product ? normalizeUnit(product.unit) : 'u';
-        const compatibleUnits = getCompatibleUnits(baseUnit);
-        
-        const currentQuantityInBase = convertUnit(wasteModal.quantity, wasteModal.unit, baseUnit);
-        const maxInCurrentUnit = convertUnit(wasteModal.item.remaining, baseUnit, wasteModal.unit);
-        
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm modal-backdrop">
-            <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl max-h-[90dvh] overflow-y-auto">
-              <div className="mb-6 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning/10">
-                    <AlertTriangle className="h-5 w-5 text-warning" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-bold text-text">Registrar Merma</h2>
-                    <p className="text-xs text-text-secondary">{product?.name}</p>
-                  </div>
-                </div>
-                <button onClick={() => setWasteModal(null)} className="rounded-full p-2 text-text-secondary hover:bg-surface-hover hover:text-text transition-colors">
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-
-              <div className="mb-4 space-y-4">
-                <div className="rounded-xl bg-bg/50 border border-border p-4">
-                  <div className="flex items-center gap-2 mb-3 text-sm text-text-secondary">
-                    <AlertTriangle className="h-4 w-4 text-warning" />
-                    Disponible: <span className="font-bold text-text">{wasteModal.item.remaining} {baseUnit}</span>
-                  </div>
-
-                  <div className="flex gap-2 mb-3">
-                    <div className="flex-1">
-                      <label className="text-xs font-medium text-text-secondary">Cantidad *</label>
-                      <NumberInput
-                        min={0.0001}
-                        max={maxInCurrentUnit}
-                        step="0.01"
-                        value={wasteModal.quantity}
-                        onValueChange={(v) => setWasteModal(prev => ({ ...prev, quantity: v }))}
-                      />
-                    </div>
-                    <div className="w-32">
-                      <label className="text-xs font-medium text-text-secondary">Unidad</label>
-                      <select
-                        value={wasteModal.unit}
-                        onChange={(e) => {
-                          const newUnit = e.target.value as UnitAbbrev;
-                          const convertedQty = convertUnit(wasteModal.quantity, wasteModal.unit, newUnit);
-                          setWasteModal(prev => ({ ...prev, quantity: convertedQty, unit: newUnit }));
-                          saveLastUsedUnit(wasteModal.item.product_id, newUnit);
-                        }}
-                        disabled={compatibleUnits.length <= 1}
-                        className="w-full rounded-lg border border-border bg-bg px-2 py-2 text-sm text-text disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {compatibleUnits.map((u) => (
-                          <option key={u} value={u}>{UNIT_LABELS[u]}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {currentQuantityInBase > wasteModal.item.remaining && (
-                    <p className="text-xs text-danger mt-2">
-                      La cantidad excede el disponible ({wasteModal.item.remaining} {baseUnit})
-                    </p>
-                  )}
-
-                  <div className="flex gap-2 mt-2">
-                    {[0.25, 0.5, 1].map((pct, i) => {
-                      const qtyInUnit = convertUnit(wasteModal.item.remaining * pct, baseUnit, wasteModal.unit);
-                      return (
-                        <button
-                          key={`waste-${pct}`}
-                          onClick={() => setWasteModal(prev => ({ ...prev, quantity: qtyInUnit }))}
-                          className="flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text-secondary hover:border-primary hover:text-primary transition-colors"
-                        >
-                          {i === 2 ? '100%' : `${i === 0 ? 25 : 50}%`}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-text-secondary">Justificación *</label>
-                  <textarea
-                    className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                    rows={2}
-                    placeholder="Ej: Producto dañado, caducado, perdido..."
-                    value={wasteModal.reason}
-                    onChange={(e) => setWasteModal(prev => ({ ...prev, reason: e.target.value }))}
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-3">
-                <Button variant="outline" onClick={() => setWasteModal(null)} className="flex-1" disabled={isWasting}>
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={handleWaste}
-                  className="flex-1 gap-2"
-                  disabled={isWasting || !wasteModal.reason.trim() || currentQuantityInBase > wasteModal.item.remaining || currentQuantityInBase <= 0}
-                >
-                  {isWasting ? 'Registrando...' : <><AlertTriangle className="h-4 w-4" /> Registrar Merma</>}
-                </Button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-      {consumptionModal && getProduct(consumptionModal.item.product_id) && (() => {
-        const product = getProduct(consumptionModal.item.product_id);
-        const baseUnit = product ? normalizeUnit(product.unit) : 'u';
-        const compatibleUnits = getCompatibleUnits(baseUnit);
-        
-        const currentQuantityInBase = convertUnit(consumptionModal.quantity, consumptionModal.unit, baseUnit);
-        const maxInCurrentUnit = convertUnit(consumptionModal.item.remaining, baseUnit, consumptionModal.unit);
-        
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm modal-backdrop">
-            <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl max-h-[90dvh] overflow-y-auto">
-              <div className="mb-6 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/10">
-                    <TrendingDown className="h-5 w-5 text-success" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-bold text-text">{product?.is_gasto_variable ? 'Registrar Gasto Variable' : 'Registrar Consumo Manual'}</h2>
-                    <p className="text-xs text-text-secondary">{product?.name}</p>
-                  </div>
-                </div>
-                <button onClick={() => setConsumptionModal(null)} className="rounded-full p-2 text-text-secondary hover:bg-surface-hover hover:text-text transition-colors">
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-
-              <div className="mb-4 space-y-4">
-                <div className="rounded-xl bg-bg/50 border border-border p-4">
-                  <div className="flex items-center gap-2 mb-3 text-sm text-text-secondary">
-                    <TrendingDown className="h-4 w-4 text-success" />
-                    Disponible: <span className="font-bold text-text">{consumptionModal.item.remaining} {baseUnit}</span>
-                  </div>
-
-                  <div className="flex gap-2 mb-3">
-                    <div className="flex-1">
-                      <label className="text-xs font-medium text-text-secondary">Cantidad consumida *</label>
-                      <NumberInput
-                        min={0.0001}
-                        max={maxInCurrentUnit}
-                        step="0.01"
-                        value={consumptionModal.quantity}
-                        onValueChange={(v) => setConsumptionModal(prev => ({ ...prev, quantity: v }))}
-                      />
-                    </div>
-                    <div className="w-32">
-                      <label className="text-xs font-medium text-text-secondary">Unidad</label>
-                      <select
-                        value={consumptionModal.unit}
-                        onChange={(e) => {
-                          const newUnit = e.target.value as UnitAbbrev;
-                          const convertedQty = convertUnit(consumptionModal.quantity, consumptionModal.unit, newUnit);
-                          setConsumptionModal(prev => ({ ...prev, quantity: convertedQty, unit: newUnit }));
-                          saveLastUsedUnit(consumptionModal.item.product_id, newUnit);
-                        }}
-                        disabled={compatibleUnits.length <= 1}
-                        className="w-full rounded-lg border border-border bg-bg px-2 py-2 text-sm text-text disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {compatibleUnits.map((u) => (
-                          <option key={u} value={u}>{UNIT_LABELS[u]}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {currentQuantityInBase > consumptionModal.item.remaining && (
-                    <p className="text-xs text-danger mt-2">
-                      La cantidad excede el disponible ({consumptionModal.item.remaining} {baseUnit})
-                    </p>
-                  )}
-
-                  <div className="flex gap-2 mt-2">
-                    {[0.25, 0.5, 1].map((pct, i) => {
-                      const qtyInUnit = convertUnit(consumptionModal.item.remaining * pct, baseUnit, consumptionModal.unit);
-                      return (
-                        <button
-                          key={`consumption-${pct}`}
-                          onClick={() => setConsumptionModal(prev => ({ ...prev, quantity: qtyInUnit }))}
-                          className="flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text-secondary hover:border-primary hover:text-primary transition-colors"
-                        >
-                          {i === 2 ? '100%' : `${i === 0 ? 25 : 50}%`}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {product?.is_consumo_directo && (
-                    <div className="mt-3 pt-3 border-t border-border">
-                      <label className="text-xs font-medium text-text-secondary">Nota *</label>
-                      <Input
-                        value={consumptionModal.note}
-                        onChange={(e) => setConsumptionModal(prev => ({ ...prev, note: e.target.value }))}
-                        placeholder="Ej: Sal - para mesa 5, Orégano - para cocina"
-                        className="mt-1"
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex gap-3">
-                <Button variant="outline" onClick={() => setConsumptionModal(null)} className="flex-1" disabled={isConsuming}>
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={handleConsumption}
-                  className="flex-1 gap-2"
-                  disabled={isConsuming || currentQuantityInBase > consumptionModal.item.remaining || currentQuantityInBase <= 0}
-                >
-                  {isConsuming ? 'Registrando...' : <><TrendingDown className="h-4 w-4" /> Registrar Consumo</>}
-                </Button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {consumptionModal && getProduct(consumptionModal.item.product_id) && (
+        <TransitActionModal
+          type="consumption"
+          item={consumptionModal.item}
+          productName={getProduct(consumptionModal.item.product_id)!.name}
+          productUnit={getProduct(consumptionModal.item.product_id)!.unit}
+          quantity={consumptionModal.quantity}
+          unit={consumptionModal.unit}
+          reason={consumptionModal.note}
+          isProcessing={isConsuming}
+          icon={<TrendingDown className="h-5 w-5 text-success" />}
+          title="Consumo Manual"
+          iconBgColor="bg-success/10"
+          onQuantityChange={(v) => setConsumptionModal(prev => prev ? { ...prev, quantity: v } : prev)}
+          onUnitChange={(u) => setConsumptionModal(prev => prev ? { ...prev, unit: u } : prev)}
+          onReasonChange={(r) => setConsumptionModal(prev => prev ? { ...prev, note: r } : prev)}
+          onConfirm={handleConsumption}
+          onCancel={() => setConsumptionModal(null)}
+          confirmLabel="Registrar Consumo"
+          reasonPlaceholder="Ej: Consumo directo para preparación..."
+          reasonRequired={false}
+        />
+      )}
     </div>
   );
 }

@@ -105,10 +105,10 @@ export default function UsersView() {
   }, [searchTerm]);
 
   useEffect(() => {
-    if (user?.email === import.meta.env.VITE_ADMIN_EMAIL) {
+    if (user?.role === 'admin') {
       fetchProfiles();
     }
-  }, [page, limit, debouncedSearch, statusFilter, dateOrder, user?.email]);
+  }, [page, limit, debouncedSearch, statusFilter, dateOrder, user?.role]);
 
   useEffect(() => {
     if (searchParams.get('filter') === 'uncontacted') {
@@ -538,7 +538,7 @@ Además, lo invitamos a ver nuestro tutorial en YouTube donde explicamos paso a 
     inactive: profiles.filter(p => ['past_due', 'canceled'].includes(getEffectiveStatus(p))).length,
   };
 
-  if (user?.email !== import.meta.env.VITE_ADMIN_EMAIL) {
+  if (user?.role !== 'admin') {
     return (
       <div className="flex h-full items-center justify-center p-8">
         <div className="text-center">

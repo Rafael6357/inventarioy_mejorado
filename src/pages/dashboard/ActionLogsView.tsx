@@ -4,6 +4,7 @@ import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { useDatabaseStore, ROLE_LABELS } from '../../store/dbStore';
 import { usePersistentFilters } from '../../lib/hooks/usePersistentFilters';
+import { MODULE_LABELS, ACTION_LABELS, DETAIL_KEY_TRANSLATIONS } from '../../lib/constants';
 
 interface ActionLog {
   id: string;
@@ -182,67 +183,6 @@ export default function ActionLogsView() {
       minute: '2-digit',
       hour12: true,
     });
-  };
-
-  const DETAIL_KEY_TRANSLATIONS: Record<string, string> = {
-    product_name: 'Producto',
-    quantity: 'Cantidad',
-    unit: 'Unidad',
-    reason: 'Razón',
-    category: 'Categoría',
-    total: 'Total',
-    items_count: 'Items',
-    sale_type: 'Tipo de venta',
-    employee: 'Empleado',
-    is_account_house: 'Cuenta Casa',
-    client_name: 'Cliente',
-    recipe_name: 'Receta',
-    recipe_id: 'ID Receta',
-    new_price: 'Nuevo precio',
-    ingredients_count: 'Ingredientes',
-    doc_type: 'Tipo doc',
-    file_name: 'Archivo',
-    doc_name: 'Documento',
-    changes: 'Cambios',
-    closing_date: 'Fecha de cierre',
-    total_sales: 'Ventas totales',
-    total_discounts: 'Descuentos',
-    total_refunds: 'Devoluciones',
-    closing_amount: 'Monto del cierre',
-    created_by_name: 'Cerrado por',
-    month: 'Mes',
-    year: 'Año',
-    total_employees: 'Total empleados',
-    total_net: 'Neto total',
-    employee_name: 'Empleado',
-    field: 'Campo',
-    old_value: 'Valor anterior',
-    new_value: 'Nuevo valor',
-    // Campos de nómina / RRHH
-    earned_salary: 'Salario Devengado',
-    base_salary: 'Salario Básico',
-    vacation_days: 'Días de Vacación',
-    exemption_base: 'Base Exenta',
-    taxable_base: 'Base Imponible',
-    tax_amount: 'Impuesto',
-    special_contribution: 'Contribución Especial',
-    net_salary: 'Salario Neto',
-    salary: 'Salario',
-    justification: 'Justificación',
-    payment_method: 'Método de Pago',
-    // Campos de syncEngine
-    product_id: 'ID Producto',
-    name: 'Nombre',
-    sale_id: 'ID Venta',
-    transitItemId: 'ID Tránsito',
-    productId: 'ID Producto',
-    customer: 'Cliente',
-    account_id: 'ID Cuenta',
-    accountId: 'ID Cuenta',
-    id: 'ID',
-    type: 'Tipo',
-    date: 'Fecha',
-    customer_name: 'Cliente',
   };
 
   const formatDetails = (details: Record<string, any>, module: string, action: string) => {

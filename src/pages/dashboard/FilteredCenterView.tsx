@@ -5,6 +5,7 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
 import { calculateMargin, exportToExcel } from '../../lib/utils';
+import SortIcon from '../../components/ui/SortIcon';
 
 export default function FilteredCenterView() {
   const { products, productWarehouse, warehouses, currentWarehouseId, setCurrentWarehouse } = useDatabaseStore();
@@ -109,11 +110,6 @@ export default function FilteredCenterView() {
       setSortBy(field);
       setSortOrder('asc');
     }
-  };
-
-  const SortIcon = ({ field }: { field: string }) => {
-    if (sortBy !== field) return <ArrowUpDown className="ml-1 h-3 w-3 opacity-30" />;
-    return <ArrowUpDown className={`ml-1 h-3 w-3 ${sortOrder === 'desc' ? 'rotate-180' : ''} text-primary`} />;
   };
 
   return (
@@ -249,19 +245,19 @@ export default function FilteredCenterView() {
             <thead className="border-b border-border bg-bg/50 text-xs uppercase text-text-secondary">
               <tr>
                 <th className="px-4 py-3 font-medium cursor-pointer hover:bg-surface-hover transition-colors" onClick={() => toggleSort('name')}>
-                  <div className="flex items-center">Producto <SortIcon field="name" /></div>
+                  <div className="flex items-center">Producto <SortIcon sortBy={sortBy} sortOrder={sortOrder} field="name" /></div>
                 </th>
                 <th className="px-4 py-3 font-medium">Categoría</th>
                 <th className="px-4 py-3 font-medium cursor-pointer hover:bg-surface-hover transition-colors" onClick={() => toggleSort('stock')}>
-                  <div className="flex items-center">Almacén <SortIcon field="stock" /></div>
+                  <div className="flex items-center">Almacén <SortIcon sortBy={sortBy} sortOrder={sortOrder} field="stock" /></div>
                 </th>
                 <th className="px-4 py-3 font-medium">Estado</th>
                 <th className="px-4 py-3 font-medium cursor-pointer hover:bg-surface-hover transition-colors" onClick={() => toggleSort('price')}>
-                  <div className="flex items-center">Precio <SortIcon field="price" /></div>
+                  <div className="flex items-center">Precio <SortIcon sortBy={sortBy} sortOrder={sortOrder} field="price" /></div>
                 </th>
                 <th className="px-4 py-3 font-medium hidden md:table-cell">Margen %</th>
                 <th className="px-4 py-3 font-medium cursor-pointer hover:bg-surface-hover transition-colors hidden md:table-cell" onClick={() => toggleSort('value')}>
-                  <div className="flex items-center">Valor Total <SortIcon field="value" /></div>
+                  <div className="flex items-center">Valor Total <SortIcon sortBy={sortBy} sortOrder={sortOrder} field="value" /></div>
                 </th>
               </tr>
             </thead>

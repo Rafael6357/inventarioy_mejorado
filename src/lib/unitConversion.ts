@@ -91,8 +91,9 @@ export function convertUnit(
     throw new Error(`No se puede convertir de ${fromUnit} a ${toUnit}: unidades incompatibles`);
   }
 
-  const baseValue = value * UNIT_CONVERSIONS[fromType!][fromUnit];
-  const convertedValue = baseValue / UNIT_CONVERSIONS[fromType!][toUnit];
+  const lookup = UNIT_CONVERSIONS[fromType!];
+  const baseValue = value * lookup[fromUnit as keyof typeof lookup];
+  const convertedValue = baseValue / lookup[toUnit as keyof typeof lookup];
 
   return Number(convertedValue.toFixed(precision));
 }

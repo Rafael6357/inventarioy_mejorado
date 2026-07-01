@@ -41,7 +41,7 @@ class SyncEngine {
     this.processing = true;
 
     try {
-      console.log(`[Sync] processQueue iniciado — online: ${navigator.onLine}`);
+      if (import.meta.env.DEV) console.log(`[Sync] processQueue iniciado — online: ${navigator.onLine}`);
 
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {

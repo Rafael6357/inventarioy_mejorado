@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { clearLocalData } from '../lib/dexieDb';
 import { useDatabaseStore } from './dbStore';
-import { encryptCredentials, decryptCredentials } from '../lib/cryptoUtils';
 import { logger } from '../lib/logger';
 import { syncEngine } from '../lib/syncEngine';
 
@@ -44,7 +43,7 @@ export interface User {
   address: string;
   businessHours: string;
   businessCode: string;
-  themePreference: 'light' | 'dark' | 'system';
+  themePreference: 'light' | 'dark';
 }
 
 interface AuthState {
@@ -63,9 +62,8 @@ interface AuthState {
 let _isInitializing = false;
 let _authListenerSubscription: any = null;
 
-const checkSubscriptionActive = (email: string, subscription: User['subscription']): boolean => {
-  const adminEmail = import.meta.env.VITE_ADMIN_EMAIL;
-  if (adminEmail && email === adminEmail) {
+const checkSubscriptionActive = (role: string, subscription: User['subscription']): boolean => {
+  if (role === 'admin') {
     return true;
   }
   
@@ -171,9 +169,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     _isInitializing = true;
     logger.info('Inicializando autenticación...');
 
-    // Solo modo online - sin SQLite
     const savedUserData = localStorage.getItem('inventarioy_user');
-    const savedCredentials = localStorage.getItem('saved_credentials');
 
     // Si hay datos de usuario guardados, mostrarlos inmediatamente mientras se verifica la sesión
     if (savedUserData) {
@@ -191,8 +187,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     // Si no hay conexión, restaurar sesión guardada inmediatamente sin timeout
     if (!navigator.onLine) {
       logger.info('📴 Modo offline — restaurando sesión guardada', { 
-        hasSavedUserData: !!savedUserData,
-        hasSavedCredentials: !!savedCredentials
+        hasSavedUserData: !!savedUserData
       });
       if (savedUserData) {
         try {
@@ -212,7 +207,6 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     }
 
     try {
-      // Timeout de 30 segundos para getSession mediante Promise.race
       const { data: { session } } = await Promise.race([
         supabase.auth.getSession(),
         new Promise<never>((_, reject) =>
@@ -221,50 +215,13 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       ]);
 
       if (session?.user) {
-        // Sesión activa - obtener datos del usuario
         await get().fetchUser();
       } else {
-        // No hay sesión activa, intentar auto-login con credenciales guardadas
-        if (navigator.onLine && savedCredentials) {
-          try {
-            const creds = await decryptCredentials(savedCredentials);
-            const { error: signInError } = await supabase.auth.signInWithPassword({
-              email: creds.email,
-              password: creds.password,
-            });
-
-            if (!signInError) {
-              // Login exitoso - obtener datos del usuario
-              await get().fetchUser();
-            } else {
-              // Credenciales expiradas o inválidas
-              logger.warn('Credenciales expiradas, guardando sesión actual temporalmente');
-              // Mantener los datos del usuario temporalmente hasta que se requiera recargar
-              if (savedUserData) {
-                const userData = JSON.parse(savedUserData);
-                set({ user: userData, isAuthenticated: true, isLoading: false });
-              } else {
-                set({ isLoading: false });
-              }
-            }
-          } catch (autoLoginErr) {
-            logger.warn('Login automático falló:', autoLoginErr);
-            // Mantener sesión si hay datos guardados
-            if (savedUserData) {
-              const userData = JSON.parse(savedUserData);
-              set({ user: userData, isAuthenticated: true, isLoading: false });
-            } else {
-              set({ isLoading: false });
-            }
-          }
+        if (savedUserData) {
+          const userData = JSON.parse(savedUserData);
+          set({ user: userData, isAuthenticated: true, isLoading: false });
         } else {
-          // Sin internet o sin credenciales guardadas
-          if (savedUserData) {
-            const userData = JSON.parse(savedUserData);
-            set({ user: userData, isAuthenticated: true, isLoading: false });
-          } else {
-            set({ isLoading: false });
-          }
+          set({ isLoading: false });
         }
       }
 
@@ -398,7 +355,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         role: (profile?.role as 'admin' | 'user') || 'user',
         createdAt: authUser.created_at,
         subscription,
-        isSubscriptionActive: checkSubscriptionActive(authUser.email || '', subscription),
+        isSubscriptionActive: checkSubscriptionActive(profile?.role || 'user', subscription),
         generateTicket: profile?.generate_ticket ?? false,
         ticketMessage: profile?.ticket_message || '¡Gracias por su visita!',
         usdEnabled: profile?.usd_enabled ?? false,
@@ -410,7 +367,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         address: profile?.address || '',
         businessHours: profile?.business_hours || '',
         businessCode: profile?.business_code || '',
-        themePreference: (profile?.theme_preference as 'light' | 'dark' | 'system') || 'dark',
+        themePreference: (profile?.theme_preference as 'light' | 'dark') || 'dark',
       };
 
       logger.info('Usuario cargado', { email: user.email, role: user.role, subscriptionActive: user.isSubscriptionActive });
@@ -446,14 +403,10 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       }
 
       if (data.user) {
-        // Guardar credenciales cifradas para sesión persistente
-        const credentials = await encryptCredentials(email, password);
-        localStorage.setItem('saved_credentials', credentials);
         localStorage.setItem('saved_email', email);
 
         const userLoaded = await get().fetchUser();
         if (!userLoaded) {
-          localStorage.removeItem('saved_credentials');
           localStorage.removeItem('saved_email');
           return { success: false, error: 'Error al cargar los datos del usuario. Intente de nuevo.' };
         }
@@ -545,9 +498,8 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     try {
       // Código SQLite eliminado
 
-      localStorage.removeItem('saved_credentials');
       localStorage.removeItem('saved_email');
-      localStorage.removeItem('inventarioy_user'); // Asegurar limpieza de sesión
+      localStorage.removeItem('inventarioy_user');
 
       _isInitializing = false;
       _authListenerSubscription = null;

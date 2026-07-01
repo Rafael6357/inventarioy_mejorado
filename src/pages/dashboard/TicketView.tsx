@@ -103,9 +103,9 @@ export default function TicketView({ ticketData, onClose, isPreticket = false }:
               </div>
             )}
 
-            {ticketData.deliveryFee > 0 && (
+            {(ticketData.deliveryFee ?? 0) > 0 && (
               <div className="mb-2 text-xs">
-                Costo Domicilio: {formatCurrency(ticketData.deliveryFee)}
+                Costo Domicilio: {formatCurrency(ticketData.deliveryFee ?? 0)}
               </div>
             )}
 

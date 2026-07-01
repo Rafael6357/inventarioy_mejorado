@@ -185,50 +185,51 @@ export default function AnalysisView() {
     const fromDate = new Date(turnoverDateFrom + 'T00:00:00');
     const toDate = new Date(turnoverDateTo + 'T23:59:59');
     const daysInPeriod = Math.max(1, Math.round((toDate.getTime() - fromDate.getTime()) / (1000 * 60 * 60 * 24)));
+
+    // Pre-agregar ventas por producto: O(S*I) una sola vez
+    const directSalesByProduct = new Map<string, number>();
+    const recipeIngredientSalesByProduct = new Map<string, number>();
+
+    safeSales.forEach(s => {
+      const sDate = new Date(s.date || s.created_at);
+      if (sDate < fromDate || sDate > toDate) return;
+      const items = parseSaleItems(s.items);
+      items.forEach((item: any) => {
+        if (!item.is_recipe) {
+          const prev = directSalesByProduct.get(item.product_id) || 0;
+          directSalesByProduct.set(item.product_id, prev + (item.quantity || 0));
+        }
+        if (item.recipe_snapshot?.ingredients) {
+          item.recipe_snapshot.ingredients.forEach((ing: any) => {
+            const prev = recipeIngredientSalesByProduct.get(ing.product_id) || 0;
+            recipeIngredientSalesByProduct.set(ing.product_id, prev + (ing.quantity || 0));
+          });
+        }
+      });
+    });
+
+    // Pre-agregar movimientos de consumo/salida por producto: O(M) una sola vez
+    const consumoByProduct = new Map<string, number>();
+    const salidasByProduct = new Map<string, number>();
+
+    safeMovements.forEach(m => {
+      const mDate = new Date(m.date);
+      if (mDate < fromDate || mDate > toDate) return;
+      if ((m.type as string) === 'CONSUMO_DIRECTO') {
+        const prev = consumoByProduct.get(m.product_id) || 0;
+        consumoByProduct.set(m.product_id, prev + Number(m.quantity));
+      }
+      if (m.type === 'SALIDA' && !m.reason?.startsWith('Venta #') && m.reason !== 'Venta de producto/ingrediente') {
+        const prev = salidasByProduct.get(m.product_id) || 0;
+        salidasByProduct.set(m.product_id, prev + Number(m.quantity));
+      }
+    });
     
     return activeProducts.map(product => {
-      const salesInPeriod = safeSales.filter(s => {
-        const sDate = new Date(s.date || s.created_at);
-        return sDate >= fromDate && sDate <= toDate;
-      });
-      
-      // 1. Ventas directas (productos individuales)
-      const ventasDirectas = salesInPeriod.reduce((sum, s) => {
-        const items = parseSaleItems(s.items);
-        return sum + items
-          .filter((item: any) => item.product_id === product.id && !item.is_recipe)
-          .reduce((itemSum: number, item: any) => itemSum + (item.quantity || 0), 0);
-      }, 0);
-      
-      // 2. Ingredientes de recetas vendidas
-      const ventasEnRecetas = salesInPeriod.reduce((sum, s) => {
-        const items = parseSaleItems(s.items);
-        return sum + items.reduce((itemSum: number, item: any) => {
-          if (item.recipe_snapshot?.ingredients) {
-            const ingredientConsumed = item.recipe_snapshot.ingredients
-              .filter((ing: any) => ing.product_id === product.id)
-              .reduce((ingSum: number, ing: any) => ingSum + (ing.quantity || 0), 0);
-            return itemSum + ingredientConsumed;
-          }
-          return itemSum;
-        }, 0);
-      }, 0);
-      
-      // 3. Movimiento de consumo directo (CONSUMO_DIRECTO)
-      const consumoDirecto = safeMovements.filter(m => 
-        m.product_id === product.id && 
-        (m.type as string) === 'CONSUMO_DIRECTO' &&
-        new Date(m.date) >= fromDate && new Date(m.date) <= toDate
-      ).reduce((sum, m) => sum + Number(m.quantity), 0);
-      
-      // 4. SALIDA movements (tránsito a cocina - gasto variable)
-      const salidasTransito = safeMovements.filter(m => 
-        m.product_id === product.id && 
-        m.type === 'SALIDA' &&
-        !m.reason?.startsWith('Venta #') &&
-        m.reason !== 'Venta de producto/ingrediente' &&
-        new Date(m.date) >= fromDate && new Date(m.date) <= toDate
-      ).reduce((sum, m) => sum + Number(m.quantity), 0);
+      const ventasDirectas = directSalesByProduct.get(product.id) || 0;
+      const ventasEnRecetas = recipeIngredientSalesByProduct.get(product.id) || 0;
+      const consumoDirecto = consumoByProduct.get(product.id) || 0;
+      const salidasTransito = salidasByProduct.get(product.id) || 0;
       
       // Total consumo/salida real
       const totalOutput = ventasDirectas + ventasEnRecetas + consumoDirecto + salidasTransito;

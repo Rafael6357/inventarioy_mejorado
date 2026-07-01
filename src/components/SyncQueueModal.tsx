@@ -6,6 +6,8 @@ import { useDatabaseStore } from '../store/dbStore';
 import { useAuthStore } from '../store/authStore';
 import { useModalAnimation } from '../lib/animations/useModalAnimation';
 
+import { OPERATION_LABELS } from '../lib/constants';
+
 const operationMeta: Record<string, { label: string; icon: React.ReactNode }> = {
   addProduct: { label: 'Agregar producto', icon: <Package className="h-4 w-4" /> },
   updateProduct: { label: 'Actualizar producto', icon: <Edit3 className="h-4 w-4" /> },
@@ -25,7 +27,7 @@ const operationMeta: Record<string, { label: string; icon: React.ReactNode }> = 
 
 function formatDate(iso: string) {
   const d = new Date(iso);
-  return d.toLocaleString('es-AR', {
+  return d.toLocaleString('es-ES', {
     day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
   });
 }

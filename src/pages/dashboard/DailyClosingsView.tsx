@@ -114,59 +114,52 @@ export default function DailyClosingsView() {
     });
   };
 
-  const calculateClosingTotals = (closingDate: string) => {
-    const allSalesForDate = sales.filter(s => {
-      const saleDate = new Date(s.date).toISOString().split('T')[0];
-      return saleDate === closingDate;
+  const closingTotalsByDate = useMemo(() => {
+    const map = new Map<string, { salon: number; domicilio: number; bar: number; venta_rapida: number; cuenta_casa: number; total: number }>();
+    sales.forEach(s => {
+      const dateKey = new Date(s.date).toISOString().split('T')[0];
+      let entry = map.get(dateKey);
+      if (!entry) {
+        entry = { salon: 0, domicilio: 0, bar: 0, venta_rapida: 0, cuenta_casa: 0, total: 0 };
+        map.set(dateKey, entry);
+      }
+      const amount = Number(s.total_amount || 0);
+      if (s.is_account_house) {
+        const items = (s as any).sale_items || [];
+        const itemsTotal = items.reduce((itemSum: number, item: any) => itemSum + Number(item.subtotal || 0), 0);
+        entry.cuenta_casa += itemsTotal;
+      } else {
+        entry.total += amount;
+        if (s.sale_type === 'SALON') entry.salon += amount;
+        else if (s.sale_type === 'DOMICILIO') entry.domicilio += amount;
+        else if (s.sale_type === 'BAR') entry.bar += amount;
+        else if (s.sale_type === 'VENTA_RAPIDA') entry.venta_rapida += amount;
+      }
     });
-    
-    const salonSales = allSalesForDate.filter(s => s.sale_type === 'SALON' && !s.is_account_house);
-    const domicilioSales = allSalesForDate.filter(s => s.sale_type === 'DOMICILIO' && !s.is_account_house);
-    const barSales = allSalesForDate.filter(s => s.sale_type === 'BAR' && !s.is_account_house);
-    const ventaRapidaSales = allSalesForDate.filter(s => s.sale_type === 'VENTA_RAPIDA' && !s.is_account_house);
-    const cuentaCasaSales = allSalesForDate.filter(s => s.is_account_house === true);
-    
-    const salonTotal = salonSales.reduce((sum, s) => sum + Number(s.total_amount || 0), 0);
-    const domicilioTotal = domicilioSales.reduce((sum, s) => sum + Number(s.total_amount || 0), 0);
-    const barTotal = barSales.reduce((sum, s) => sum + Number(s.total_amount || 0), 0);
-    const ventaRapidaTotal = ventaRapidaSales.reduce((sum, s) => sum + Number(s.total_amount || 0), 0);
-    const cuentaCasaTotal = cuentaCasaSales.reduce((sum, s) => {
-      const items = (s as any).sale_items || [];
-      const itemsTotal = items.reduce((itemSum: number, item: any) => itemSum + Number(item.subtotal || 0), 0);
-      return sum + itemsTotal;
-    }, 0);
-    
-    return {
-      salon: salonTotal,
-      domicilio: domicilioTotal,
-      bar: barTotal,
-      venta_rapida: ventaRapidaTotal,
-      cuenta_casa: cuentaCasaTotal,
-      total: salonTotal + domicilioTotal + barTotal + ventaRapidaTotal
-    };
-  };
+    return map;
+  }, [sales]);
 
   const totalVentasHistorico = filteredClosings.reduce((sum, c) => sum + Number(c.total_sales || 0), 0);
   const totalDescuentosHistorico = filteredClosings.reduce((sum, c) => sum + Number(c.total_discounts || 0), 0);
-  
+
   const totalSalonHistorico = filteredClosings.reduce((sum, c) => {
-    return sum + calculateClosingTotals(c.closing_date.split('T')[0]).salon;
+    return sum + (closingTotalsByDate.get(c.closing_date.split('T')[0])?.salon || 0);
   }, 0);
   
   const totalDomicilioHistorico = filteredClosings.reduce((sum, c) => {
-    return sum + calculateClosingTotals(c.closing_date.split('T')[0]).domicilio;
+    return sum + (closingTotalsByDate.get(c.closing_date.split('T')[0])?.domicilio || 0);
   }, 0);
 
   const totalCuentaCasaHistorico = filteredClosings.reduce((sum, c) => {
-    return sum + calculateClosingTotals(c.closing_date.split('T')[0]).cuenta_casa;
+    return sum + (closingTotalsByDate.get(c.closing_date.split('T')[0])?.cuenta_casa || 0);
   }, 0);
 
   const totalBarHistorico = filteredClosings.reduce((sum, c) => {
-    return sum + calculateClosingTotals(c.closing_date.split('T')[0]).bar;
+    return sum + (closingTotalsByDate.get(c.closing_date.split('T')[0])?.bar || 0);
   }, 0);
 
   const totalVentaRapidaHistorico = filteredClosings.reduce((sum, c) => {
-    return sum + calculateClosingTotals(c.closing_date.split('T')[0]).venta_rapida;
+    return sum + (closingTotalsByDate.get(c.closing_date.split('T')[0])?.venta_rapida || 0);
   }, 0);
 
   const statsRef = useStaggerEnter([totalVentasHistorico]);
@@ -566,26 +559,31 @@ export default function DailyClosingsView() {
 
             <div className="space-y-3 rounded-xl bg-bg/50 p-4">
               <div className="text-xs font-medium text-text-secondary mb-2">Desglose de Ventas:</div>
+              {(() => {
+                const totals = closingTotalsByDate.get(selectedClosing.closing_date.split('T')[0]) || { salon: 0, domicilio: 0, cuenta_casa: 0, bar: 0, venta_rapida: 0 };
+                return <>
               <div className="flex justify-between text-sm">
                 <span className="text-text-secondary">Salón:</span>
-                <span className="font-mono text-text">${calculateClosingTotals(selectedClosing.closing_date.split('T')[0]).salon.toFixed(2)}</span>
+                <span className="font-mono text-text">${totals.salon.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-text-secondary">Domicilio:</span>
-                <span className="font-mono text-text">${calculateClosingTotals(selectedClosing.closing_date.split('T')[0]).domicilio.toFixed(2)}</span>
+                <span className="font-mono text-text">${totals.domicilio.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-text-secondary">Cuenta Casa:</span>
-                <span className="font-mono text-text">${calculateClosingTotals(selectedClosing.closing_date.split('T')[0]).cuenta_casa.toFixed(2)}</span>
+                <span className="font-mono text-text">${totals.cuenta_casa.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-text-secondary">Bar:</span>
-                <span className="font-mono text-text">${calculateClosingTotals(selectedClosing.closing_date.split('T')[0]).bar.toFixed(2)}</span>
+                <span className="font-mono text-text">${totals.bar.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-text-secondary">Venta Rápida:</span>
-                <span className="font-mono text-text">${calculateClosingTotals(selectedClosing.closing_date.split('T')[0]).venta_rapida.toFixed(2)}</span>
+                <span className="font-mono text-text">${totals.venta_rapida.toFixed(2)}</span>
               </div>
+                </>;
+              })()}
               <div className="flex justify-between text-sm border-t border-border/50 pt-2">
                 <span className="text-text-secondary">Ventas brutas:</span>
                 <span className="font-mono text-text">${Number(selectedClosing.total_sales || 0).toFixed(2)}</span>
@@ -596,7 +594,7 @@ export default function DailyClosingsView() {
               </div>
               <div className="flex justify-between text-sm text-text-secondary">
                 <span>Devoluciones:</span>
-                <span className="font-mono">$${Number(selectedClosing.total_refunds || 0).toFixed(2)}</span>
+                <span className="font-mono">-${Number(selectedClosing.total_refunds || 0).toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-lg font-bold border-t border-border/50 pt-2">
                 <span className="text-text">Total en Caja:</span>

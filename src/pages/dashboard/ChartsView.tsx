@@ -28,10 +28,9 @@ export default function ChartsView() {
 
   // 2. Top Selling Products (Bar Chart) - incluye productos individuales y recetas
   const topProducts = useMemo(() => {
-    const productSales = sales.flatMap(s => s.items).reduce((acc, item) => {
+    const productSales = sales.flatMap(s => s.items || []).reduce((acc, item) => {
       let name: string;
       
-      // Si es receta, usar el nombre del snapshot o buscar en recipes
       if (item.is_recipe) {
         if (item.recipe_snapshot?.name) {
           name = item.recipe_snapshot.name;
@@ -41,13 +40,13 @@ export default function ChartsView() {
           name = recipe.name;
         }
       } else {
-        // Producto individual
         const product = products.find(p => p.id === item.product_id);
         if (!product) return acc;
         name = product.name;
       }
       
-      acc[name] = (acc[name] || 0) + item.quantity;
+      const qty = Number(item.quantity) || 0;
+      acc[name] = (acc[name] || 0) + qty;
       return acc;
     }, {} as Record<string, number>);
 
@@ -90,7 +89,7 @@ export default function ChartsView() {
                   <Tooltip 
                     contentStyle={{ backgroundColor: '#1a1a1a', borderColor: '#333', borderRadius: '8px' }}
                     itemStyle={{ color: '#fff' }}
-                    formatter={(value: number) => [`$${value.toFixed(2)}`, 'Ventas']}
+                    formatter={(value: any) => [`$${Number(value).toFixed(2)}`, 'Ventas']}
                   />
                   <Line type="monotone" dataKey="total" stroke="#d4af37" strokeWidth={3} dot={{ fill: '#d4af37', strokeWidth: 2 }} activeDot={{ r: 6 }} />
                 </LineChart>
@@ -122,7 +121,7 @@ export default function ChartsView() {
                   <Tooltip 
                     contentStyle={{ backgroundColor: '#1a1a1a', borderColor: '#333', borderRadius: '8px' }}
                     cursor={{ fill: '#333', opacity: 0.4 }}
-                    formatter={(value: number) => [value, 'Unidades']}
+                    formatter={(value: any) => [value, 'Unidades']}
                   />
                   <Bar dataKey="quantity" fill="#d4af37" radius={[0, 4, 4, 0]} barSize={24}>
                     {topProducts.map((entry, index) => (

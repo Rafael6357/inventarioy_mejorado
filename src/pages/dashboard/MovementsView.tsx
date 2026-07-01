@@ -30,9 +30,46 @@ export default function MovementsView() {
   const getProductName = (id: string) => products.find(p => p.id === id)?.name || 'Producto Eliminado';
 
   const filteredMovements = useMemo(() => {
-    // Paso 1: Ordenar del más antiguo al más reciente para calcular el balance acumulativo
-    // Tiebreaker: created_at (orden de creación/inserción) para movimientos con mismo date
-    const sortedMovements = [...movements].sort((a, b) => {
+    // Paso 1: Filtrar movimientos
+    const filtered = movements.filter(m => {
+      const isSaleMovement = m.reason?.startsWith('Venta #') || m.reason === 'Venta de producto/ingrediente';
+      if (isSaleMovement) return false;
+
+      const isInventoryMovement = m.type === 'ENTRADA' || m.type === 'SALIDA' || m.type === 'MERMA' || m.type === 'AJUSTE';
+      const matchesSearch = getProductName(m.product_id).toLowerCase().includes(searchTerm.toLowerCase());
+      
+      let matchesType = true;
+      if (typeFilter === 'ALL') {
+        matchesType = true;
+      } else if (typeFilter === 'CONSUMO_DIRECTO') {
+        matchesType = m.is_consumo_directo === true;
+      } else if (typeFilter === 'GASTO_VARIABLE') {
+        matchesType = m.is_gasto_variable === true;
+      } else {
+        matchesType = m.type === typeFilter;
+      }
+      
+      let matchesDate = true;
+      if (startDate) {
+        matchesDate = matchesDate && new Date(m.date) >= new Date(startDate);
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        matchesDate = matchesDate && new Date(m.date) <= end;
+      }
+
+      let matchesWarehouse = true;
+      if (currentWarehouseId) {
+        matchesWarehouse = m.warehouse_id === currentWarehouseId || m.warehouse_id === null || m.warehouse_id === undefined;
+      }
+      
+      return isInventoryMovement && matchesSearch && matchesType && matchesDate && matchesWarehouse;
+    });
+
+    // Paso 2: Calcular balance sobre los movimientos YA filtrados
+    // Ordenar del más antiguo al más reciente para balance acumulativo
+    const sorted = [...filtered].sort((a, b) => {
       const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
       if (dateDiff !== 0) return dateDiff;
       return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
@@ -40,7 +77,7 @@ export default function MovementsView() {
 
     const productBalances: Record<string, number> = {};
 
-    const movementsWithBal = sortedMovements.map(m => {
+    const withBalance = sorted.map(m => {
       const balanceKey = `${m.product_id}::${m.warehouse_id || '__legacy__'}`;
       const prevBalance = productBalances[balanceKey] || 0;
       let currentBalance = prevBalance;
@@ -53,53 +90,12 @@ export default function MovementsView() {
 
       const clampedBalance = Math.max(0, currentBalance);
       productBalances[balanceKey] = clampedBalance;
-      currentBalance = clampedBalance;
       
-      return {
-        ...m,
-        balance: currentBalance
-      };
+      return { ...m, balance: clampedBalance };
     });
 
-    // Paso 2: Aplicar filtros
-    return movementsWithBal
-      .filter(m => {
-        const isSaleMovement = m.reason?.startsWith('Venta #') || m.reason === 'Venta de producto/ingrediente';
-        if (isSaleMovement) return false;
-
-        const isInventoryMovement = m.type === 'ENTRADA' || m.type === 'SALIDA' || m.type === 'MERMA' || m.type === 'AJUSTE';
-        const matchesSearch = getProductName(m.product_id).toLowerCase().includes(searchTerm.toLowerCase());
-        
-        let matchesType = true;
-        if (typeFilter === 'ALL') {
-          matchesType = true;
-        } else if (typeFilter === 'CONSUMO_DIRECTO') {
-          matchesType = m.is_consumo_directo === true;
-        } else if (typeFilter === 'GASTO_VARIABLE') {
-          matchesType = m.is_gasto_variable === true;
-        } else {
-          matchesType = m.type === typeFilter;
-        }
-        
-        let matchesDate = true;
-        if (startDate) {
-          matchesDate = matchesDate && new Date(m.date) >= new Date(startDate);
-        }
-if (endDate) {
-          const end = new Date(endDate);
-          end.setHours(23, 59, 59, 999);
-          matchesDate = matchesDate && new Date(m.date) <= end;
-        }
-
-        let matchesWarehouse = true;
-        if (currentWarehouseId) {
-          // Mostrar: movimientos del almacén específico O movimientos históricos (sin warehouse_id)
-          matchesWarehouse = m.warehouse_id === currentWarehouseId || m.warehouse_id === null || m.warehouse_id === undefined;
-        }
-        
-        return isInventoryMovement && matchesSearch && matchesType && matchesDate && matchesWarehouse;
-      })
-      .reverse();
+    // Paso 3: Revertir para mostrar más reciente primero
+    return withBalance.reverse();
   }, [movements, searchTerm, typeFilter, startDate, endDate, products, currentWarehouseId]);
 
   useEffect(() => {

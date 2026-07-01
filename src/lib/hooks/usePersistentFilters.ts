@@ -63,7 +63,7 @@ export function usePersistentFilters<T extends Record<string, unknown>>(
       if (typeof partial === "object" && partial !== null && !Array.isArray(partial)) {
         return { ...prev, ...(partial as Partial<T>) };
       }
-      return partial as T;
+      return partial as unknown as T;
     });
   }, []);
 

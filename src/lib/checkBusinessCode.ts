@@ -9,7 +9,7 @@ export async function ensureBusinessCodeColumn(): Promise<boolean> {
       .limit(1);
 
     if (error && error.message.includes('business_code')) {
-      console.log('La columna business_code no existe, creando...');
+      if (import.meta.env.DEV) console.log('La columna business_code no existe, creando...');
       
       // La columna no existe - necesita ser creada por el usuario manualmente
       // ya queALTER TABLE requiere permisos de SQL

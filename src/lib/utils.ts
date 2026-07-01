@@ -63,7 +63,7 @@ export interface ExportColumn {
   format?: (value: any, row?: any) => string;
 }
 
-export function exportToExcel(columns: ExportColumn[], data: any[], filename: string): void {
+export function exportToCSV(columns: ExportColumn[], data: any[], filename: string): void {
   if (!data || data.length === 0) return;
   
   const headers = columns.map(col => col.header);
@@ -109,3 +109,9 @@ export function calculateMargin(cost: number, price: number): number {
   if (!price || price <= 0) return 0;
   return ((price - cost) / price) * 100;
 }
+
+export function normalizeStr(str: string): string {
+  return str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+}
+
+export const exportToExcel = exportToCSV;

@@ -10,7 +10,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 const DEFAULT_TIMEOUT = 30000;
 
 const customFetch: typeof fetch = async (url, options = {}) => {
-  const urlString = typeof url === 'string' ? url : url.url;
+  const urlString = typeof url === 'string' ? url : (url as Request).url;
 
   const isRefreshToken = urlString.includes('grant_type=refresh_token');
   const isRecover = urlString.includes('/auth/v1/recover');

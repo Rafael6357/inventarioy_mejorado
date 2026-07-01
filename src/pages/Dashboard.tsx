@@ -113,7 +113,7 @@ export default function Dashboard() {
   const navigation = useMemo(() => {
     let nav = [...baseNav];
     
-    if (user?.email === import.meta.env.VITE_ADMIN_EMAIL) {
+    if (user?.role === 'admin') {
       nav.push({ name: 'Gestión de Usuarios', href: '/dashboard/users', icon: Users });
     }
     
@@ -293,7 +293,7 @@ export default function Dashboard() {
   }, [navigate]);
 
   useEffect(() => {
-    if (user?.email !== import.meta.env.VITE_ADMIN_EMAIL || hasCheckedUncontacted.current) return;
+    if (user?.role !== 'admin' || hasCheckedUncontacted.current) return;
     hasCheckedUncontacted.current = true;
     checkUncontactedUsers();
   }, [user, checkUncontactedUsers]);
@@ -315,7 +315,6 @@ export default function Dashboard() {
   }
 
   const handleLogout = async () => {
-    console.log('handleLogout ejecutado');
     clearVerifiedRole();
     localStorage.removeItem('verifiedRole');
     localStorage.removeItem('verifiedRoleName');
@@ -339,7 +338,6 @@ export default function Dashboard() {
       } catch { }
       await logout();
     }
-    console.log('logout completado');
   };
 
   const bannerPadding = user?.isSubscriptionActive === false ? 'pt-16' : '';
@@ -422,10 +420,10 @@ export default function Dashboard() {
 
           <div className="mt-8 border-t border-border pt-4">
             <div className="mb-4 px-3">
-              <p className="text-sm font-medium text-text">{user.name}</p>
-              <p className="text-xs text-text-secondary truncate">{user.email}</p>
+              <p className="text-sm font-medium text-text">{user?.name}</p>
+              <p className="text-xs text-text-secondary truncate">{user?.email}</p>
               <div className="mt-2 inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-                {user.subscription?.status === 'trialing' ? 'Prueba Gratis' : 'Plan Profesional'}
+                {user?.subscription?.status === 'trialing' ? 'Prueba Gratis' : 'Plan Profesional'}
               </div>
             </div>
             {verifiedRole && (
@@ -522,7 +520,7 @@ export default function Dashboard() {
                 <Route path="/filtered" element={<FilteredCenterView />} />
                 <Route path="/settings" element={<SettingsView />} />
                 <Route path="/action-logs" element={<ActionLogsView />} />
-                {user?.email === import.meta.env.VITE_ADMIN_EMAIL && (
+                    {user?.role === 'admin' && (
                   <Route path="/users" element={<UsersView />} />
                 )}
               </Routes>

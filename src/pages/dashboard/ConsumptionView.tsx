@@ -43,9 +43,14 @@ export default function ConsumptionView() {
     // Initialize map with all products to 0? No, only show consumed ones.
     
     dailySales.forEach(sale => {
-      const items = typeof sale.items === 'string' 
-        ? JSON.parse(sale.items || '[]') 
-        : (sale.items || []);
+      let items: any[] = [];
+      if (typeof sale.items === 'string') {
+        try {
+          items = JSON.parse(sale.items || '[]');
+        } catch { items = []; }
+      } else {
+        items = sale.items || [];
+      }
       items.forEach(item => {
         // Is it a direct product?
         const product = products.find(p => p.id === item.product_id);
@@ -66,7 +71,7 @@ export default function ConsumptionView() {
         } else {
           // Is it a recipe?
           if (item.is_recipe && item.recipe_snapshot) {
-            item.recipe_snapshot.ingredients?.forEach(ing => {
+            item.recipe_snapshot.ingredients?.forEach((ing: any) => {
               const ingProduct = products.find(p => p.id === ing.product_id);
               if (ingProduct) {
                 const existing = consumptionMap.get(ingProduct.id) || {

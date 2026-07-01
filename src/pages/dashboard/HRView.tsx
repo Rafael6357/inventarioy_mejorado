@@ -11,6 +11,7 @@ import { validateNumber, getNumberFromString, exportToExcel } from '../../lib/ut
 import { useStaggerEnter } from '../../lib/animations/useStaggerEnter';
 import { usePersistentFilters } from '../../lib/hooks/usePersistentFilters';
 import { useIsOffline } from '../../hooks/useOfflineDisabled';
+import PaginationControls from '../../components/PaginationControls';
 
 const DOC_TYPE_LABELS: Record<string, string> = {
   MANUAL: 'Manual',
@@ -270,6 +271,17 @@ export default function HRView() {
     name: '', role: '', salary: 0, phone: '', email: '', nit_id: '', category: '', hire_date: '', photo_url: '',
   });
   const [newEmployeePhoto, setNewEmployeePhoto] = useState<File | null>(null);
+  const [newEmployeePhotoUrl, setNewEmployeePhotoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (newEmployeePhoto) {
+      const url = URL.createObjectURL(newEmployeePhoto);
+      setNewEmployeePhotoUrl(url);
+      return () => URL.revokeObjectURL(url);
+    }
+    setNewEmployeePhotoUrl(null);
+  }, [newEmployeePhoto]);
+
   const [newDepartment, setNewDepartment] = useState('');
   const [editingDepartment, setEditingDepartment] = useState<{id: string, name: string} | null>(null);
   const [payrollMonth, setPayrollMonth] = useState(() => {
@@ -366,8 +378,8 @@ export default function HRView() {
         email: newEmployee.email, 
         nit_id: newEmployee.nit_id, 
         category: newEmployee.category,
-        hire_date: newEmployee.hire_date || null,
-        photo_url: photoUrl,
+        hire_date: newEmployee.hire_date || undefined,
+        photo_url: photoUrl || undefined,
       });
       setNewEmployee({ name: '', role: '', salary: 0, phone: '', email: '', nit_id: '', category: '', hire_date: '', photo_url: '' });
       setNewEmployeePhoto(null);
@@ -601,7 +613,7 @@ export default function HRView() {
                 <div className="flex items-center gap-3">
                   <label className="flex items-center justify-center w-24 h-24 sm:w-20 sm:h-20 rounded-lg border-2 border-dashed border-border hover:border-primary cursor-pointer transition-colors overflow-hidden bg-bg">
                     {newEmployeePhoto ? (
-                      <img src={URL.createObjectURL(newEmployeePhoto)} alt="Preview" className="w-full h-full object-cover" />
+                      <img src={newEmployeePhotoUrl || ''} alt="Preview" className="w-full h-full object-cover" />
                     ) : (
                       <div className="flex flex-col items-center">
                         <Camera className="h-6 w-6 text-text-secondary" />
@@ -750,29 +762,7 @@ export default function HRView() {
               )}
             </div>
 
-            {departmentsTotal > 10 && (
-              <div className="flex items-center justify-center gap-2 mt-6">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={departmentsPage === 1}
-                  onClick={() => setDepartmentsPage(p => Math.max(1, p - 1))}
-                >
-                  ← Anterior
-                </Button>
-                <span className="text-sm text-text-secondary px-3">
-                  Página {departmentsPage} de {Math.ceil(departmentsTotal / 10)}
-                </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={departmentsPage >= Math.ceil(departmentsTotal / 10)}
-                  onClick={() => setDepartmentsPage(p => p + 1)}
-                >
-                  Siguiente →
-                </Button>
-              </div>
-            )}
+            <PaginationControls page={departmentsPage} total={employeesTotal} onPageChange={setDepartmentsPage} />
           </div>
         </div>
       )}
@@ -880,29 +870,7 @@ export default function HRView() {
               )}
             </div>
 
-            {departmentsTotal > 10 && (
-              <div className="flex items-center justify-center gap-2 mt-6">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={departmentsPage === 1}
-                  onClick={() => setDepartmentsPage(p => Math.max(1, p - 1))}
-                >
-                  ← Anterior
-                </Button>
-                <span className="text-sm text-text-secondary px-3">
-                  Página {departmentsPage} de {Math.ceil(departmentsTotal / 10)}
-                </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={departmentsPage >= Math.ceil(departmentsTotal / 10)}
-                  onClick={() => setDepartmentsPage(p => p + 1)}
-                >
-                  Siguiente →
-                </Button>
-              </div>
-            )}
+            <PaginationControls page={departmentsPage} total={departmentsTotal} onPageChange={setDepartmentsPage} />
           </div>
         </div>
       )}
@@ -1142,29 +1110,7 @@ export default function HRView() {
                 );
               })}
 
-              {payrollTotal > 20 && (
-                <div className="flex items-center justify-center gap-2 mt-6">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={payrollPage === 1}
-                    onClick={() => setPayrollPage(p => Math.max(1, p - 1))}
-                  >
-                    ← Anterior
-                  </Button>
-                  <span className="text-sm text-text-secondary px-3">
-                    Página {payrollPage} de {Math.ceil(payrollTotal / 20)}
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={payrollPage >= Math.ceil(payrollTotal / 20)}
-                    onClick={() => setPayrollPage(p => p + 1)}
-                  >
-                    Siguiente →
-                  </Button>
-                </div>
-              )}
+              <PaginationControls page={payrollPage} total={payrollTotal} itemsPerPage={20} onPageChange={setPayrollPage} />
 
               <div className="rounded-xl border border-primary bg-primary/5 p-4 space-y-2">
                 <div className="flex justify-between text-sm">

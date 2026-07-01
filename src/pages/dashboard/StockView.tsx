@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from 'react';
-import { Search, AlertTriangle, ArrowDownToLine, ArrowUpFromLine, Trash2, Filter, Pencil, X, Settings2, Scale, ArrowUpDown, Printer, ChevronLeft, ChevronRight, Package } from 'lucide-react';
+import { Search, AlertTriangle, ArrowDownToLine, ArrowUpFromLine, Trash2, Filter, Pencil, X, Settings2, Scale, Printer, ChevronLeft, ChevronRight, Package } from 'lucide-react';
 import { useDatabaseStore } from '../../store/dbStore';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -12,6 +12,7 @@ import { formatNumber } from '../../lib/formatNumber';
 import { useStaggerEnter } from '../../lib/animations/useStaggerEnter';
 import { usePersistentFilters } from '../../lib/hooks/usePersistentFilters';
 import EmptyState from '../../components/EmptyState';
+import SortIcon from '../../components/ui/SortIcon';
 
 export default function StockView() {
   // Helper to get stock per warehouse
@@ -91,6 +92,7 @@ export default function StockView() {
   const deleteProduct = useDatabaseStore((state) => state.deleteProduct);
   const updateProduct = useDatabaseStore((state) => state.updateProduct);
   const accessPins = useDatabaseStore((state) => state.accessPins);
+  const verifiedRole = useDatabaseStore((state) => state.verifiedRole);
   const logAction = useDatabaseStore((state) => state.logAction);
   const currentWarehouseId = useDatabaseStore((state) => state.currentWarehouseId);
   const warehouses = useDatabaseStore((state) => state.warehouses);
@@ -101,12 +103,10 @@ export default function StockView() {
     if (!accessPins || accessPins.length === 0) return true;
 
     const activePin = accessPins.find(p => p.is_active);
-    const sessionRole = typeof window !== 'undefined'
-      ? localStorage.getItem('verifiedRole')
-      : null;
+    const sessionRole = verifiedRole;
 
     return (activePin && ['owner', 'economist'].includes(activePin.role)) ||
-           (sessionRole && ['owner', 'economist'].includes(sessionRole));
+           (!!sessionRole && ['owner', 'economist'].includes(sessionRole));
   };
 
   const activeProducts = useMemo(() => {
@@ -226,11 +226,6 @@ export default function StockView() {
       setSortBy(field);
       setSortOrder('asc');
     }
-  };
-
-  const SortIcon = ({ field }: { field: string }) => {
-    if (sortBy !== field) return <ArrowUpDown className="ml-1 h-3 w-3 opacity-30" />;
-    return <ArrowUpDown className={`ml-1 h-3 w-3 ${sortOrder === 'desc' ? 'rotate-180' : ''} text-primary`} />;
   };
 
   const scrollTable = (direction: 'left' | 'right') => {
@@ -527,26 +522,26 @@ export default function StockView() {
             <thead className="border-b border-border/50 bg-bg/50 text-xs uppercase text-text-secondary sticky top-0 z-10">
               <tr>
                 <th className="px-3 py-3 font-medium min-w-[120px] cursor-pointer hover:text-text" onClick={() => toggleSort('name')} aria-sort={sortBy === 'name' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}>
-                  <div className="flex items-center">Producto <SortIcon field="name" /></div>
+                  <div className="flex items-center">Producto <SortIcon sortBy={sortBy} sortOrder={sortOrder} field="name" /></div>
                 </th>
                 <th className="px-3 py-3 font-medium min-w-[100px] hidden md:table-cell">Categoría</th>
                 <th className="px-3 py-3 font-medium min-w-[90px]">Tipo</th>
                 <th className="px-3 py-3 font-medium text-right min-w-[80px] cursor-pointer hover:text-text" onClick={() => toggleSort('available')}>
-                  <div className="flex items-center justify-end">Disponible <SortIcon field="available" /></div>
+                  <div className="flex items-center justify-end">Disponible <SortIcon sortBy={sortBy} sortOrder={sortOrder} field="available" /></div>
                 </th>
                 <th className="px-3 py-3 font-medium text-right min-w-[80px] cursor-pointer hover:text-text" onClick={() => toggleSort('in_transit')}>
-                  <div className="flex items-center justify-end">En Tránsito <SortIcon field="in_transit" /></div>
+                  <div className="flex items-center justify-end">En Tránsito <SortIcon sortBy={sortBy} sortOrder={sortOrder} field="in_transit" /></div>
                 </th>
                 <th className="px-3 py-3 font-medium text-right min-w-[90px] cursor-pointer hover:text-text hidden md:table-cell" onClick={() => toggleSort('cost')}>
-                  <div className="flex items-center justify-end">Costo Unit. <SortIcon field="cost" /></div>
+                  <div className="flex items-center justify-end">Costo Unit. <SortIcon sortBy={sortBy} sortOrder={sortOrder} field="cost" /></div>
                 </th>
                 <th className="px-3 py-3 font-medium text-right min-w-[90px] cursor-pointer hover:text-text hidden md:table-cell" onClick={() => toggleSort('total')}>
-                  <div className="flex items-center justify-end">Total <SortIcon field="total" /></div>
+                  <div className="flex items-center justify-end">Total <SortIcon sortBy={sortBy} sortOrder={sortOrder} field="total" /></div>
                 </th>
                 <th className="px-3 py-3 font-medium min-w-[80px]">Unidad</th>
                 <th className="px-3 py-3 font-medium min-w-[80px] hidden md:table-cell">Parámetros</th>
                 <th className="px-4 py-3 font-medium cursor-pointer hover:text-text hidden md:table-cell" onClick={() => toggleSort('date')}>
-                  <div className="flex items-center">Fecha Última Actualización <SortIcon field="date" /></div>
+                  <div className="flex items-center">Fecha Última Actualización <SortIcon sortBy={sortBy} sortOrder={sortOrder} field="date" /></div>
                 </th>
                 <th className="px-4 py-3 font-medium text-center">Acciones</th>
               </tr>
@@ -968,7 +963,7 @@ export default function StockView() {
                             reason: 'Ajuste de inventario',
                             status: 'NORMAL',
                             date: new Date(adjustmentModal.date).toISOString(),
-                            warehouse_id: currentWarehouseId || null,
+                            warehouse_id: currentWarehouseId || undefined,
                           });
                           
                           await logAction('stock', 'AJUSTE', {

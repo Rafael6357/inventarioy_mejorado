@@ -74,7 +74,7 @@ export default function AccessPinsConfig() {
       return;
     }
     if (pinValue !== confirmPin) {
-      toast.error('Los PINs no coincided');
+      toast.error('Los PINs no coinciden');
       return;
     }
     if (!selectedRole) {

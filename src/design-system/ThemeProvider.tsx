@@ -2,11 +2,11 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 
-type Theme = 'light' | 'dark' | 'system';
+type Theme = 'light' | 'dark';
 
 interface ThemeContextValue {
   theme: Theme;
-  resolvedTheme: 'light' | 'dark';
+  resolvedTheme: Theme;
   setTheme: (theme: Theme) => void;
 }
 
@@ -15,8 +15,8 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const user = useAuthStore(state => state.user);
   
-  const [theme, setThemeState] = useState<Theme>('system');
-  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('dark');
+  const [theme, setThemeState] = useState<Theme>('dark');
+  const [resolvedTheme, setResolvedTheme] = useState<Theme>('dark');
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -28,32 +28,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!mounted) return;
-    
-    let resolved: 'light' | 'dark' = 'dark';
-    if (theme === 'system') {
-      resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    } else {
-      resolved = theme;
-    }
-    setResolvedTheme(resolved);
-    document.documentElement.setAttribute('data-theme', resolved);
+    setResolvedTheme(theme);
+    document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme-preference', theme);
   }, [theme, mounted]);
 
   useEffect(() => {
-    if (theme !== 'system') return;
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handler = () => {
-      const resolved = mediaQuery.matches ? 'dark' : 'light';
-      setResolvedTheme(resolved);
-      document.documentElement.setAttribute('data-theme', resolved);
-    };
-    mediaQuery.addEventListener('change', handler);
-    return () => mediaQuery.removeEventListener('change', handler);
-  }, [theme]);
-
-  useEffect(() => {
-    if (!user || theme === 'system') return;
+    if (!user) return;
     supabase.from('profiles').update({ theme_preference: theme }).eq('id', user.id);
   }, [theme]);
 

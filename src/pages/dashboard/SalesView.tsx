@@ -1532,7 +1532,7 @@ setShowTicket(true);
                       unit_price: item.price,
                       subtotal: item.price * item.quantity,
                       is_recipe: item.is_recipe || false,
-                      recipe_snapshot: item.recipe_snapshot || null,
+                      recipe_snapshot: item.recipe_snapshot || undefined,
                     }));
                     const result = await addItemsToPendingAccount(selectedPendingAccount, items, isAccountHouse, saleType);
                     if (result.success) {
@@ -1968,7 +1968,6 @@ setShowTicket(true);
                       chargeBreakdown.usd || 0,
                       chargeBreakdown.eur || 0
                     );
-                    console.log('[SalesView] chargePendingAccount result:', result);
                     if (result.success) {
                       try {
                         toast.success('Cuenta cobrada');
@@ -2005,14 +2004,12 @@ setShowTicket(true);
                         setShowTicket(true);
                         setSelectedAccountForCharge(null);
                         setChargeBreakdown({ efectivo: 0, transferencia: 0, usd: 0, eur: 0 });
-                        console.log('[SalesView] Cerrando modal de cobro...');
                       } catch (successErr) {
                         console.error('[SalesView] Error en flujo success:', successErr);
                         setSelectedAccountForCharge(null);
                         setChargeBreakdown({ efectivo: 0, transferencia: 0, usd: 0, eur: 0 });
                       } finally {
                         setShowChargeMixModal(false);
-                        console.log('[SalesView] Modal de cobro cerrado');
                       }
                     } else {
                       toast.error(result.error || 'Error al cobrar');

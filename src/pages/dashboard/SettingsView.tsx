@@ -66,7 +66,6 @@ export default function SettingsView() {
     e.preventDefault();
     
     if (isSubmitting) {
-      console.log('Guardado ya en proceso, ignorando...');
       return;
     }
     
@@ -124,13 +123,6 @@ export default function SettingsView() {
     setIsSaving(true);
     setIsSubmitting(true);
     
-    console.log('Intentando guardar perfil con datos:', {
-      userId: user.id,
-      phone: formData.phone,
-      address: formData.address,
-      businessHours: formData.businessHours
-    });
-    
     try {
       // Verificar si la columna business_code existe
     const { data: testData, error: testError } = await supabase
@@ -164,8 +156,6 @@ export default function SettingsView() {
       .from('profiles')
       .update(updateData)
       .eq('id', user.id);
-
-      console.log('Resultado de guardado:', { error });
 
       if (error) {
         let errorMessage = 'Error al guardar la configuración';

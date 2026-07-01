@@ -335,10 +335,10 @@ export default function Landing() {
           <div className="container mx-auto px-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
               {[
-                { icon: Package, label: 'Productos', value: stats?.products, color: 'text-primary' },
-                { icon: TrendingUp, label: 'Movimientos', value: stats?.movements, color: 'text-primary' },
-                { icon: ShoppingCart, label: 'Ventas', value: stats?.sales, color: 'text-primary' },
-                { icon: Users, label: 'Usuarios', value: stats?.users, color: 'text-primary' },
+                { icon: Package, label: 'Productos', value: stats?.products ?? '—', color: statsError ? 'text-text-muted' : 'text-primary' },
+                { icon: TrendingUp, label: 'Movimientos', value: stats?.movements ?? '—', color: statsError ? 'text-text-muted' : 'text-primary' },
+                { icon: ShoppingCart, label: 'Ventas', value: stats?.sales ?? '—', color: statsError ? 'text-text-muted' : 'text-primary' },
+                { icon: Users, label: 'Usuarios', value: stats?.users ?? '—', color: statsError ? 'text-text-muted' : 'text-primary' },
               ].map((stat, idx) => (
                 <div key={stat.label} className="fade-up text-center rounded-2xl border border-border/50 bg-surface p-6 hover:border-primary/30 transition-all" style={{ transitionDelay: `${idx * 100}ms` }}>
                   <div className={`mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl ${stat.color}/10`}>

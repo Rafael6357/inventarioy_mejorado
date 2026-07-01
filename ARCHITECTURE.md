@@ -51,10 +51,10 @@ Estructura plana (no Feature-Sliced):
 *   **Supabase Auth:** Email/password.
 *   **Roles:** `admin`, `user`. Además PIN-based: `owner`, `economist`, `admin`, `supervisor`, `clerk`.
 *   **Auto-login:** Credenciales en localStorage (base64 — mejorable).
-*   **Admin global:** Configurable vía `VITE_ADMIN_EMAIL`.
+*   **Admin global:** Configurable vía `VITE_ADMIN_EMAIL` (solo para configuración inicial). El rol `admin` en la tabla `profiles` determina los permisos en runtime.
 
 ### 3.5. Estilos y UI/UX
-*   **Tema:** Solo oscuro (sin toggle claro/oscuro).
+*   **Tema:** Claro y Oscuro (toggle en sidebar).
 *   **Feedback Visual:** Botones con hover/active/disabled. Spinners en operaciones async.
 *   **Manejo de Errores:** Toasts con Sonner.
 *   **Responsive:** Mobile-first con Tailwind (`hidden md:table-cell`, etc.).

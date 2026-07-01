@@ -7,6 +7,7 @@ import { syncEngine } from '../lib/syncEngine';
 import { isDateClosed } from '../lib/dateUtils';
 import { calcularNomina } from '../utils/payrollCalculations';
 import { logger } from '../lib/logger';
+import { normalizeStr } from '../lib/utils';
 
 let _isFetchingAll = false;
 
@@ -118,7 +119,7 @@ export interface Sale {
         quantity: number;
         cost: number;
       }[];
-    };
+    } | null;
   }[];
   total_amount: number;
   date: string;
@@ -126,7 +127,7 @@ export interface Sale {
   is_account_house: boolean;
   notes?: string;
   discount: number;
-  payment_method?: string;
+  payment_method?: string | null;
   efectivo?: number;
   transferencia?: number;
   usd?: number;
@@ -177,7 +178,7 @@ export interface PendingItem {
       quantity: number;
       cost: number;
     }[];
-  };
+  } | null;
 }
 
 export interface AccessPin {
@@ -849,11 +850,8 @@ addProduct: async (product) => {
     const { user } = useAuthStore.getState();
     if (!user) throw new Error('No hay usuario autenticado');
 
-    const normalizeString = (str: string) =>
-      str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-
     const isDuplicate = get().products.some(
-      p => p.user_id === user.id && p.is_active === true && normalizeString(p.name) === normalizeString(product.name)
+      p => p.user_id === user.id && p.is_active === true && normalizeStr(p.name) === normalizeStr(product.name)
     );
 
     if (isDuplicate) {
@@ -987,11 +985,8 @@ addProduct: async (product) => {
     if (!user) throw new Error('No hay usuario autenticado');
 
     if (updates.name !== undefined) {
-      const normalizeString = (str: string) =>
-        str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-
       const isDuplicate = get().products.some(
-        p => p.id !== id && p.user_id === user.id && p.is_active === true && normalizeString(p.name) === normalizeString(updates.name!)
+        p => p.id !== id && p.user_id === user.id && p.is_active === true && normalizeStr(p.name) === normalizeStr(updates.name!)
       );
 
       if (isDuplicate) {
@@ -2230,7 +2225,7 @@ addProduct: async (product) => {
         payload: { id, user_id: user.id, client_name: clientName, items: [], total_amount: 0, is_account_house: false, sale_type: 'SALON', status: 'pending', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
       });
       get().refreshSyncQueueCount();
-      return;
+      return { success: true, accountId: id };
     }
 
     try {
@@ -2756,6 +2751,35 @@ deletePendingAccount: async (accountId: string) => {
     const anyPin = get().accessPins.find(p => p.is_active);
     if (!anyPin) return { success: false, error: 'No hay pines activos configurados' };
 
+    // Online: verify server-side via RPC (secure)
+    if (navigator.onLine) {
+      try {
+        const { data, error: rpcError } = await supabase.rpc('verify_access_pin', {
+          p_pin: pin,
+          p_module_path: modulePath,
+        });
+        if (rpcError) throw rpcError;
+        if (data) {
+          if (data.success) {
+            set({ verifiedRole: data.role, verifiedRoleName: data.pin_name });
+            localStorage.setItem('verifiedRole', data.role);
+            localStorage.setItem('verifiedRoleName', data.pin_name || '');
+            await get().fetchAll();
+            return { success: true, verifiedRole: data.role };
+          }
+          return {
+            success: false,
+            error: data.error || 'PIN incorrecto',
+            blocked: data.blocked || false,
+            remainingTime: data.remaining_seconds || 0,
+          };
+        }
+      } catch (err: any) {
+        logger.warn('RPC verify_access_pin falló, usando fallback offline:', err?.message);
+      }
+    }
+
+    // Offline fallback: client-side hash comparison
     const pinHash = await get().hashPin(pin);
     const matchingPins = get().accessPins.filter(p => p.is_active && requiredRoles.includes(p.role));
     const userPin = matchingPins.find(p => p.pin_hash === pinHash);
@@ -2764,59 +2788,25 @@ deletePendingAccount: async (accountId: string) => {
       const existingPin = matchingPins[0];
       if (!existingPin) return { success: false, error: 'Tu PIN no tiene acceso a este módulo' };
       
-      const newAttempts = existingPin.failed_attempts + 1;
-      if (newAttempts >= 3) {
-        const blockedUntil = new Date(Date.now() + 5 * 60 * 1000).toISOString();
-        if (navigator.onLine) {
-          await supabase.from('access_pins').update({ failed_attempts: newAttempts, blocked_until: blockedUntil }).eq('id', existingPin.id);
-        } else {
-          await addToSyncQueue({ operation: 'updateAccessPinAttempts', table: 'access_pins', payload: { pinId: existingPin.id, failed_attempts: newAttempts, blocked_until: blockedUntil } });
-        }
-        set((state) => ({
-          accessPins: state.accessPins.map(p => p.id === existingPin.id ? { ...p, failed_attempts: newAttempts, blocked_until: blockedUntil } : p),
-        }));
-        await cacheAccessPins(user.id, get().accessPins);
-        return { success: false, error: 'PIN bloqueado por 3 intentos fallidos', blocked: true, remainingTime: 300 };
+      if (navigator.onLine) {
+        await supabase.from('access_pins').update({ failed_attempts: existingPin.failed_attempts + 1 }).eq('id', existingPin.id);
       } else {
-        if (navigator.onLine) {
-          await supabase.from('access_pins').update({ failed_attempts: newAttempts }).eq('id', existingPin.id);
-        } else {
-          await addToSyncQueue({ operation: 'updateAccessPinAttempts', table: 'access_pins', payload: { pinId: existingPin.id, failed_attempts: newAttempts } });
+        const newAttempts = existingPin.failed_attempts + 1;
+        const blockedUntil = newAttempts >= 3 ? new Date(Date.now() + 5 * 60 * 1000).toISOString() : null;
+        await addToSyncQueue({ operation: 'updateAccessPinAttempts', table: 'access_pins', payload: { pinId: existingPin.id, failed_attempts: newAttempts, blocked_until: blockedUntil } });
+        if (blockedUntil) {
+          return { success: false, error: 'PIN bloqueado por 3 intentos fallidos', blocked: true, remainingTime: 300 };
         }
-        set((state) => ({
-          accessPins: state.accessPins.map(p => p.id === existingPin.id ? { ...p, failed_attempts: newAttempts } : p),
-        }));
       }
-      return { success: false, error: `PIN incorrecto. Intentos: ${newAttempts}/3` };
+      return { success: false, error: 'PIN incorrecto' };
     }
 
     if (userPin.blocked_until) {
       const blockedUntil = new Date(userPin.blocked_until);
       const now = new Date();
       if (blockedUntil > now) {
-        const remaining = Math.ceil((blockedUntil.getTime() - now.getTime()) / 1000);
-        return { success: false, error: 'PIN bloqueado', blocked: true, remainingTime: remaining };
-      } else {
-        if (navigator.onLine) {
-          await supabase.from('access_pins').update({ blocked_until: null, failed_attempts: 0 }).eq('id', userPin.id);
-        } else {
-          await addToSyncQueue({ operation: 'updateAccessPinAttempts', table: 'access_pins', payload: { pinId: userPin.id, blocked_until: null, failed_attempts: 0 } });
-        }
-        set((state) => ({
-          accessPins: state.accessPins.map(p => p.id === userPin.id ? { ...p, blocked_until: null, failed_attempts: 0 } : p),
-        }));
+        return { success: false, error: 'PIN bloqueado', blocked: true, remainingTime: Math.ceil((blockedUntil.getTime() - now.getTime()) / 1000) };
       }
-    }
-
-    if (userPin.failed_attempts > 0) {
-      if (navigator.onLine) {
-        await supabase.from('access_pins').update({ failed_attempts: 0, blocked_until: null }).eq('id', userPin.id);
-      } else {
-        await addToSyncQueue({ operation: 'updateAccessPinAttempts', table: 'access_pins', payload: { pinId: userPin.id, failed_attempts: 0, blocked_until: null } });
-      }
-      set((state) => ({
-        accessPins: state.accessPins.map(p => p.id === userPin.id ? { ...p, failed_attempts: 0, blocked_until: null } : p),
-      }));
     }
 
     set({ verifiedRole: userPin.role, verifiedRoleName: userPin.pin_name });
@@ -2829,66 +2819,57 @@ deletePendingAccount: async (accountId: string) => {
     const user = useAuthStore.getState().user;
     if (!user) return { success: false, error: 'No hay usuario autenticado' };
 
+    // Online: verify server-side via RPC (secure)
+    if (navigator.onLine) {
+      try {
+        const { data, error: rpcError } = await supabase.rpc('verify_access_pin', {
+          p_pin: pin,
+          p_module_path: null,
+        });
+        if (rpcError) throw rpcError;
+        if (data) {
+          if (data.success) {
+            set({ verifiedRole: data.role, verifiedRoleName: data.pin_name });
+            localStorage.setItem('verifiedRole', data.role);
+            localStorage.setItem('verifiedRoleName', data.pin_name || '');
+            await get().fetchAll();
+            return { success: true, role: data.role };
+          }
+          return {
+            success: false,
+            error: data.error || 'PIN incorrecto',
+            blocked: data.blocked || false,
+            remainingTime: data.remaining_seconds || 0,
+          };
+        }
+      } catch (err: any) {
+        logger.warn('RPC verify_access_pin falló, usando fallback offline:', err?.message);
+      }
+    }
+
+    // Offline fallback
     const pinHash = await get().hashPin(pin);
     const userPin = get().accessPins.find(p => p.is_active && p.pin_hash === pinHash);
     
     if (!userPin) {
       const anyPin = get().accessPins.find(p => p.is_active);
       if (!anyPin) return { success: false, error: 'No hay pines activos configurados' };
-      
-      const newAttempts = anyPin.failed_attempts + 1;
-      if (newAttempts >= 3) {
-        const blockedUntil = new Date(Date.now() + 5 * 60 * 1000).toISOString();
-        if (navigator.onLine) {
-          await supabase.from('access_pins').update({ failed_attempts: newAttempts, blocked_until: blockedUntil }).eq('id', anyPin.id);
-        } else {
-          await addToSyncQueue({ operation: 'updateAccessPinAttempts', table: 'access_pins', payload: { pinId: anyPin.id, failed_attempts: newAttempts, blocked_until: blockedUntil } });
+      if (!navigator.onLine) {
+        const newAttempts = anyPin.failed_attempts + 1;
+        const blockedUntil = newAttempts >= 3 ? new Date(Date.now() + 5 * 60 * 1000).toISOString() : null;
+        await addToSyncQueue({ operation: 'updateAccessPinAttempts', table: 'access_pins', payload: { pinId: anyPin.id, failed_attempts: newAttempts, blocked_until: blockedUntil } });
+        if (blockedUntil) {
+          return { success: false, error: 'PIN bloqueado por 3 intentos fallidos', blocked: true, remainingTime: 300 };
         }
-        set((state) => ({
-          accessPins: state.accessPins.map(p => p.id === anyPin.id ? { ...p, failed_attempts: newAttempts, blocked_until: blockedUntil } : p),
-        }));
-        await cacheAccessPins(user.id, get().accessPins);
-        return { success: false, error: 'PIN bloqueado por 3 intentos fallidos', blocked: true, remainingTime: 300 };
-      } else {
-        if (navigator.onLine) {
-          await supabase.from('access_pins').update({ failed_attempts: newAttempts }).eq('id', anyPin.id);
-        } else {
-          await addToSyncQueue({ operation: 'updateAccessPinAttempts', table: 'access_pins', payload: { pinId: anyPin.id, failed_attempts: newAttempts } });
-        }
-        set((state) => ({
-          accessPins: state.accessPins.map(p => p.id === anyPin.id ? { ...p, failed_attempts: newAttempts } : p),
-        }));
       }
-      return { success: false, error: `PIN incorrecto. Intentos: ${newAttempts}/3` };
+      return { success: false, error: 'PIN incorrecto' };
     }
 
     if (userPin.blocked_until) {
       const blockedUntil = new Date(userPin.blocked_until);
-      const now = new Date();
-      if (blockedUntil > now) {
-        const remaining = Math.ceil((blockedUntil.getTime() - now.getTime()) / 1000);
-        return { success: false, error: 'PIN bloqueado', blocked: true, remainingTime: remaining };
-      } else {
-        if (navigator.onLine) {
-          await supabase.from('access_pins').update({ blocked_until: null, failed_attempts: 0 }).eq('id', userPin.id);
-        } else {
-          await addToSyncQueue({ operation: 'updateAccessPinAttempts', table: 'access_pins', payload: { pinId: userPin.id, blocked_until: null, failed_attempts: 0 } });
-        }
-        set((state) => ({
-          accessPins: state.accessPins.map(p => p.id === userPin.id ? { ...p, blocked_until: null, failed_attempts: 0 } : p),
-        }));
+      if (blockedUntil > new Date()) {
+        return { success: false, error: 'PIN bloqueado', blocked: true, remainingTime: Math.ceil((blockedUntil.getTime() - Date.now()) / 1000) };
       }
-    }
-
-    if (userPin.failed_attempts > 0) {
-      if (navigator.onLine) {
-        await supabase.from('access_pins').update({ failed_attempts: 0, blocked_until: null }).eq('id', userPin.id);
-      } else {
-        await addToSyncQueue({ operation: 'updateAccessPinAttempts', table: 'access_pins', payload: { pinId: userPin.id, failed_attempts: 0, blocked_until: null } });
-      }
-      set((state) => ({
-        accessPins: state.accessPins.map(p => p.id === userPin.id ? { ...p, failed_attempts: 0, blocked_until: null } : p),
-      }));
     }
 
     set({ verifiedRole: userPin.role, verifiedRoleName: userPin.pin_name });
@@ -3253,16 +3234,20 @@ deletePendingAccount: async (accountId: string) => {
     const currentConfig = get().payrollConfig;
     if (!currentConfig) return;
 
+    // Re-check user after config fetch
+    const currentUser = useAuthStore.getState().user;
+    if (!currentUser) return;
+
     const monthStr = `${year}-${String(month).padStart(2, '0')}`;
     const { data: existingEntries } = await supabase
       .from('payroll_entries')
       .select('id')
-      .eq('user_id', user.id)
+      .eq('user_id', currentUser.id)
       .eq('month', month)
       .eq('year', year);
 
     if (existingEntries && existingEntries.length > 0) {
-      await supabase.from('payroll_entries').delete().eq('user_id', user.id).eq('month', month).eq('year', year);
+      await supabase.from('payroll_entries').delete().eq('user_id', currentUser.id).eq('month', month).eq('year', year);
     }
 
     const employees = get().employees;
@@ -3276,7 +3261,7 @@ deletePendingAccount: async (accountId: string) => {
       const empDept = departments.find(d => d.id === emp.category);
 
       return {
-        user_id: user.id,
+        user_id: currentUser.id,
         employee_id: emp.id,
         employee_name: emp.name,
         employee_category: empDept?.name || 'Sin Departamento',
@@ -3307,7 +3292,7 @@ deletePendingAccount: async (accountId: string) => {
         payrollConfig: state.payrollConfig ? { ...state.payrollConfig, last_calculated_month: monthStr } : null,
       }));
 
-      await supabase.from('payroll_config').update({ last_calculated_month: monthStr }).eq('user_id', user.id);
+      await supabase.from('payroll_config').update({ last_calculated_month: monthStr }).eq('user_id', currentUser.id);
     }
 
     await get().logAction('payroll', 'GENERAR_NOMINA', {

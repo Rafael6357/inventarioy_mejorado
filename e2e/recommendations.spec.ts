@@ -1,11 +1,11 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('R4 - Web Crypto API encryption', () => {
-  test('authStore importa cryptoUtils sin errores de compilación', async ({ page }) => {
-    // Validado por npx tsc --noEmit
+test.describe('R4 - Auth store sin almacenamiento de credenciales', () => {
+  test('authStore no guarda saved_credentials en localStorage', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
-    expect(await page.locator('body').isVisible()).toBe(true);
+    const hasSavedCreds = await page.evaluate(() => localStorage.getItem('saved_credentials'));
+    expect(hasSavedCreds).toBeNull();
   });
 });
 
