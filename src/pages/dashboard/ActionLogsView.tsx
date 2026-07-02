@@ -211,23 +211,36 @@ export default function ActionLogsView() {
       if (typeof value === 'boolean') {
         return value ? 'Sí' : 'No';
       }
-      if (typeof value === 'number') {
-        if (key === 'year') {
-          return value.toString();
+
+      // Convertir strings numéricos a número para formatearlos correctamente
+      let numericValue: number | null = null;
+      if (typeof value === 'number' && !isNaN(value)) {
+        numericValue = value;
+      } else if (typeof value === 'string') {
+        const trimmed = value.trim();
+        // Solo convertir si la cadena completa es numérica (ej: "2000", "45.5", "2,99")
+        if (/^\d+([.,]\d+)?$/.test(trimmed) && !isNaN(Number(trimmed.replace(',', '.')))) {
+          numericValue = Number(trimmed.replace(',', '.'));
         }
+      }
+
+      if (numericValue !== null) {
+        if (key === 'year') return Math.round(numericValue).toString();
         if (key === 'month') {
-          const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+          const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
                               'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-          return monthNames[value - 1] || value.toString();
+          return monthNames[Math.round(numericValue) - 1] || Math.round(numericValue).toString();
         }
         if (key?.includes('total') && (key.includes('employees') || key.includes('items') || key.includes('count'))) {
-          return value.toString();
+          return Math.round(numericValue).toLocaleString('es-CO');
         }
         if (key?.includes('total') || key === 'total') {
-          return value.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          return numericValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
-        return value.toLocaleString('es-CO');
+        // Formatear con separador de miles (.) y decimal (,) estilo español
+        return numericValue.toLocaleString('es-CO');
       }
+
       return String(value);
     };
     
