@@ -95,9 +95,26 @@ export default function SalesView() {
     setIsSyncing(true);
     try {
       if (navigator.onLine) {
+        let syncedCount = 0;
+        let hadError = false;
+        const unsub = syncEngine.onEvent((event) => {
+          if (event === 'synced') {
+            syncedCount = (event as any).count || 0;
+          }
+          if (event === 'error') {
+            hadError = true;
+          }
+        });
         await syncEngine.processQueue();
+        unsub();
         await refreshSyncQueueCount();
-        toast.success('Sincronización completada');
+        if (syncedCount > 0) {
+          toast.success(`${syncedCount} cambio(s) sincronizado(s)`);
+        } else if (hadError) {
+          toast.error('Algunos cambios no pudieron sincronizarse');
+        } else {
+          toast.info('No hay cambios pendientes');
+        }
       } else {
         toast.warning('No hay conexión a internet');
       }
@@ -800,7 +817,7 @@ setShowTicket(true);
         <div className="mb-4 p-3 bg-warning/10 border border-warning/30 rounded-lg flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-warning">⚠️</span>
-            <span className="text-sm text-text">{pendingSyncCount} venta(s) pendientes de sincronizar</span>
+            <span className="text-sm text-text">{pendingSyncCount} cambio(s) pendientes de sincronizar</span>
           </div>
           <Button size="sm" variant="outline" onClick={handleManualSync} disabled={isSyncing} className="gap-1">
             <Loader2 className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />

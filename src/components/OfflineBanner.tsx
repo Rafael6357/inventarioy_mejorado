@@ -29,7 +29,7 @@ export default function OfflineBanner() {
   const refreshSyncQueueCount = useDatabaseStore((s) => s.refreshSyncQueueCount);
 
   useEffect(() => {
-    const goOnline = () => { setIsOnline(true); refreshSyncQueueCount(); };
+    const goOnline = () => { setIsOnline(true); refreshSyncQueueCount(); syncEngine.processPending(); };
     const goOffline = () => setIsOnline(false);
     window.addEventListener('online', goOnline);
     window.addEventListener('offline', goOffline);

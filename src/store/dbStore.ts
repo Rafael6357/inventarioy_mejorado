@@ -337,7 +337,7 @@ export interface PayrollEntry {
 const capitalize = (str: string) =>
   str.trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
 
-const DEFAULT_TIMEOUT = 30000; // 30 segundos
+const DEFAULT_TIMEOUT = 15000; // 15 segundos
 
 const isRateLimitError = (err: any): boolean => {
   return err?.status === 429 || err?.code === '429' || 
@@ -737,21 +737,26 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     let productWarehouseData: any[] = [];
 
     try {
-      logger.info('📥 Cargando cierres y configuración...');
-      const [transitRes, dailyClosingsRes, pendingRes, accessPinsRes, actionLogsRes, payrollConfigRes, warehousesRes, productWarehouseRes] = await Promise.all([
+      logger.info(' Cargando cierres y configuración (parte 1/2)...');
+      const [transitRes, dailyClosingsRes, pendingRes, accessPinsRes] = await Promise.all([
         queryWithRetry(() => supabase.from('transit_items').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(limit)),
         queryWithRetry(() => supabase.from('daily_closings').select('*').eq('user_id', user.id).order('closing_date', { ascending: false }).limit(limit)),
         queryWithRetry(() => supabase.from('pending_accounts').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(limit)),
         queryWithRetry(() => supabase.from('access_pins').select('*').eq('user_id', user.id).limit(limit)),
-        queryWithRetry(() => supabase.from('action_logs').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(limit)),
-        queryWithRetry(() => supabase.from('payroll_config').select('*').eq('user_id', user.id).maybeSingle()),
-        queryWithRetry(() => supabase.from('warehouses').select('*').eq('user_id', user.id).order('name')),
-        queryWithRetry(() => supabase.from('product_warehouse').select('*')),
       ]);
       transitItemsData = (transitRes.data || []).filter((t: any) => t.remaining > 0);
       dailyClosingsData = dailyClosingsRes.data || [];
       pendingData = (pendingRes.data || []).filter((p: any) => p.status === 'pending');
       accessPinsData = accessPinsRes.data || [];
+      await delay(100);
+
+      logger.info('📥 Cargando cierres y configuración (parte 2/2)...');
+      const [actionLogsRes, payrollConfigRes, warehousesRes, productWarehouseRes] = await Promise.all([
+        queryWithRetry(() => supabase.from('action_logs').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(limit)),
+        queryWithRetry(() => supabase.from('payroll_config').select('*').eq('user_id', user.id).maybeSingle()),
+        queryWithRetry(() => supabase.from('warehouses').select('*').eq('user_id', user.id).order('name')),
+        queryWithRetry(() => supabase.from('product_warehouse').select('*')),
+      ]);
       actionLogsData = actionLogsRes.data || [];
       payrollConfigData = payrollConfigRes.data || null;
       warehousesData = warehousesRes.data || [];

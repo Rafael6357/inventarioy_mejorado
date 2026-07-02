@@ -158,7 +158,7 @@ export default function SyncQueuePanel() {
                     {OPERATION_LABELS[item.operation] || item.operation}
                   </p>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[11px] text-text-secondary">{formatDate(item.created_at)}</span>
+                    <span className="text-[11px] text-text-secondary">En cola: {formatDate(item.created_at)}</span>
                     <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
                       item.status === 'failed'
                         ? 'bg-danger/10 text-danger'

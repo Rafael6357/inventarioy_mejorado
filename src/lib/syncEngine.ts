@@ -95,16 +95,14 @@ class SyncEngine {
       const syncedCount = this.processedItems;
       const remaining = await getPendingSyncItems();
       const store = useDatabaseStore.getState();
-      if (remaining.length === 0) {
-        try {
-          await store.fetchAll();
-        } catch { }
-        store.refreshSyncQueueCount();
-        if (syncedCount > 0) {
-          this.emit('synced', { count: syncedCount, total: this.totalItems });
-        }
-      } else {
-        store.refreshSyncQueueCount();
+      store.refreshSyncQueueCount();
+      try {
+        await store.fetchAll();
+      } catch { }
+      if (remaining.length === 0 && syncedCount > 0) {
+        this.emit('synced', { count: syncedCount, total: this.totalItems });
+      }
+      if (remaining.length > 0) {
         setTimeout(() => this.processQueue(), 0);
       }
     } finally {

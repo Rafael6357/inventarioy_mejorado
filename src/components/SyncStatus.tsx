@@ -28,7 +28,7 @@ export default function SyncStatusComponent() {
   }, [isSyncing, isOnline, hasPending]);
 
   useEffect(() => {
-    const goOnline = () => { setIsOnline(true); refreshSyncQueueCount(); };
+    const goOnline = () => { setIsOnline(true); refreshSyncQueueCount(); syncEngine.processPending(); };
     const goOffline = () => setIsOnline(false);
     window.addEventListener('online', goOnline);
     window.addEventListener('offline', goOffline);

@@ -178,7 +178,7 @@ function enrichItem(item: SyncQueueItem, productMap: Map<string, string>): Enric
     case 'createDailyClosing': {
       productName = 'Cierre de caja';
       const date = p.closing_date ? new Date(p.closing_date + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' }) : '?';
-      detail = `${date} · $${Number(p.closing_amount || 0).toFixed(2)}`;
+      detail = `Del ${date} · $${Number(p.closing_amount || 0).toFixed(2)}`;
       break;
     }
     case 'justifyMovement': {
@@ -322,7 +322,7 @@ export default function SyncQueueModal({ onClose }: { onClose: () => void }) {
                       </div>
                       <p className={`text-xs ${ei.detailColor} truncate mt-0.5`}>{ei.detail}</p>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[10px] text-text-secondary">{formatDate(ei.item.created_at)}</span>
+                        <span className="text-[10px] text-text-secondary">En cola: {formatDate(ei.item.created_at)}</span>
                         <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium ${
                           isFailed ? 'bg-danger/10 text-danger' : 'bg-warning/10 text-warning'
                         }`}>

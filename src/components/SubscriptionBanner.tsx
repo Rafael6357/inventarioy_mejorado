@@ -38,7 +38,7 @@ export default function SubscriptionBanner() {
           <div className="flex items-center gap-3">
             <AlertTriangle className="h-5 w-5 flex-shrink-0" />
             <span className="text-sm font-medium">
-              Tu suscripción ha vencido. Perderás acceso en {countdown} segundos.
+              Su período de prueba o suscripción ha vencido. Por favor contacte con +53 54523884 para coordinar el pago mensual y pueda usted seguir usando la app. Perderá acceso en {countdown} segundos.
             </span>
           </div>
           <button
