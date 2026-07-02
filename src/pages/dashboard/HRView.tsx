@@ -12,6 +12,7 @@ import { useStaggerEnter } from '../../lib/animations/useStaggerEnter';
 import { usePersistentFilters } from '../../lib/hooks/usePersistentFilters';
 import { useIsOffline } from '../../hooks/useOfflineDisabled';
 import PaginationControls from '../../components/PaginationControls';
+import OfflineLimitBanner from '../../components/OfflineLimitBanner';
 
 const DOC_TYPE_LABELS: Record<string, string> = {
   MANUAL: 'Manual',
@@ -428,6 +429,7 @@ export default function HRView() {
 
   return (
     <div className="space-y-6">
+      <OfflineLimitBanner moduleName="Recursos Humanos" />
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-text">Recursos Humanos</h1>

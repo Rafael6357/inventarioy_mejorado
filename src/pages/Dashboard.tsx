@@ -24,10 +24,12 @@ import {
   LockOpen,
   Phone,
   Crown,
-  AlertTriangle
+  AlertTriangle,
+  WifiOff
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { useDatabaseStore, MODULE_ROLES } from '../store/dbStore';
+import { useIsOnline } from '../hooks/useIsOnline';
 import InventarioYLogo from '../components/InventarioYLogo';
 import SubscriptionBanner from '../components/SubscriptionBanner';
 import SyncStatus from '../components/SyncStatus';
@@ -69,6 +71,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { user, logout, isLoading: authLoading, initialize } = useAuthStore();
   const { fetchAll, isLoading: dbLoading, accessPins, verifiedRole, clearVerifiedRole, verifyPinSimple } = useDatabaseStore();
+  const isOnline = useIsOnline();
   const [localVerifiedRole, setLocalVerifiedRole] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('verifiedRole');
@@ -104,9 +107,9 @@ export default function Dashboard() {
     { name: 'Gráficos', href: '/dashboard/charts', icon: PieChart },
     { name: 'Centro Filtrado', href: '/dashboard/filtered', icon: Filter },
     // RRHH
-    { name: 'RRHH', href: '/dashboard/hr', icon: Users },
+    { name: 'RRHH', href: '/dashboard/hr', icon: Users, offlineLimited: true },
     // CONFIGURACIÓN
-    { name: 'Configuración', href: '/dashboard/settings', icon: Settings },
+    { name: 'Configuración', href: '/dashboard/settings', icon: Settings, offlineLimited: true },
     { name: 'Registro de Acciones', href: '/dashboard/action-logs', icon: FileText, requiresOwnerPin: true },
   ], []);
 
@@ -397,6 +400,7 @@ export default function Dashboard() {
             {navigation.map((item) => {
               const isActive = location.pathname === item.href || (item.href === '/dashboard' && location.pathname === '/dashboard/');
               const isExclusive = item.name === 'Gestión de Usuarios';
+              const isOfflineLimited = item.offlineLimited && !isOnline;
               return (
                 <Link
                   key={item.name}
@@ -412,6 +416,9 @@ export default function Dashboard() {
                 >
                   <item.icon className={`h-5 w-5 ${isActive ? 'text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]' : 'text-text-secondary'}`} />
                   {item.name}
+                  {isOfflineLimited && (
+                    <WifiOff className="h-3.5 w-3.5 text-warning ml-auto" title="Funciones limitadas sin conexión" aria-label="Funciones limitadas sin conexión" />
+                  )}
                   {isExclusive && <Crown className="h-3 w-3 text-warning ml-auto" />}
                 </Link>
               );

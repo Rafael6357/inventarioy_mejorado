@@ -80,10 +80,16 @@ export default function OfflineBanner() {
   const isOffline = !isOnline;
 
   const bgColor = isOffline
-    ? 'bg-danger/10 border-danger/30'
+    ? 'bg-danger/15 border-danger/50'
     : isSyncing
       ? 'bg-primary/10 border-primary/30'
       : 'bg-warning/10 border-warning/30';
+
+  const glowClass = isOffline
+    ? 'shadow-[0_-4px_20px_rgba(239,68,68,0.15)] animate-[offlinePulse_3s_ease-in-out_infinite]'
+    : isSyncing
+      ? 'shadow-[0_-4px_20px_rgba(205,164,52,0.15)]'
+      : '';
 
   const textColor = isOffline ? 'text-danger' : isSyncing ? 'text-primary' : 'text-warning';
   const iconColor = isOffline ? 'text-danger' : isSyncing ? 'text-primary' : 'text-warning';
@@ -98,7 +104,7 @@ export default function OfflineBanner() {
 
   return (
     <>
-      <div role="status" aria-live="polite" className={`fixed bottom-0 left-0 right-0 z-[100] border-t ${bgColor} backdrop-blur-xl`}>
+      <div role="status" aria-live="polite" className={`fixed bottom-0 left-0 right-0 z-[100] border-t ${bgColor} ${glowClass} backdrop-blur-xl`}>
         <div className="flex items-center justify-center gap-4 px-4 py-3 max-w-7xl mx-auto">
           <div className="flex items-center gap-3">
             {isOffline ? (

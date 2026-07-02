@@ -5,6 +5,7 @@ import { Input } from './ui/input';
 import { useDatabaseStore, ROLE_LABELS, ROLE_MODULES } from '../store/dbStore';
 import { toast } from 'sonner';
 import { useOfflineAction } from '../hooks/useOfflineDisabled';
+import OfflineLimitBanner from './OfflineLimitBanner';
 
 const MODULE_TRANSLATIONS: Record<string, string> = {
   sales: 'Ventas',
@@ -126,6 +127,7 @@ export default function AccessPinsConfig() {
 
   return (
     <div className="space-y-8">
+      <OfflineLimitBanner moduleName="Gestión de PINs" />
       {/* Header */}
       <div className="border-b border-border pb-6">
         <h3 className="text-xl font-semibold text-text flex items-center gap-3">

@@ -13,6 +13,7 @@ import AccessPinsConfig from '../../components/AccessPinsConfig';
 import SyncQueuePanel from '../../components/SyncQueuePanel';
 import QRCode from 'react-qr-code';
 import { useOfflineAction } from '../../hooks/useOfflineDisabled';
+import OfflineLimitBanner from '../../components/OfflineLimitBanner';
 
 export default function SettingsView() {
   const { user, fetchUser } = useAuthStore();
@@ -200,6 +201,7 @@ export default function SettingsView() {
   return (
     <>
       <div className="space-y-6 max-w-7xl">
+        <OfflineLimitBanner moduleName="Configuración" />
         {/* Header */}
         <div>
           <h1 className="text-2xl font-bold text-text">Configuración</h1>
