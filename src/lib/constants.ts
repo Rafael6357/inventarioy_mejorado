@@ -145,4 +145,11 @@ export const DETAIL_KEY_TRANSLATIONS: Record<string, string> = {
   expiration_date: 'Fecha expiración',
   description: 'Descripción',
   is_active: 'Activo',
+  address: 'Dirección',
+  businessHours: 'Horario',
+  businessName: 'Nombre del negocio',
+  businessCode: 'Código de negocio',
+  generateTicket: 'Generar ticket',
+  ticketMessage: 'Mensaje del ticket',
+  phone: 'Teléfono',
 };
