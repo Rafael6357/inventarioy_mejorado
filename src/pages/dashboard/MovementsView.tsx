@@ -103,6 +103,19 @@ export default function MovementsView() {
     setShowLoadMore(true);
   }, [searchTerm, typeFilter, startDate, endDate]);
 
+  // Al montar, cargar más movimientos automáticamente para mostrar un mejor vistazo inicial
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      for (let i = 0; i < 3; i++) {
+        if (cancelled) return;
+        try { await fetchMore(50); } catch { break; }
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [fetchMore]);
+
   const [loadingMore, setLoadingMore] = useState(false);
   const [showLoadMore, setShowLoadMore] = useState(true);
 

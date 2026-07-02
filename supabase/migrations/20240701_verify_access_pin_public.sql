@@ -10,7 +10,7 @@ CREATE OR REPLACE FUNCTION verify_access_pin_public(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path TO 'public'
+SET search_path TO 'public', 'extensions'
 AS $$
 DECLARE
   v_user_id UUID;
