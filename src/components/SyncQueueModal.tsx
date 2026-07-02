@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { X, Package, ArrowRightLeft, ShoppingCart, AlertCircle, Clock, Edit3, Trash2, DollarSign, ChefHat, XCircle, RefreshCw } from 'lucide-react';
+import { X, Package, ArrowRightLeft, ShoppingCart, AlertCircle, Clock, Edit3, Trash2, DollarSign, ChefHat, XCircle, RefreshCw, Plus, FileText, ShieldAlert, CheckCircle } from 'lucide-react';
 import { getPendingSyncItems, removeSyncItem, getCachedProducts, type SyncQueueItem } from '../lib/dexieDb';
 import { syncEngine } from '../lib/syncEngine';
 import { useDatabaseStore } from '../store/dbStore';
@@ -19,10 +19,18 @@ const operationMeta: Record<string, { label: string; icon: React.ReactNode }> = 
   registerManualConsumption: { label: 'Registrar consumo', icon: <Clock className="h-4 w-4" /> },
   createPendingAccount: { label: 'Crear cuenta pendiente', icon: <DollarSign className="h-4 w-4" /> },
   chargePendingAccount: { label: 'Cobrar cuenta pendiente', icon: <DollarSign className="h-4 w-4" /> },
+  deletePendingAccount: { label: 'Eliminar cuenta', icon: <Trash2 className="h-4 w-4" /> },
+  addItemsToPendingAccount: { label: 'Agregar items a cuenta', icon: <Plus className="h-4 w-4" /> },
+  updatePendingAccountItems: { label: 'Actualizar items', icon: <Edit3 className="h-4 w-4" /> },
+  togglePendingAccountType: { label: 'Cambiar tipo de cuenta', icon: <ArrowRightLeft className="h-4 w-4" /> },
+  updatePendingAccount: { label: 'Actualizar cuenta', icon: <Edit3 className="h-4 w-4" /> },
+  markPendingAccountPaid: { label: 'Marcar cuenta pagada', icon: <CheckCircle className="h-4 w-4" /> },
   createDailyClosing: { label: 'Crear cierre de caja', icon: <DollarSign className="h-4 w-4" /> },
   addRecipe: { label: 'Agregar receta', icon: <ChefHat className="h-4 w-4" /> },
   updateRecipe: { label: 'Actualizar receta', icon: <ChefHat className="h-4 w-4" /> },
   deleteRecipe: { label: 'Eliminar receta', icon: <ChefHat className="h-4 w-4" /> },
+  justifyMovement: { label: 'Justificar movimiento', icon: <FileText className="h-4 w-4" /> },
+  updateAccessPinAttempts: { label: 'Actualizar intentos PIN', icon: <ShieldAlert className="h-4 w-4" /> },
 };
 
 function formatDate(iso: string) {
@@ -71,16 +79,39 @@ function enrichItem(item: SyncQueueItem, productMap: Map<string, string>): Enric
       detail = `Actualizar: ${changed || 'varios campos'}`;
       break;
     }
+    case 'deleteProduct': {
+      productName = resolveProductName(p.id, productMap);
+      detail = 'Eliminado del inventario';
+      break;
+    }
     case 'addSale': {
       const sale = p.sale || {};
-      productName = 'Venta';
-      detail = `$${Number(sale.total_amount || 0).toFixed(2)} · ${(p.sale_items || []).length} item${p.sale_items?.length !== 1 ? 's' : ''}`;
+      const items = (p.sale_items || []) as any[];
+      const itemCount = items.length;
+      const itemDetails = items.map((i: any) => {
+        const name = i.product_name || i.recipe_snapshot?.name || 'Producto';
+        return `${name} ×${i.quantity}`;
+      }).join(', ');
+      productName = `Venta · ${itemCount} item${itemCount !== 1 ? 's' : ''}`;
+      detail = `$${Number(sale.total_amount || 0).toFixed(2)}` + (itemDetails ? ` · ${itemDetails}` : '');
       break;
     }
     case 'addRecipe': {
       const recipe = p.recipe || {};
       productName = recipe.name || 'Receta nueva';
       detail = `Precio venta: $${Number(recipe.selling_price || 0).toFixed(2)} · ${(p.ingredients || []).length} ingrediente${p.ingredients?.length !== 1 ? 's' : ''}`;
+      break;
+    }
+    case 'updateRecipe': {
+      const recipeUpdates = p.updates || {};
+      const changed = Object.keys(recipeUpdates).join(', ');
+      productName = p.recipeName || 'Receta';
+      detail = `Actualizar: ${changed || 'varios campos'}`;
+      break;
+    }
+    case 'deleteRecipe': {
+      productName = p.name || 'Receta';
+      detail = 'Eliminada';
       break;
     }
     case 'cancelTransit': {
@@ -97,6 +128,72 @@ function enrichItem(item: SyncQueueItem, productMap: Map<string, string>): Enric
     case 'registerManualConsumption': {
       productName = p.productName || resolveProductName(p.productId, productMap);
       detail = `Consumir ${p.quantity} unidades${p.note ? ` · ${p.note}` : ''}`;
+      break;
+    }
+    case 'createPendingAccount': {
+      productName = p.client_name || 'Cliente';
+      detail = `${p.sale_type || 'SALON'} · $${Number(p.total_amount || 0).toFixed(2)}`;
+      break;
+    }
+    case 'deletePendingAccount': {
+      productName = 'Cuenta';
+      detail = `Eliminada · ${(p.transitRestores || []).length} restauraciones`;
+      break;
+    }
+    case 'addItemsToPendingAccount': {
+      const accItems = (p.items || []) as any[];
+      const names = accItems.map((i: any) => i.product_name || '?').join(', ');
+      productName = 'Cuenta';
+      detail = `${accItems.length} item${accItems.length !== 1 ? 's' : ''}${names ? `: ${names}` : ''}`;
+      break;
+    }
+    case 'updatePendingAccountItems': {
+      const accItems = (p.items || []) as any[];
+      productName = 'Cuenta';
+      detail = `${accItems.length} item${accItems.length !== 1 ? 's' : ''} actualizados`;
+      break;
+    }
+    case 'togglePendingAccountType': {
+      productName = 'Cuenta';
+      detail = p.is_account_house ? 'Cuenta Casa' : 'Cuenta Normal';
+      break;
+    }
+    case 'updatePendingAccount': {
+      const accUpdates = p.updates || {};
+      const accChanged = Object.keys(accUpdates).join(', ');
+      productName = 'Cuenta';
+      detail = accChanged ? `Actualizar: ${accChanged}` : 'Actualizada';
+      break;
+    }
+    case 'markPendingAccountPaid': {
+      productName = 'Cuenta';
+      detail = 'Marcada como pagada';
+      break;
+    }
+    case 'chargePendingAccount': {
+      productName = 'Cuenta';
+      detail = 'Cobro registrado';
+      break;
+    }
+    case 'createDailyClosing': {
+      productName = 'Cierre de caja';
+      const date = p.closing_date ? new Date(p.closing_date + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' }) : '?';
+      detail = `${date} · $${Number(p.closing_amount || 0).toFixed(2)}`;
+      break;
+    }
+    case 'justifyMovement': {
+      const justification = p.justification || '';
+      productName = null;
+      detail = `Justificación: ${justification.length > 60 ? justification.slice(0, 57) + '...' : justification}`;
+      detailColor = 'text-success';
+      break;
+    }
+    case 'updateAccessPinAttempts': {
+      productName = 'PIN';
+      const attempts = p.failed_attempts ?? 0;
+      const until = p.blocked_until ? ' · Bloqueado' : '';
+      detail = `${attempts} intento${attempts !== 1 ? 's' : ''} fallido${attempts !== 1 ? 's' : ''}${until}`;
+      detailColor = attempts >= 3 ? 'text-danger' : 'text-warning';
       break;
     }
     default: {

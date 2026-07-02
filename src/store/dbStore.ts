@@ -1667,6 +1667,7 @@ addProduct: async (product) => {
       const saleItems = sale.items.map(item => ({
         sale_id: tempId,
         product_id: item.product_id,
+        product_name: item.is_recipe ? (item.recipe_snapshot?.name || 'Receta') : (productsMap.get(item.product_id)?.name || 'Producto'),
         quantity: item.quantity,
         unit_cost: item.unit_cost,
         selling_price: item.selling_price,
@@ -1812,7 +1813,7 @@ addProduct: async (product) => {
       for (const ci of consumptionItems) {
         await addToSyncQueue({
           operation: 'registerManualConsumption', table: 'transit_items',
-          payload: { transitItemId: ci.transitItemId, quantity: ci.quantity, note: reason || 'Consumo desde tránsito', userId: user.id, productId },
+          payload: { transitItemId: ci.transitItemId, quantity: ci.quantity, note: reason || 'Consumo desde tránsito', userId: user.id, productId, productName: product.name },
         });
       }
       get().refreshSyncQueueCount();
@@ -3054,7 +3055,7 @@ deletePendingAccount: async (accountId: string) => {
       }));
       await addToSyncQueue({
         operation: 'updateRecipe', table: 'recipes',
-        payload: { id, updates: { name: updates.name ? capitalize(updates.name) : undefined, selling_price: updates.selling_price, ingredients: updates.ingredients } },
+        payload: { id, recipeName: get().recipes.find(r => r.id === id)?.name || updates.name || 'Receta', updates: { name: updates.name ? capitalize(updates.name) : undefined, selling_price: updates.selling_price, ingredients: updates.ingredients } },
       });
       get().refreshSyncQueueCount();
       toast.success('Receta actualizada (sin conexión)');
@@ -3100,8 +3101,9 @@ deletePendingAccount: async (accountId: string) => {
 
   deleteRecipe: async (id) => {
     if (!navigator.onLine) {
+      const recipeToDelete = get().recipes.find(r => r.id === id);
       set((state) => ({ recipes: state.recipes.filter(r => r.id !== id) }));
-      await addToSyncQueue({ operation: 'deleteRecipe', table: 'recipes', payload: { id } });
+      await addToSyncQueue({ operation: 'deleteRecipe', table: 'recipes', payload: { id, name: recipeToDelete?.name || 'Receta' } });
       get().refreshSyncQueueCount();
       toast.success('Receta eliminada (sin conexión)');
       return;
