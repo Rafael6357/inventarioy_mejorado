@@ -25,7 +25,7 @@ export default function OfflineLimitBanner({ moduleName }: OfflineLimitBannerPro
     >
       <AlertTriangle className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
       <span className="flex-1">
-        Algunas funciones de <strong>{moduleName}</strong> requieren conexión a internet. Tus cambios se guardarán localmente al reconectar.
+        Algunas funciones de <strong>{moduleName}</strong> requieren conexión a internet. Sus cambios se guardarán localmente hasta que tenga conexión nuevamente.
       </span>
       <button
         onClick={handleDismiss}
