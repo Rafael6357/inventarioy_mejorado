@@ -33,6 +33,7 @@ const MODULE_TRANSLATIONS: Record<string, string> = {
   stock: 'Stock',
   accounts: 'Cuentas por Cobrar',
   closing: 'Cierre Diario',
+  sync: 'Sincronización',
 };
 
 const MODULE_ICONS: Record<string, string> = {
@@ -50,6 +51,10 @@ const MODULE_ICONS: Record<string, string> = {
   ai: '🤖',
   settings: '⚙️',
   stock: '📉',
+  accounts: '📋',
+  closing: '💰',
+  sync: '🔄',
+  payroll: '💵',
 };
 
 const ACTION_COLORS: Record<string, string> = {
@@ -75,6 +80,13 @@ const ACTION_COLORS: Record<string, string> = {
   CONSUMO_MANUAL: 'bg-surface-hover border-l-4 border-l-amber-500 text-amber-700',
   COBRAR: 'bg-surface-hover border-l-4 border-l-green-500 text-green-700',
   MARCAR_PAGADO: 'bg-surface-hover border-l-4 border-l-teal-500 text-teal-700',
+  CANCELAR_CUENTA: 'bg-surface-hover border-l-4 border-l-red-500 text-red-700',
+  EDITAR_PARAMETROS: 'bg-surface-hover border-l-4 border-l-gray-500 text-gray-700',
+  AGREGAR_ITEMS: 'bg-surface-hover border-l-4 border-l-blue-500 text-blue-700',
+  ACTUALIZAR_ITEMS: 'bg-surface-hover border-l-4 border-l-cyan-500 text-cyan-700',
+  TOGGLE_TIPO: 'bg-surface-hover border-l-4 border-l-purple-500 text-purple-700',
+  COMPENSAR: 'bg-surface-hover border-l-4 border-l-amber-500 text-amber-700',
+  JUSTIFICAR: 'bg-surface-hover border-l-4 border-l-teal-500 text-teal-700',
 };
 
 const ACTION_TRANSLATIONS: Record<string, string> = {
@@ -91,15 +103,22 @@ const ACTION_TRANSLATIONS: Record<string, string> = {
   SALIDA: 'Salida de producto',
   MERMA: 'Merma de producto',
   SUBIR: 'Documento subido',
-  GENERAR_NOMINA: 'Nómina Generada',
-  ACTUALIZAR_NOMINA: 'Nómina Actualizada',
+  GENERAR_NOMINA: 'Nómina generada',
+  ACTUALIZAR_NOMINA: 'Nómina actualizada',
   AJUSTE: 'Ajuste de inventario',
   ACTUALIZAR: 'Actualizar',
-  CANCELAR_TRANSITO: 'Cancelar Tránsito',
-  MERMA_TRANSITO: 'Merma en Tránsito',
-  CONSUMO_MANUAL: 'Consumo Manual',
+  CANCELAR_TRANSITO: 'Cancelar tránsito',
+  MERMA_TRANSITO: 'Merma en tránsito',
+  CONSUMO_MANUAL: 'Consumo manual',
   COBRAR: 'Cobrar cuenta',
   MARCAR_PAGADO: 'Marcar como pagada',
+  CANCELAR_CUENTA: 'Cancelar cuenta',
+  EDITAR_PARAMETROS: 'Editar parámetros',
+  AGREGAR_ITEMS: 'Agregar ítems',
+  ACTUALIZAR_ITEMS: 'Actualizar ítems',
+  TOGGLE_TIPO: 'Cambiar tipo',
+  COMPENSAR: 'Compensar',
+  JUSTIFICAR: 'Justificar',
 };
 
 export default function ActionLogsView() {
@@ -185,16 +204,8 @@ export default function ActionLogsView() {
     });
   };
 
-  const formatDetails = (details: Record<string, any>, module: string, action: string) => {
+  const formatDetails = (details: Record<string, any>, _module: string, _action: string) => {
     if (!details || Object.keys(details).length === 0) return '-';
-    
-    if (module === 'movements') {
-      const productName = details.product_name || '';
-      const qty = details.quantity || '';
-      const unit = details.unit || '';
-      const reason = details.reason || '';
-      return `${productName} ${qty ? `(${qty} ${unit})` : ''}${reason ? ` - ${reason}` : ''}`.trim();
-    }
     
     const formatValue = (value: any, key?: string): string => {
       if (typeof value === 'boolean') {
