@@ -1222,7 +1222,7 @@ addProduct: async (product) => {
         }
       }
 
-      await addToSyncQueue({ operation: 'addMovement', table: 'movements', payload: { ...movement, id: movementId, user_id: user.id, date: movementDate, created_at: offlineMovement.created_at } });
+      await addToSyncQueue({ operation: 'addMovement', table: 'movements', payload: { ...movement, id: movementId, user_id: user.id, date: movementDate, created_at: offlineMovement.created_at, product_name: product.name } });
       get().refreshSyncQueueCount();
       toast.success('Movimiento guardado localmente (sin conexión)');
     };
@@ -1969,7 +1969,7 @@ addProduct: async (product) => {
           movements: [localMovement, ...state.movements],
         };
       });
-      await addToSyncQueue({ operation: 'cancelTransit', table: 'transit_items', payload: { transitItemId, quantity, reason, userId: user.id, productId: product.id } });
+      await addToSyncQueue({ operation: 'cancelTransit', table: 'transit_items', payload: { transitItemId, quantity, reason, userId: user.id, productId: product.id, productName: product.name } });
       get().refreshSyncQueueCount();
       toast.success('Cancelación guardada localmente (sin conexión)');
       return { success: true };
@@ -2074,7 +2074,7 @@ addProduct: async (product) => {
         transitItems: state.transitItems.map(t => t.id === transitItemId ? { ...t, remaining: newRemaining } : t).filter(t => t.remaining > 0),
         products: state.products.map(p => p.id === product.id ? { ...p, in_transit: newInTransitVal } : p),
       }));
-      await addToSyncQueue({ operation: 'registerWasteFromTransit', table: 'transit_items', payload: { transitItemId, quantity, reason, userId: user.id, productId: product.id } });
+      await addToSyncQueue({ operation: 'registerWasteFromTransit', table: 'transit_items', payload: { transitItemId, quantity, reason, userId: user.id, productId: product.id, productName: product.name } });
       get().refreshSyncQueueCount();
       toast.success('Merma guardada localmente (sin conexión)');
       return { success: true };
@@ -2161,7 +2161,7 @@ addProduct: async (product) => {
         transitItems: state.transitItems.map(t => t.id === transitItemId ? { ...t, remaining: newRemaining, consumed: newConsumed } : t).filter(t => t.remaining > 0),
         products: state.products.map(p => p.id === product.id ? { ...p, in_transit: newInTransit } : p),
       }));
-      await addToSyncQueue({ operation: 'registerManualConsumption', table: 'transit_items', payload: { transitItemId, quantity, note, userId: user.id, productId: product.id } });
+      await addToSyncQueue({ operation: 'registerManualConsumption', table: 'transit_items', payload: { transitItemId, quantity, note, userId: user.id, productId: product.id, productName: product.name } });
       get().refreshSyncQueueCount();
       toast.success('Consumo guardado localmente (sin conexión)');
       return { success: true };

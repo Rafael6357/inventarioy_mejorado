@@ -39,6 +39,11 @@ interface EnrichedItem {
   detailColor: string;
 }
 
+function resolveProductName(pid: string | undefined, productMap: Map<string, string>): string {
+  if (!pid) return 'Producto';
+  return productMap.get(pid) || 'Producto (ID: ' + pid.slice(0, 7) + ')';
+}
+
 function enrichItem(item: SyncQueueItem, productMap: Map<string, string>): EnrichedItem {
   const p = item.payload;
   let productName: string | null = null;
@@ -48,7 +53,7 @@ function enrichItem(item: SyncQueueItem, productMap: Map<string, string>): Enric
   switch (item.operation) {
     case 'addMovement': {
       const pid = p.product_id;
-      productName = productMap.get(pid) || pid?.slice(0, 8) || '—';
+      productName = p.product_name || resolveProductName(pid, productMap);
       const mType = p.type || '';
       detail = `Movimiento ${mType} · ${p.quantity ?? '?'} ${p.unit ?? ''}`;
       detailColor = mType === 'ENTRADA' ? 'text-success' : mType === 'SALIDA' ? 'text-primary' : 'text-warning';
@@ -61,7 +66,7 @@ function enrichItem(item: SyncQueueItem, productMap: Map<string, string>): Enric
     }
     case 'updateProduct': {
       const updates = p.updates || {};
-      productName = productMap.get(p.id) || p.id?.slice(0, 8) || '—';
+      productName = resolveProductName(p.id, productMap);
       const changed = Object.keys(updates).filter(k => k !== 'updated_at').join(', ');
       detail = `Actualizar: ${changed || 'varios campos'}`;
       break;
@@ -79,18 +84,18 @@ function enrichItem(item: SyncQueueItem, productMap: Map<string, string>): Enric
       break;
     }
     case 'cancelTransit': {
-      productName = productMap.get(p.productId) || p.productId?.slice(0, 8) || '—';
+      productName = p.productName || resolveProductName(p.productId, productMap);
       detail = `Devolver ${p.quantity} unidades · ${p.reason || ''}`;
       break;
     }
     case 'registerWasteFromTransit': {
-      productName = productMap.get(p.productId) || p.productId?.slice(0, 8) || '—';
+      productName = p.productName || resolveProductName(p.productId, productMap);
       detail = `Merma ${p.quantity} unidades · ${p.reason || ''}`;
       detailColor = 'text-danger';
       break;
     }
     case 'registerManualConsumption': {
-      productName = productMap.get(p.productId) || p.productId?.slice(0, 8) || '—';
+      productName = p.productName || resolveProductName(p.productId, productMap);
       detail = `Consumir ${p.quantity} unidades${p.note ? ` · ${p.note}` : ''}`;
       break;
     }
@@ -109,6 +114,8 @@ export default function SyncQueueModal({ onClose }: { onClose: () => void }) {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [cancelling, setCancelling] = useState<number | null>(null);
+  const [productMap, setProductMap] = useState<Map<string, string>>(new Map());
+  const [productMapReady, setProductMapReady] = useState(false);
   const refreshSyncQueueCount = useDatabaseStore((s) => s.refreshSyncQueueCount);
   const user = useAuthStore((s) => s.user);
   const { backdropRef, cardRef } = useModalAnimation(true);
@@ -122,9 +129,16 @@ export default function SyncQueueModal({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     loadItems();
+    if (!user) return;
+    setProductMapReady(false);
+    getCachedProducts(user.id).then((prods) => {
+      setProductMap(new Map(prods.map(p => [p.id, p.name])));
+      setProductMapReady(true);
+    });
   }, []);
 
   useEffect(() => {
+    if (!user) return;
     const unsub = syncEngine.onEvent((event) => {
       if (event === 'complete' || event === 'error' || event === 'idle') {
         setSyncing(false);
@@ -134,16 +148,7 @@ export default function SyncQueueModal({ onClose }: { onClose: () => void }) {
       if (event === 'start') setSyncing(true);
     });
     return () => { unsub(); };
-  }, [refreshSyncQueueCount]);
-
-  const [productMap, setProductMap] = useState<Map<string, string>>(new Map());
-
-  useEffect(() => {
-    if (!user) return;
-    getCachedProducts(user.id).then((prods) => {
-      setProductMap(new Map(prods.map(p => [p.id, p.name])));
-    });
-  }, [user, items]);
+  }, [refreshSyncQueueCount, user]);
 
   const enrichedItems = useMemo(() => items.map((it) => enrichItem(it, productMap)), [items, productMap]);
 
@@ -183,7 +188,7 @@ export default function SyncQueueModal({ onClose }: { onClose: () => void }) {
             </div>
           )}
 
-          {loading ? (
+          {loading || !productMapReady ? (
             <div className="flex items-center justify-center py-12">
               <RefreshCw className="h-6 w-6 text-text-secondary animate-spin" />
             </div>
