@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
 import { useAuthStore } from '../../store/authStore';
-import { Plus, Minus, Trash2, ShoppingCart, CreditCard, Search, X, DollarSign, User, PlusCircle, Users, Loader2, Printer, AlertCircle } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingCart, CreditCard, Search, X, DollarSign, User, PlusCircle, Users, Loader2, Printer, AlertCircle, ChevronDown } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { NumberInput } from '../../components/ui/NumberInput';
@@ -75,6 +75,7 @@ export default function SalesView() {
   const [newPendingName, setNewPendingName] = useState('');
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [showSaleDetails, setShowSaleDetails] = useState(false);
 
   useEffect(() => {
     setPendingSyncCount(syncQueueCount);
@@ -1051,7 +1052,7 @@ setShowTicket(true);
       </div>
 
       {/* Panel Derecho - Carrito y Cobro */}
-      <div className="flex w-full flex-col rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm shadow-sm lg:w-[400px] transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(205,164,52,0.15)]">
+      <div className="flex w-full flex-col rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm shadow-sm lg:w-[480px] transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(205,164,52,0.15)]">
         <div className="border-b border-border/50 p-4">
           <h2 className="text-lg font-semibold text-text flex items-center gap-2">
             <ShoppingCart className="h-5 w-5 text-primary drop-shadow-[0_0_8px_rgba(205,164,52,0.5)]" />
@@ -1059,56 +1060,58 @@ setShowTicket(true);
           </h2>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 animate-scrollbar-pulse">
+        <div className="flex-1 overflow-y-auto p-4 min-h-0 animate-scrollbar-pulse">
           {cart.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center text-text-secondary">
               <ShoppingCart className="mb-4 h-12 w-12 opacity-20" />
               <p>El carrito está vacío</p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-2">
               {cart.map(item => (
-                <div key={item.product_id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-bg p-2 sm:p-3">
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-text truncate text-sm" title={item.name}>{item.name}</h4>
-                    <p className="font-mono text-xs text-primary">${item.price.toFixed(2)}</p>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
+                <div key={item.product_id} className="rounded-lg border border-border bg-bg p-2 sm:p-3 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <h4 className="font-medium text-text text-sm leading-tight flex-1 text-center" title={item.name}>{item.name}</h4>
                     <button 
-                      onClick={() => updateQuantity(item.product_id, -1)}
-                      className="rounded-xl bg-surface-hover p-3 text-text hover:bg-border transition-colors"
+                      onClick={() => removeFromCart(item.product_id)}
+                      className="text-text-secondary hover:text-danger transition-colors p-1 shrink-0"
                     >
-                      <Minus className="h-4 w-4" />
-                    </button>
-                    <input
-                      type="number"
-                      min="1"
-                      max={getMaxQuantity(item)}
-                      step="1"
-                      value={item.quantity}
-                      onChange={(e) => handleQuantityChange(item.product_id, e.target.value)}
-                      onBlur={(e) => handleQuantityBlur(item.product_id, e.target.value)}
-                      className="w-20 text-center font-mono text-sm border border-border rounded px-1 py-0.5 bg-bg text-text focus:outline-none focus:ring-1 focus:ring-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    />
-                    <button 
-                      onClick={() => updateQuantity(item.product_id, 1)}
-                      className="rounded-md bg-surface-hover p-3 text-text hover:bg-border transition-colors"
-                    >
-                      <Plus className="h-4 w-4" />
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
                   
-                  <div className="text-right font-mono font-medium text-sm w-20">
-                    ${(item.price * item.quantity).toFixed(2)}
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-mono text-xs text-primary shrink-0">${item.price.toFixed(2)}</p>
+                    
+                    <div className="flex items-center gap-1">
+                      <button 
+                        onClick={() => updateQuantity(item.product_id, -1)}
+                        className="rounded-md bg-surface-hover p-1.5 text-text hover:bg-border transition-colors"
+                      >
+                        <Minus className="h-3.5 w-3.5" />
+                      </button>
+                      <input
+                        type="number"
+                        min="1"
+                        max={getMaxQuantity(item)}
+                        step="1"
+                        value={item.quantity}
+                        onChange={(e) => handleQuantityChange(item.product_id, e.target.value)}
+                        onBlur={(e) => handleQuantityBlur(item.product_id, e.target.value)}
+                        className="w-14 text-center font-mono text-sm border border-border rounded px-1 py-0.5 bg-bg text-text focus:outline-none focus:ring-1 focus:ring-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                      <button 
+                        onClick={() => updateQuantity(item.product_id, 1)}
+                        className="rounded-md bg-surface-hover p-1.5 text-text hover:bg-border transition-colors"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    
+                    <div className="text-right font-mono font-medium text-sm shrink-0">
+                      ${(item.price * item.quantity).toFixed(2)}
+                    </div>
                   </div>
-                  
-                  <button 
-                    onClick={() => removeFromCart(item.product_id)}
-                    className="text-text-secondary hover:text-danger transition-colors p-2"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
                 </div>
               ))}
             </div>
@@ -1116,107 +1119,129 @@ setShowTicket(true);
         </div>
 
         <div className="border-t border-border bg-bg/50">
-          <div className="max-h-[280px] overflow-y-auto p-4 space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <div>
-              <label htmlFor="saleType" className="text-xs font-medium text-text-secondary block mb-1">Tipo de Venta</label>
-              <select 
-                id="saleType"
-                className="w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                value={saleType}
-                onChange={e => setSaleType(e.target.value as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA')}
-              >
-                <option value="SALON">Salón</option>
-                <option value="DOMICILIO">Domicilio</option>
-                <option value="BAR">Bar</option>
-                <option value="VENTA_RAPIDA">Venta Rápida</option>
-              </select>
+          <button
+            type="button"
+            onClick={() => setShowSaleDetails(!showSaleDetails)}
+            className={`w-full flex items-center justify-between px-4 py-3 transition-all duration-300 ${
+              showSaleDetails 
+                ? 'bg-bg/80' 
+                : 'bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 animate-[glow_2s_ease-in-out_infinite] hover:from-primary/10 hover:via-primary/15 hover:to-primary/10'
+            }`}
+          >
+            <span className="text-sm font-medium text-text-secondary">
+              {showSaleDetails ? 'Detalles de Venta' : 'Total'}
+            </span>
+            <div className="flex items-center gap-2">
+              <span className="font-mono font-bold text-primary">${total.toFixed(2)}</span>
+              <ChevronDown className={`h-4 w-4 text-primary transition-transform duration-300 ${showSaleDetails ? 'rotate-180' : ''}`} />
             </div>
-            <div>
-              <label htmlFor="seller" className="text-xs font-medium text-text-secondary block mb-1">Vendedor</label>
-              <select
-                id="seller" 
-                className="w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                value={employeeId}
-                onChange={e => handleEmployeeChange(e.target.value)}
-              >
-                <option value="">{user ? `Dueño: ${user.name}` : '(Yo)'}</option>
-                {employees.map(emp => (
-                  <option key={emp.id} value={emp.id}>{emp.role}: {emp.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
+          </button>
 
-          {saleType === 'DOMICILIO' && (
-            <div className="mt-3 p-3 rounded-lg bg-bg/50 border border-border/50">
-              <label className="text-xs font-medium text-text-secondary block mb-1">
-                Costo Domicilio (para el motorista)
-              </label>
-              <Input
-                type="number"
-                min={0}
-                step="0.01"
-                className="w-full h-9 font-mono"
-                value={deliveryFee || ''}
-                onChange={e => setDeliveryFee(Number(e.target.value))}
-                placeholder="0.00"
+          {showSaleDetails && (
+            <div className="max-h-[280px] overflow-y-auto p-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              <div>
+                <label htmlFor="saleType" className="text-xs font-medium text-text-secondary block mb-1">Tipo de Venta</label>
+                <select 
+                  id="saleType"
+                  className="w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  value={saleType}
+                  onChange={e => setSaleType(e.target.value as 'SALON' | 'DOMICILIO' | 'BAR' | 'VENTA_RAPIDA')}
+                >
+                  <option value="SALON">Salón</option>
+                  <option value="DOMICILIO">Domicilio</option>
+                  <option value="BAR">Bar</option>
+                  <option value="VENTA_RAPIDA">Venta Rápida</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="seller" className="text-xs font-medium text-text-secondary block mb-1">Vendedor</label>
+                <select
+                  id="seller" 
+                  className="w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  value={employeeId}
+                  onChange={e => handleEmployeeChange(e.target.value)}
+                >
+                  <option value="">{user ? `Dueño: ${user.name}` : '(Yo)'}</option>
+                  {employees.map(emp => (
+                    <option key={emp.id} value={emp.id}>{emp.role}: {emp.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {saleType === 'DOMICILIO' && (
+              <div className="mt-3 p-3 rounded-lg bg-bg/50 border border-border/50">
+                <label className="text-xs font-medium text-text-secondary block mb-1">
+                  Costo Domicilio (para el motorista)
+                </label>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  className="w-full h-9 font-mono"
+                  value={deliveryFee || ''}
+                  onChange={e => setDeliveryFee(Number(e.target.value))}
+                  placeholder="0.00"
+                />
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 mt-3">
+              <input
+                type="checkbox"
+                id="accountHouse"
+                checked={isAccountHouse}
+                disabled={selectedPendingAccount ? (pendingAccounts.find(a => a.id === selectedPendingAccount)?.items || []).length > 0 : false}
+                onChange={e => setIsAccountHouse(e.target.checked)}
+                className="w-4 h-4 rounded border-border text-primary focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
               />
+              <label htmlFor="accountHouse" className={`text-sm ${selectedPendingAccount ? ((pendingAccounts.find(a => a.id === selectedPendingAccount)?.items || []).length > 0 ? 'text-text-secondary' : 'text-text') : 'text-text'}`}>
+                Cuenta Casa
+                {selectedPendingAccount && (pendingAccounts.find(a => a.id === selectedPendingAccount)?.items || []).length > 0 && (
+                  <span className="text-xs ml-1 text-warning">(usar botón CC)</span>
+                )}
+              </label>
+            </div>
+
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-text-secondary">Subtotal</span>
+              <span className="font-mono">${subtotal.toFixed(2)}</span>
+            </div>
+            
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-text-secondary">Descuento ($)</span>
+              <Input 
+                type="number" 
+                min={0} 
+                step="0.01" 
+                className="w-24 h-8 text-right font-mono" 
+                value={discount || ''} 
+                onChange={e => setDiscount(Math.min(Number(e.target.value), subtotal))}
+              />
+            </div>
+
+            <div className="flex items-center justify-between border-t border-border pt-3">
+              <span className="text-lg font-bold text-text">Total</span>
+              <span className="text-2xl font-mono font-bold text-primary">${total.toFixed(2)}</span>
+            </div>
             </div>
           )}
 
-          <div className="flex items-center gap-2 mt-3">
-            <input
-              type="checkbox"
-              id="accountHouse"
-              checked={isAccountHouse}
-              disabled={selectedPendingAccount ? (pendingAccounts.find(a => a.id === selectedPendingAccount)?.items || []).length > 0 : false}
-              onChange={e => setIsAccountHouse(e.target.checked)}
-              className="w-4 h-4 rounded border-border text-primary focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
-            />
-            <label htmlFor="accountHouse" className={`text-sm ${selectedPendingAccount ? ((pendingAccounts.find(a => a.id === selectedPendingAccount)?.items || []).length > 0 ? 'text-text-secondary' : 'text-text') : 'text-text'}`}>
-              Cuenta Casa
-              {selectedPendingAccount && (pendingAccounts.find(a => a.id === selectedPendingAccount)?.items || []).length > 0 && (
-                <span className="text-xs ml-1 text-warning">(usar botón CC)</span>
+          <div className="p-4">
+            <Button 
+              className="w-full h-12 text-base gap-2" 
+              onClick={handleCheckout}
+              disabled={cart.length === 0 || isClosed || isProcessingSale}
+            >
+              {isProcessingSale ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <CreditCard className="h-5 w-5" />
               )}
-            </label>
+              {isProcessingSale ? 'Procesando...' : isClosed ? 'Día Cerrado' : 'Agregar Venta'}
+            </Button>
           </div>
-
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-text-secondary">Subtotal</span>
-            <span className="font-mono">${subtotal.toFixed(2)}</span>
-          </div>
-          
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-text-secondary">Descuento ($)</span>
-            <Input 
-              type="number" 
-              min={0} 
-              step="0.01" 
-              className="w-24 h-8 text-right font-mono" 
-              value={discount || ''} 
-              onChange={e => setDiscount(Math.min(Number(e.target.value), subtotal))}
-            />
-          </div>
-
-          <div className="flex items-center justify-between border-t border-border pt-3">
-            <span className="text-lg font-bold text-text">Total</span>
-            <span className="text-2xl font-mono font-bold text-primary">${total.toFixed(2)}</span>
-          </div>
-          </div>
-
-          <Button 
-            className="w-full h-12 text-base gap-2" 
-            onClick={handleCheckout}
-            disabled={cart.length === 0 || isClosed || isProcessingSale}
-          >
-            {isProcessingSale ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              <CreditCard className="h-5 w-5" />
-            )}
-            {isProcessingSale ? 'Procesando...' : isClosed ? 'Día Cerrado' : 'Agregar Venta'}
-          </Button>
         </div>
       </div>
 
