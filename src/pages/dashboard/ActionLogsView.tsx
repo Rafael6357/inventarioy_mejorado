@@ -212,13 +212,11 @@ export default function ActionLogsView() {
         return value ? 'Sí' : 'No';
       }
 
-      // Convertir strings numéricos a número para formatearlos correctamente
       let numericValue: number | null = null;
       if (typeof value === 'number' && !isNaN(value)) {
         numericValue = value;
       } else if (typeof value === 'string') {
         const trimmed = value.trim();
-        // Solo convertir si la cadena completa es numérica (ej: "2000", "45.5", "2,99")
         if (/^\d+([.,]\d+)?$/.test(trimmed) && !isNaN(Number(trimmed.replace(',', '.')))) {
           numericValue = Number(trimmed.replace(',', '.'));
         }
@@ -231,14 +229,7 @@ export default function ActionLogsView() {
                               'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
           return monthNames[Math.round(numericValue) - 1] || Math.round(numericValue).toString();
         }
-        if (key?.includes('total') && (key.includes('employees') || key.includes('items') || key.includes('count'))) {
-          return Math.round(numericValue).toLocaleString('es-CO');
-        }
-        if (key?.includes('total') || key === 'total') {
-          return numericValue.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        }
-        // Formatear con separador de miles (.) y decimal (,) estilo español
-        return numericValue.toLocaleString('es-CO');
+        return String(numericValue);
       }
 
       return String(value);
