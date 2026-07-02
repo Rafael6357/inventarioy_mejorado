@@ -271,6 +271,14 @@ export default function Dashboard() {
     return () => { unsub(); };
   }, []);
 
+  useEffect(() => {
+    const handleOnline = () => {
+      fetchAll().catch(() => {});
+    };
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [fetchAll]);
+
   const checkUncontactedUsers = useCallback(async () => {
     try {
       const { count, error } = await supabase
