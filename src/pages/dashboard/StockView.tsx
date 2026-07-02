@@ -13,6 +13,7 @@ import { useStaggerEnter } from '../../lib/animations/useStaggerEnter';
 import { usePersistentFilters } from '../../lib/hooks/usePersistentFilters';
 import EmptyState from '../../components/EmptyState';
 import SortIcon from '../../components/ui/SortIcon';
+import { TableSkeleton } from '../../components/Skeleton';
 
 export default function StockView() {
   // Helper to get stock per warehouse
@@ -87,6 +88,7 @@ export default function StockView() {
   const tableContainerRef = useRef<HTMLDivElement>(null);
   
   const products = useDatabaseStore((state) => state.products);
+  const isLoading = useDatabaseStore((state) => state.isLoading);
   const movements = useDatabaseStore((state) => state.movements);
   const transitItems = useDatabaseStore((state) => state.transitItems);
   const deleteProduct = useDatabaseStore((state) => state.deleteProduct);
@@ -548,11 +550,19 @@ export default function StockView() {
             </thead>
             <tbody ref={stockTbodyRef} className="divide-y divide-border">
               {filteredProducts.length === 0 ? (
-                <tr>
-                  <td colSpan={13} className="px-4 py-8">
-                    <EmptyState icon={Package} title="No hay productos" description={products.length === 0 ? 'Agregue su primer producto desde la sección Inventario.' : 'Ningún producto coincide con los filtros aplicados.'} />
-                  </td>
-                </tr>
+                isLoading ? (
+                  <tr>
+                    <td colSpan={13} className="px-4 py-8">
+                      <TableSkeleton rows={5} cols={13} />
+                    </td>
+                  </tr>
+                ) : (
+                  <tr>
+                    <td colSpan={13} className="px-4 py-8">
+                      <EmptyState icon={Package} title="No hay productos" description={products.length === 0 ? 'Agregue su primer producto desde la sección Inventario.' : 'Ningún producto coincide con los filtros aplicados.'} />
+                    </td>
+                  </tr>
+                )
               ) : (
                 filteredProducts.map((product) => {
                   const warehouseStock = getStockForWarehouse(product.id);

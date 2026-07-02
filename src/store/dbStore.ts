@@ -666,23 +666,49 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
 
     const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+    // ── Grupo 1: Productos y Movimientos ──
+    let productsData: any[] = [];
+    let movementsData: any[] = [];
+
     try {
       logger.info('📥 Cargando datos principales...');
       const [productsRes, movementsRes] = await Promise.all([
         queryWithRetry(() => supabase.from('products').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(limit)),
         queryWithRetry(() => supabase.from('movements').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(limit)),
       ]);
-      await delay(300);
+      productsData = productsRes.data || [];
+      movementsData = movementsRes.data || [];
+      set({ products: productsData, movements: movementsData });
+      await delay(100);
+    } catch (e) {
+      logger.error('❌ Grupo 1 (productos/movimientos) falló:', e);
+    }
 
-      // Grupo 2: Ventas y Recetas
+    // ── Grupo 2: Ventas y Recetas ──
+    let salesData: any[] = [];
+    let recipesData: any[] = [];
+
+    try {
       logger.info('📥 Cargando ventas y recetas...');
       const [salesRes, recipesRes] = await Promise.all([
         queryWithRetry(() => supabase.from('sales').select('*, sale_items(*)').eq('user_id', user.id).order('created_at', { ascending: false }).limit(limit)),
         queryWithRetry(() => supabase.from('recipes').select('*, recipe_ingredients(*)').eq('user_id', user.id).order('created_at', { ascending: false }).limit(limit)),
       ]);
-      await delay(300);
+      salesData = salesRes.data?.map((s: any) => ({ ...s, items: s.sale_items || [] })) || [];
+      recipesData = recipesRes.data?.map((r: any) => ({ ...r, ingredients: r.recipe_ingredients || [] })) || [];
+      set({ sales: salesData, recipes: recipesData });
+      await delay(100);
+    } catch (e) {
+      logger.error('❌ Grupo 2 (ventas/recetas) falló:', e);
+    }
 
-      // Grupo 3: Empleados y Recursos Humanos
+    // ── Grupo 3: Empleados y RRHH ──
+    let employeesData: any[] = [];
+    let categoriesData: any[] = [];
+    let hrDocsData: any[] = [];
+    let departmentsData: any[] = [];
+
+    try {
       logger.info('📥 Cargando empleados y RRHH...');
       const [employeesRes, categoriesRes, hrDocsRes, departmentsRes] = await Promise.all([
         queryWithRetry(() => supabase.from('employees').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(limit)),
@@ -690,9 +716,27 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
         queryWithRetry(() => supabase.from('hr_documents').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(limit)),
         queryWithRetry(() => supabase.from('departments').select('*').eq('user_id', user.id).order('name', { ascending: true })),
       ]);
-      await delay(300);
+      employeesData = employeesRes.data || [];
+      categoriesData = categoriesRes.data || [];
+      hrDocsData = hrDocsRes.data || [];
+      departmentsData = departmentsRes.data || [];
+      set({ employees: employeesData, categories: categoriesData, hrDocuments: hrDocsData, departments: departmentsData });
+      await delay(100);
+    } catch (e) {
+      logger.error('❌ Grupo 3 (empleados/RRHH) falló:', e);
+    }
 
-      // Grupo 4: Cierres, Configuración y Otros
+    // ── Grupo 4: Tránsito, Cierres, Configuración ──
+    let transitItemsData: any[] = [];
+    let dailyClosingsData: any[] = [];
+    let pendingData: any[] = [];
+    let accessPinsData: any[] = [];
+    let actionLogsData: any[] = [];
+    let payrollConfigData: any = null;
+    let warehousesData: any[] = [];
+    let productWarehouseData: any[] = [];
+
+    try {
       logger.info('📥 Cargando cierres y configuración...');
       const [transitRes, dailyClosingsRes, pendingRes, accessPinsRes, actionLogsRes, payrollConfigRes, warehousesRes, productWarehouseRes] = await Promise.all([
         queryWithRetry(() => supabase.from('transit_items').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(limit)),
@@ -704,88 +748,89 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
         queryWithRetry(() => supabase.from('warehouses').select('*').eq('user_id', user.id).order('name')),
         queryWithRetry(() => supabase.from('product_warehouse').select('*')),
       ]);
-
-      const recipes = recipesRes.data?.map(r => ({
-        ...r,
-        ingredients: r.recipe_ingredients || [],
-      })) || [];
-
-      const sales = salesRes.data?.map(s => ({
-        ...s,
-        items: s.sale_items || [],
-      })) || [];
-
-      const transitItems = (transitRes.data || []).filter(t => t.remaining > 0);
-
-      const products = (productsRes.data || []).map(p => {
-        const totalInTransit = transitItems
-          .filter(t => t.product_id === p.id)
-          .reduce((sum, t) => sum + t.remaining, 0);
-        return { ...p, in_transit: totalInTransit };
-      });
-
-      const productWarehouseWithTransit = (productWarehouseRes.data || []).map(pw => {
-        const transitForWarehouse = transitItems
-          .filter(t => t.product_id === pw.product_id && t.warehouse_id === pw.warehouse_id)
-          .reduce((sum, t) => sum + t.remaining, 0);
-        return { ...pw, in_transit: transitForWarehouse };
-      });
-
-      set({
-        products,
-        movements: movementsRes.data || [],
-        sales,
-        recipes,
-        employees: employeesRes.data || [],
-        categories: categoriesRes.data || [],
-        transitItems,
-        dailyClosings: dailyClosingsRes.data || [],
-        hrDocuments: hrDocsRes.data || [],
-        departments: departmentsRes.data || [],
-        payrollConfig: payrollConfigRes.data || null,
-        pendingAccounts: (pendingRes.data || []).filter((p: any) => p.status === 'pending'),
-        accessPins: accessPinsRes.data || [],
-        actionLogs: actionLogsRes.data || [],
-        warehouses: warehousesRes.data || [],
-        productWarehouse: productWarehouseWithTransit,
-        isLoading: false,
-      });
-      logger.info('✅ Datos cargados completamente');
-      localStorage.setItem('lastSyncedAt', new Date().toISOString());
-      cacheAllData({
-        products: productsRes.data || [],
-        movements: movementsRes.data || [],
-        warehouses: warehousesRes.data || [],
-        productWarehouse: productWarehouseWithTransit,
-        transitItems: transitRes.data || [],
-        sales,
-        recipes,
-        pendingAccounts: pendingRes.data || [],
-        dailyClosings: dailyClosingsRes.data || [],
-        employees: employeesRes.data || [],
-        categories: categoriesRes.data || [],
-        accessPins: accessPinsRes.data || [],
-      });
-
-      // Auto-crear almacén "Almacén" para usuarios nuevos (sin warehouses en Supabase)
-      const warehousesData = warehousesRes.data || [];
-      if (warehousesData.length === 0) {
-        logger.info('⚠️ No hay warehouses — disparando fetchWarehouses para auto-crear el principal');
-        await get().fetchWarehouses();
-      } else if (!get().currentWarehouseId) {
-        // Setear currentWarehouseId para usuarios existentes (que ya tienen warehouses)
-        const mainWarehouse = warehousesData.find((w: any) => w.is_main) || warehousesData[0];
-        if (mainWarehouse) {
-          set({ currentWarehouseId: mainWarehouse.id });
-        }
-      }
-    } catch (error) {
-      logger.error('Error en fetchAll — restaurando desde caché:', error);
-      await restoreFromCache(user.id);
-      set({ isLoading: false });
-    } finally {
-      _isFetchingAll = false;
+      transitItemsData = (transitRes.data || []).filter((t: any) => t.remaining > 0);
+      dailyClosingsData = dailyClosingsRes.data || [];
+      pendingData = (pendingRes.data || []).filter((p: any) => p.status === 'pending');
+      accessPinsData = accessPinsRes.data || [];
+      actionLogsData = actionLogsRes.data || [];
+      payrollConfigData = payrollConfigRes.data || null;
+      warehousesData = warehousesRes.data || [];
+      productWarehouseData = productWarehouseRes.data || [];
+    } catch (e) {
+      logger.error('❌ Grupo 4 (cierres/configuración) falló:', e);
     }
+
+    // ── Computar in_transit y commit final ──
+    const transitItems = transitItemsData;
+
+    const productsWithTransit = productsData.map(p => {
+      const totalInTransit = transitItems
+        .filter(t => t.product_id === p.id)
+        .reduce((sum, t) => sum + t.remaining, 0);
+      return { ...p, in_transit: totalInTransit };
+    });
+
+    const productWarehouseWithTransit = productWarehouseData.map((pw: any) => {
+      const transitForWarehouse = transitItems
+        .filter((t: any) => t.product_id === pw.product_id && t.warehouse_id === pw.warehouse_id)
+        .reduce((sum: number, t: any) => sum + t.remaining, 0);
+      return { ...pw, in_transit: transitForWarehouse };
+    });
+
+    set({
+      products: productsWithTransit,
+      movements: movementsData,
+      sales: salesData,
+      recipes: recipesData,
+      employees: employeesData,
+      categories: categoriesData,
+      transitItems,
+      dailyClosings: dailyClosingsData,
+      hrDocuments: hrDocsData,
+      departments: departmentsData,
+      payrollConfig: payrollConfigData,
+      pendingAccounts: pendingData,
+      accessPins: accessPinsData,
+      actionLogs: actionLogsData,
+      warehouses: warehousesData,
+      productWarehouse: productWarehouseWithTransit,
+      isLoading: false,
+    });
+
+    logger.info('✅ Datos cargados completamente');
+    localStorage.setItem('lastSyncedAt', new Date().toISOString());
+    cacheAllData({
+      products: productsData,
+      movements: movementsData,
+      warehouses: warehousesData,
+      productWarehouse: productWarehouseWithTransit,
+      transitItems: transitItemsData,
+      sales: salesData,
+      recipes: recipesData,
+      pendingAccounts: pendingData,
+      dailyClosings: dailyClosingsData,
+      employees: employeesData,
+      categories: categoriesData,
+      accessPins: accessPinsData,
+    });
+
+    // Si no hay productos ni movimientos, restaurar desde caché
+    if (productsData.length === 0 && movementsData.length === 0) {
+      logger.warn('⚠️ fetchAll no obtuvo productos ni movimientos — restaurando caché');
+      await restoreFromCache(user.id);
+    }
+
+    // Auto-crear almacén "Almacén" para usuarios nuevos
+    if (warehousesData.length === 0) {
+      logger.info('⚠️ No hay warehouses — disparando fetchWarehouses para auto-crear el principal');
+      await get().fetchWarehouses();
+    } else if (!get().currentWarehouseId) {
+      const mainWarehouse = warehousesData.find((w: any) => w.is_main) || warehousesData[0];
+      if (mainWarehouse) {
+        set({ currentWarehouseId: mainWarehouse.id });
+      }
+    }
+    _isFetchingAll = false;
   },
 
   fetchMore: async (limit = 50) => {
