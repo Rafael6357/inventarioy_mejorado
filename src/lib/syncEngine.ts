@@ -111,6 +111,10 @@ class SyncEngine {
       this.emit('complete');
       this.processing = false;
     }
+
+    if (navigator.onLine) {
+      setTimeout(() => this.retryFailed(), 1000);
+    }
   }
 
   private async processItem(item: SyncQueueItem): Promise<boolean> {
@@ -125,7 +129,8 @@ class SyncEngine {
 
         switch (item.operation) {
           case 'addMovement': {
-            const { error } = await supabase.from('movements').insert(item.payload);
+            const { product_name, ...cleanPayload } = item.payload;
+            const { error } = await supabase.from('movements').insert(cleanPayload);
             if (error) throw error;
 
             if (item.payload.type === 'SALIDA') {
@@ -258,7 +263,10 @@ class SyncEngine {
             const { data: newSale, error: se } = await supabase.from('sales').insert(saleInsert).select().single();
             if (se) throw se;
             if (saleItems?.length) {
-              const itemsWithRealId = saleItems.map((si: any) => ({ ...si, sale_id: newSale.id }));
+              const itemsWithRealId = saleItems.map((si: any) => {
+                const { product_name, ...cleanSi } = si;
+                return { ...cleanSi, sale_id: newSale.id };
+              });
               const { error: sie } = await supabase.from('sale_items').insert(itemsWithRealId);
               if (sie) throw sie;
             }
@@ -517,7 +525,12 @@ class SyncEngine {
           || err?.message?.includes('NetworkError')
           || err?.message?.includes('timeout');
 
-        if (isOffline && attempt < maxRetries) {
+        if (!isOffline) {
+          console.error(`Sync: error fatal no-reintentable en ${item.operation}:`, err?.message || err);
+          return false;
+        }
+
+        if (attempt < maxRetries) {
           await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
           continue;
         }
@@ -542,6 +555,16 @@ class SyncEngine {
     if (count > 0 && navigator.onLine) {
       this.processQueue();
     }
+  }
+
+  async retryFailed() {
+    const failedItems = await getFailedSyncItems();
+    if (failedItems.length === 0) return;
+    for (const item of failedItems) {
+      await updateSyncItemStatus(item.id!, 'pending', undefined);
+    }
+    if (import.meta.env.DEV) console.log(`[Sync] Reintentando ${failedItems.length} items fallados`);
+    this.processQueue();
   }
 
   async compensateFailedSync() {
@@ -584,6 +607,7 @@ export const syncEngine = new SyncEngine();
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => {
     syncEngine.processQueue();
+    setTimeout(() => syncEngine.processQueue(), 3000);
   });
   setInterval(() => syncEngine.processQueue(), 30000);
 }
