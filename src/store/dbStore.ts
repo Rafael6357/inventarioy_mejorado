@@ -1686,15 +1686,16 @@ addProduct: async (product) => {
           let remainingLocal = ci.qtyNeeded;
           let consumedLocal = 0;
           const updatedTransitItems = state.transitItems
-            .filter(t => t.product_id === ci.productId && t.remaining > 0)
             .sort((a, b) => new Date(a.sent_date).getTime() - new Date(b.sent_date).getTime())
             .map(t => {
+              if (t.product_id !== ci.productId || t.remaining <= 0) return t;
               if (remainingLocal <= 0) return t;
               const toConsume = Math.min(t.remaining, remainingLocal);
               remainingLocal -= toConsume;
               consumedLocal += toConsume;
               return { ...t, remaining: t.remaining - toConsume, consumed: (t.consumed || 0) + toConsume };
-            });
+            })
+            .filter(t => t.remaining > 0);
           const newInTransit = Math.max(0, Number(state.products.find(p => p.id === ci.productId)?.in_transit || 0) - consumedLocal);
           return {
             transitItems: updatedTransitItems,
@@ -3695,6 +3696,12 @@ deletePendingAccount: async (accountId: string) => {
   getDailyClosings: async () => {
     const user = useAuthStore.getState().user;
     if (!user) return;
+
+    if (!navigator.onLine) {
+      const cached = await getCachedDailyClosings(user.id);
+      set({ dailyClosings: cached || [] });
+      return;
+    }
 
     const { data, error } = await supabase
       .from('daily_closings')

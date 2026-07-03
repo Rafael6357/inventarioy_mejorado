@@ -452,7 +452,7 @@ export default function SalesView() {
         });
         toast.success(`Cierre de caja del ${closingDate} registrado`);
         setShowClosingModal(false);
-        getDailyClosings();
+        getDailyClosings().catch(() => {});
         return { success: true };
       } else {
         toast.error(result.error || 'Error al registrar cierre');
@@ -1755,7 +1755,7 @@ setShowTicket(true);
                     setClosingLoading,
                     () => {
                       setShowClosingModal(false);
-                      getDailyClosings();
+                      getDailyClosings().catch(() => {});
                     },
                     `Cierre de caja del ${closingDate} registrado`
                   );
