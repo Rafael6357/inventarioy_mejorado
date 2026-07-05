@@ -97,7 +97,7 @@ class SyncEngine {
       const store = useDatabaseStore.getState();
       store.refreshSyncQueueCount();
       try {
-        await store.fetchAll();
+        if (navigator.onLine) await store.fetchAll();
       } catch { }
       if (remaining.length === 0 && syncedCount > 0) {
         this.emit('synced', { count: syncedCount, total: this.totalItems });
@@ -378,8 +378,22 @@ class SyncEngine {
             break;
           }
           case 'createDailyClosing': {
+            const closingDate = item.payload.closing_date || item.payload.date;
+            if (closingDate) {
+              const dateStr = new Date(closingDate).toISOString().split('T')[0];
+              const { data: existing } = await supabase
+                .from('daily_closings')
+                .select('id')
+                .eq('user_id', item.payload.user_id)
+                .eq('closing_date', dateStr)
+                .maybeSingle();
+              if (existing) break;
+            }
             const { error } = await supabase.from('daily_closings').insert(item.payload);
-            if (error) throw error;
+            if (error) {
+              if (error.code === '23505') break;
+              throw error;
+            }
             await store.logAction('closing', 'CREAR', { date: item.payload.closing_date || item.payload.date }).catch(() => {});
             break;
           }

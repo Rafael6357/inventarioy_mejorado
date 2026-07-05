@@ -817,7 +817,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       employees: employeesData,
       categories: categoriesData,
       accessPins: accessPinsData,
-    });
+    }, user.id);
 
     // Si no hay productos ni movimientos, restaurar desde caché
     if (productsData.length === 0 && movementsData.length === 0) {
@@ -1132,8 +1132,6 @@ addProduct: async (product) => {
       const movementId = crypto.randomUUID();
       const offlineMovement = { ...movement, id: movementId, user_id: user.id, date: movementDate, created_at: new Date().toISOString() } as Movement;
 
-      set((state) => ({ movements: [offlineMovement, ...state.movements] }));
-
       if (movement.warehouse_id) {
         const pw = get().productWarehouse.find(p => p.product_id === movement.product_id && p.warehouse_id === movement.warehouse_id);
         const currentQty = pw ? Number(pw.quantity) : 0;
@@ -1145,7 +1143,12 @@ addProduct: async (product) => {
           }
           newQty = currentQty - Number(movement.quantity);
         }
-        else if (movement.type === 'MERMA') newQty = Math.max(0, currentQty - Number(movement.quantity));
+        else if (movement.type === 'MERMA') {
+          if (currentQty < Number(movement.quantity)) {
+            throw new Error(`Stock insuficiente en almacén para ${product.name}: disponible ${currentQty}, solicitado ${movement.quantity}`);
+          }
+          newQty = Math.max(0, currentQty - Number(movement.quantity));
+        }
         else if (movement.type === 'AJUSTE') newQty = Math.max(0, currentQty + Number(movement.quantity));
 
         set((state) => ({
@@ -1205,7 +1208,12 @@ addProduct: async (product) => {
           newQuantity = newQuantity - Number(movement.quantity);
           newInTransit += Number(movement.quantity);
         }
-        else if (movement.type === 'MERMA') newQuantity -= Number(movement.quantity);
+        else if (movement.type === 'MERMA') {
+          if (newQuantity < Number(movement.quantity)) {
+            throw new Error(`Stock insuficiente para ${product.name}: disponible ${newQuantity}, solicitado ${movement.quantity}`);
+          }
+          newQuantity -= Number(movement.quantity);
+        }
         else if (movement.type === 'AJUSTE') newQuantity += Number(movement.quantity);
 
         set((state) => ({
@@ -1226,6 +1234,8 @@ addProduct: async (product) => {
           set((state) => ({ transitItems: [transitItem, ...state.transitItems] }));
         }
       }
+
+      set((state) => ({ movements: [offlineMovement, ...state.movements] }));
 
       await addToSyncQueue({ operation: 'addMovement', table: 'movements', payload: { ...movement, id: movementId, user_id: user.id, date: movementDate, created_at: offlineMovement.created_at, product_name: product.name } });
       get().refreshSyncQueueCount();
@@ -1335,6 +1345,9 @@ addProduct: async (product) => {
             logger.error('❌ SALIDA: Error en transit_item:', err);
           }
         } else if (movement.type === 'MERMA') {
+          if (currentQty < Number(movement.quantity)) {
+            throw new Error(`Stock insuficiente en almacén para ${product.name}: disponible ${currentQty}, solicitado ${movement.quantity}`);
+          }
           await get().updateProductWarehouseQuantity(movement.product_id, movement.warehouse_id, Math.max(0, currentQty - Number(movement.quantity)), true);
           set((state) => ({
             products: state.products.map(p =>
@@ -1412,6 +1425,9 @@ addProduct: async (product) => {
           }));
         }
       } else if (movement.type === 'MERMA') {
+        if (Number(product.quantity) < Number(movement.quantity)) {
+          throw new Error(`Stock insuficiente para ${product.name}: disponible ${product.quantity}, solicitado ${movement.quantity}`);
+        }
         newQuantity = Number(product.quantity) - Number(movement.quantity);
         
         await get().updateProduct(movement.product_id, { quantity: newQuantity });
@@ -1505,7 +1521,20 @@ addProduct: async (product) => {
           .select()
           .single();
 
-        if (!createError && newWarehouse) {
+        if (createError) {
+          if (createError.code !== '23505') {
+            logger.error('Error auto-creating warehouse:', createError);
+          }
+          // Duplicado por race condition: re-fetch
+          const { data: existing } = await supabase
+            .from('warehouses')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: true });
+          if (existing && existing.length > 0) {
+            warehouses = existing as Warehouse[];
+          }
+        } else if (newWarehouse) {
           warehouses = [newWarehouse as Warehouse];
         }
       }
@@ -2246,6 +2275,7 @@ addProduct: async (product) => {
   getPendingAccounts: async () => {
     const user = useAuthStore.getState().user;
     if (!user) return;
+    if (!navigator.onLine) return;
 
     const { data, error } = await supabase
       .from('pending_accounts')
@@ -2272,10 +2302,13 @@ addProduct: async (product) => {
         created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
       };
       set((state) => ({ pendingAccounts: [offlineAccount, ...state.pendingAccounts] }));
-      await addToSyncQueue({
-        operation: 'createPendingAccount', table: 'pending_accounts',
-        payload: { id, user_id: user.id, client_name: clientName, items: [], total_amount: 0, is_account_house: false, sale_type: 'SALON', status: 'pending', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-      });
+      await Promise.all([
+        addToSyncQueue({
+          operation: 'createPendingAccount', table: 'pending_accounts',
+          payload: { id, user_id: user.id, client_name: clientName, items: [], total_amount: 0, is_account_house: false, sale_type: 'SALON', status: 'pending', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+        }),
+        db.pendingAccounts.put(offlineAccount).catch(() => {}),
+      ]);
       get().refreshSyncQueueCount();
       return { success: true, accountId: id };
     }
@@ -2377,6 +2410,7 @@ addProduct: async (product) => {
         payload: { accountId, items, isAccountHouse: accountIsAccountHouse, saleType: accountSaleType },
       });
       get().refreshSyncQueueCount();
+      try { await db.pendingAccounts.put(get().pendingAccounts.find(a => a.id === accountId)!); } catch {}
       toast.success('Items agregados a la cuenta (sin conexión)');
       return { success: true };
     }
@@ -2448,6 +2482,7 @@ addProduct: async (product) => {
         payload: { accountId, items },
       });
       get().refreshSyncQueueCount();
+      try { await db.pendingAccounts.put(get().pendingAccounts.find(a => a.id === accountId)!); } catch {}
       toast.success('Items actualizados (sin conexión)');
       return { success: true };
     }
@@ -2492,6 +2527,7 @@ addProduct: async (product) => {
         payload: { accountId, is_account_house: newIsAccountHouse },
       });
       get().refreshSyncQueueCount();
+      try { await db.pendingAccounts.put(get().pendingAccounts.find(a => a.id === accountId)!); } catch {}
       toast.success('Tipo de cuenta cambiado (sin conexión)');
       return { success: true };
     }
@@ -2551,6 +2587,7 @@ deletePendingAccount: async (accountId: string) => {
         payload: { accountId, transitRestores: transitRestores.map(r => ({ transitItemId: r.transitItemId, quantity: r.quantity })) },
       });
       get().refreshSyncQueueCount();
+      try { await db.pendingAccounts.delete(accountId); } catch {}
       return { success: true };
     }
 
@@ -2657,6 +2694,7 @@ deletePendingAccount: async (accountId: string) => {
         payload: { accountId },
       });
       get().refreshSyncQueueCount();
+      try { await db.pendingAccounts.delete(accountId); } catch {}
       return { success: true };
     }
 
@@ -3698,8 +3736,6 @@ deletePendingAccount: async (accountId: string) => {
     if (!user) return;
 
     if (!navigator.onLine) {
-      const cached = await getCachedDailyClosings(user.id);
-      set({ dailyClosings: cached || [] });
       return;
     }
 
@@ -3731,6 +3767,7 @@ deletePendingAccount: async (accountId: string) => {
       set((state) => ({ dailyClosings: [offlineClosing, ...state.dailyClosings] }));
       await addToSyncQueue({ operation: 'createDailyClosing', table: 'daily_closings', payload: { ...closing, id, user_id: user.id, created_at: offlineClosing.created_at } });
       get().refreshSyncQueueCount();
+      try { await db.dailyClosings.put(offlineClosing); } catch {}
       return { success: true };
     }
 
@@ -3970,6 +4007,7 @@ async function replayPendingSyncQueue(set: any, get: any) {
   logger.info(`[replayPendingSyncQueue] Replaying ${pendingItems.length} pending items...`);
 
   for (const item of pendingItems) {
+    try {
     logger.info(`[replayPendingSyncQueue] Processing operation: ${item.operation}`);
     const p = item.payload as any;
     switch (item.operation) {
@@ -4225,6 +4263,9 @@ async function replayPendingSyncQueue(set: any, get: any) {
           ),
         }));
         break;
+    }
+    } catch (e) {
+      logger.error(`[replayPendingSyncQueue] Error processing ${item.operation}:`, e);
     }
   }
 }

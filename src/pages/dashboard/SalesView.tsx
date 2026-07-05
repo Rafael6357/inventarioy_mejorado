@@ -1576,6 +1576,12 @@ setShowTicket(true);
                       is_recipe: item.is_recipe || false,
                       recipe_snapshot: item.recipe_snapshot || undefined,
                     }));
+                    const accountExists = pendingAccounts.some(a => a.id === selectedPendingAccount);
+                    if (!accountExists) {
+                      toast.error('La cuenta ya no está disponible. Seleccione o cree una nueva.');
+                      setSelectedPendingAccount('');
+                      return;
+                    }
                     const result = await addItemsToPendingAccount(selectedPendingAccount, items, isAccountHouse, saleType);
                     if (result.success) {
                       const cartItems = cart.map(item => ({
@@ -2045,13 +2051,16 @@ setShowTicket(true);
                         });
                         setShowTicket(true);
                         setSelectedAccountForCharge(null);
+                        setSelectedPendingAccount('');
                         setChargeBreakdown({ efectivo: 0, transferencia: 0, usd: 0, eur: 0 });
                       } catch (successErr) {
                         console.error('[SalesView] Error en flujo success:', successErr);
                         setSelectedAccountForCharge(null);
+                        setSelectedPendingAccount('');
                         setChargeBreakdown({ efectivo: 0, transferencia: 0, usd: 0, eur: 0 });
                       } finally {
                         setShowChargeMixModal(false);
+                        setIsProcessingCharge(false);
                       }
                     } else {
                       toast.error(result.error || 'Error al cobrar');

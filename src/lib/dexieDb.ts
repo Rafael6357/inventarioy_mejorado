@@ -103,7 +103,7 @@ export async function cacheAllData(data: {
   employees?: Employee[];
   categories?: Category[];
   accessPins?: AccessPin[];
-}) {
+}, userId?: string) {
   if (_isCaching) {
     console.warn('[Dexie] cacheAllData ya en progreso, ignorando llamada concurrente');
     return;
@@ -125,12 +125,16 @@ export async function cacheAllData(data: {
       ['accessPins', data.accessPins, db.accessPins],
     ];
     for (const [name, items, table] of entries) {
-      if (items && items.length > 0) {
-        try {
-          await table.bulkPut(items);
-        } catch (err) {
-          console.warn(`[Dexie] Error caching ${name}:`, err);
+      try {
+        const uid = userId || (items && items.length > 0 ? (items[0] as any)?.user_id : null);
+        if (uid) {
+          await table.where('user_id').equals(uid).delete();
         }
+        if (items && items.length > 0) {
+          await table.bulkPut(items);
+        }
+      } catch (err) {
+        console.warn(`[Dexie] Error caching ${name}:`, err);
       }
     }
   } finally {

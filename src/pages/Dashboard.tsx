@@ -272,8 +272,8 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    const handleOnline = () => {
-      syncEngine.processQueue();
+    const handleOnline = async () => {
+      await syncEngine.processQueue();
       fetchAll().catch(() => {});
     };
     window.addEventListener('online', handleOnline);

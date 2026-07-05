@@ -23,7 +23,7 @@ import { usePersistentFilters } from '../../lib/hooks/usePersistentFilters';
 import TransitActionModal from '../../components/TransitActionModal';
 
 export default function TransitView() {
-  const { transitItems, products, cancelTransit, registerWasteFromTransit, registerManualConsumption, logAction, warehouses, currentWarehouseId, setCurrentWarehouse } = useDatabaseStore();
+  const { transitItems, products, cancelTransit, registerWasteFromTransit, registerManualConsumption, logAction, currentWarehouseId } = useDatabaseStore();
   const { filters, setFilters, resetFilters } = usePersistentFilters<{ searchTerm: string; currentPage: number }>(
     'transit',
     { searchTerm: '', currentPage: 1 }
@@ -266,21 +266,6 @@ const handleWaste = async () => {
           Productos enviados a producción que aún no han sido consumidos en ventas
         </p>
       </div>
-
-      {warehouses.length > 1 && (
-        <div className="flex items-center gap-2">
-          <select
-            value={currentWarehouseId || ''}
-            onChange={(e) => setCurrentWarehouse(e.target.value)}
-            className="h-10 rounded-md border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          >
-            <option value="">Todos los almacenes</option>
-            {warehouses.map(w => (
-              <option key={w.id} value={w.id}>{w.name}</option>
-            ))}
-          </select>
-        </div>
-      )}
 
       <div ref={transitStatsRef} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         <div className="rounded-xl border border-border bg-surface p-4 shadow-sm">

@@ -11,7 +11,7 @@ import { usePersistentFilters } from '../../lib/hooks/usePersistentFilters';
 import EmptyState from '../../components/EmptyState';
 
 export default function MovementsView() {
-  const { movements, products, fetchMore, warehouses, currentWarehouseId } = useDatabaseStore();
+  const { movements, products, fetchMore, currentWarehouseId } = useDatabaseStore();
   const { filters, setFilters, resetFilters } = usePersistentFilters<{
     searchTerm: string;
     typeFilter: string;
@@ -221,21 +221,6 @@ export default function MovementsView() {
                 <option value="GASTO_VARIABLE">Gasto Variable</option>
               </select>
             </div>
-
-            {warehouses.length > 1 && (
-              <div className="flex items-center gap-2">
-                <select
-                  value={currentWarehouseId || 'ALL'}
-                  onChange={(e) => useDatabaseStore.getState().setCurrentWarehouse(e.target.value === 'ALL' ? '' : e.target.value)}
-                  className="h-10 rounded-md border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                >
-                  <option value="ALL">Todos los almacenes</option>
-                  {warehouses.map(w => (
-                    <option key={w.id} value={w.id}>{w.name}</option>
-                  ))}
-                </select>
-              </div>
-            )}
 
             {(searchTerm || typeFilter !== 'ALL' || startDate || endDate) && (
               <button

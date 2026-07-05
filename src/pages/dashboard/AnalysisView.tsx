@@ -23,7 +23,7 @@ function parseSaleItems(items: any): any[] {
 }
 
 export default function AnalysisView() {
-  const { products, sales, movements, isLoading, warehouses, currentWarehouseId, setCurrentWarehouse } = useDatabaseStore();
+  const { products, sales, movements, isLoading, currentWarehouseId } = useDatabaseStore();
   
   // Verificar si los datos aún están cargando para evitar errores
   const isDataLoaded = !isLoading && Array.isArray(products);
@@ -111,7 +111,7 @@ export default function AnalysisView() {
     const filteredMovements = movements.filter(m => {
       const mDate = new Date(m.date);
       return m.product_id === auditProduct && mDate >= fromDate && mDate <= toDate;
-    });
+    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     const entradas = filteredMovements
       .filter(m => m.type === 'ENTRADA')
@@ -293,21 +293,6 @@ export default function AnalysisView() {
           Métricas clave del negocio, rotación de inventario y auditoría
         </p>
       </div>
-
-      {warehouses.length > 1 && (
-        <div className="flex items-center gap-2">
-          <select
-            value={currentWarehouseId || ''}
-            onChange={(e) => setCurrentWarehouse(e.target.value)}
-            className="h-10 rounded-md border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          >
-            <option value="">Todos los almacenes</option>
-            {warehouses.map(w => (
-              <option key={w.id} value={w.id}>{w.name}</option>
-            ))}
-          </select>
-        </div>
-      )}
 
       <div ref={analysisStatsRef} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-border/50 bg-surface/80 backdrop-blur-sm p-6 shadow-sm transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_20px_-5px_rgba(255,193,7,0.15)]">

@@ -36,7 +36,7 @@ const DEFAULT_CATEGORIES = [
 
 export default function InventoryView() {
   const { user } = useAuthStore();
-  const { products, addProduct, addMovement, logAction, warehouses, currentWarehouseId, productWarehouse, updateProductWarehouseQuantity, transitItems, movements } = useDatabaseStore();
+  const { products, addProduct, addMovement, logAction, currentWarehouseId, productWarehouse, updateProductWarehouseQuantity, transitItems, movements } = useDatabaseStore();
   
   const activeProducts = products.filter(p => p.is_active !== false);
 
@@ -202,8 +202,8 @@ export default function InventoryView() {
       return;
     }
     
-    // SALIDA requiere validación de stock (usar product_warehouse.quantity como source of truth)
-    if (movement.type === 'SALIDA') {
+    // SALIDA y MERMA requieren validación de stock (usar product_warehouse.quantity como source of truth)
+    if (movement.type === 'SALIDA' || movement.type === 'MERMA') {
       const pw = productWarehouse.find(
         pw => pw.product_id === movement.product_id && pw.warehouse_id === movement.warehouse_id
       );
@@ -502,25 +502,6 @@ export default function InventoryView() {
                 <option value="MERMA">Merma (Pérdida/Desperdicio)</option>
               </select>
             </div>
-
-            {warehouses.length > 1 && (
-              <div className="space-y-2">
-                <Label htmlFor="mov_warehouse">Almacén *</Label>
-                <select 
-                  id="mov_warehouse" 
-                  required
-                  className="flex h-10 w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  value={movement.warehouse_id}
-                  onChange={e => setMovement({...movement, warehouse_id: e.target.value})}
-                >
-                  {warehouses.map(w => (
-                    <option key={w.id} value={w.id}>
-                      {w.name} {w.is_main ? '(Principal)' : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
 
             <div className="space-y-2">
               <Label htmlFor="mov_product">Producto *</Label>

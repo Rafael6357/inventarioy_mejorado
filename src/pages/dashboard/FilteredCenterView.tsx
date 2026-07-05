@@ -8,7 +8,7 @@ import { calculateMargin, exportToExcel } from '../../lib/utils';
 import SortIcon from '../../components/ui/SortIcon';
 
 export default function FilteredCenterView() {
-  const { products, productWarehouse, warehouses, currentWarehouseId, setCurrentWarehouse } = useDatabaseStore();
+  const { products, productWarehouse, currentWarehouseId } = useDatabaseStore();
   
   const activeProducts = products.filter(p => p.is_active !== false);
 
@@ -213,21 +213,6 @@ export default function FilteredCenterView() {
               <option value="INGREDIENTE">Ingrediente</option>
             </select>
           </div>
-
-          {warehouses.length > 1 && (
-            <div className="space-y-1.5">
-              <Label className="text-xs text-text-secondary">Almacén</Label>
-              <select
-                className="w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-text focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary h-10"
-                value={currentWarehouseId || ''}
-                onChange={(e) => setCurrentWarehouse(e.target.value)}
-              >
-                {warehouses.map(w => (
-                  <option key={w.id} value={w.id}>{w.name}</option>
-                ))}
-              </select>
-            </div>
-          )}
 
           <div className="space-y-1.5 flex flex-col justify-end">
             <div className="flex items-center gap-2 h-10 px-3 rounded-md bg-bg border border-border text-sm text-text-secondary">
