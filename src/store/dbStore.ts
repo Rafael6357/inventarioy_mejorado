@@ -3171,6 +3171,21 @@ deletePendingAccount: async (accountId: string) => {
     const user = useAuthStore.getState().user;
     if (!user) throw new Error('No hay usuario autenticado');
 
+    if (!navigator.onLine) {
+      const tempId = crypto.randomUUID();
+      const tempEmployee = {
+        ...employee,
+        id: tempId,
+        user_id: user.id,
+        name: capitalize(employee.name),
+        created_at: new Date().toISOString(),
+      };
+      set((state) => ({ employees: [tempEmployee, ...state.employees] }));
+      await addToSyncQueue({ operation: 'addEmployee', table: 'employees', payload: { employee: tempEmployee } });
+      get().refreshSyncQueueCount();
+      return;
+    }
+
     try {
       const { data, error } = await queryWithRetry(() =>
         supabase
@@ -3736,6 +3751,12 @@ deletePendingAccount: async (accountId: string) => {
     if (!user) return;
 
     if (!navigator.onLine) {
+      try {
+        const cached = await getCachedDailyClosings(user.id);
+        if (cached && cached.length > 0) {
+          set({ dailyClosings: cached });
+        }
+      } catch {}
       return;
     }
 
@@ -3837,6 +3858,10 @@ deletePendingAccount: async (accountId: string) => {
     const user = useAuthStore.getState().user;
     if (!user) return { success: false, error: 'No autenticado' };
 
+    if (!navigator.onLine) {
+      return { success: false, error: 'No hay conexión — los documentos se pueden subir solo cuando hay internet' };
+    }
+
     const fileExt = file.name.split('.').pop();
     const fileName = `${user.id}/${docType}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
     const filePath = `hr-documents/${fileName}`;
@@ -3913,6 +3938,10 @@ deletePendingAccount: async (accountId: string) => {
   uploadEmployeeDocument: async (file: File, employeeId: string, docType: 'CONTRATO' | 'IDENTIFICACION' | 'OTRO', name?: string) => {
     const user = useAuthStore.getState().user;
     if (!user) return { success: false, error: 'No autenticado' };
+
+    if (!navigator.onLine) {
+      return { success: false, error: 'No hay conexión — los documentos se pueden subir solo cuando hay internet' };
+    }
 
     const fileExt = file.name.split('.').pop();
     const fileName = `${user.id}/employees/${employeeId}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;

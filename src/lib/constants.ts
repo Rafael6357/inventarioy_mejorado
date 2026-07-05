@@ -4,6 +4,7 @@ export const OPERATION_LABELS: Record<string, string> = {
   deleteProduct: 'Eliminar producto',
   addMovement: 'Registrar movimiento',
   addSale: 'Registrar venta',
+  addEmployee: 'Agregar empleado',
   cancelTransit: 'Cancelar tránsito',
   registerWasteFromTransit: 'Registrar merma',
   registerManualConsumption: 'Registrar consumo',

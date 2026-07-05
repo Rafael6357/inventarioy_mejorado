@@ -240,6 +240,12 @@ class SyncEngine {
             await store.logAction('inventory', 'CREAR', { name: item.payload.product.name }).catch(() => {});
             break;
           }
+          case 'addEmployee': {
+            const { id: _empId, ...empData } = item.payload.employee;
+            const { error: ee } = await supabase.from('employees').insert(empData);
+            if (ee) throw ee;
+            break;
+          }
           case 'addRecipe': {
             const { recipe, ingredients } = item.payload;
             const { data: newRecipe, error: re } = await supabase.from('recipes').insert(recipe).select().single();

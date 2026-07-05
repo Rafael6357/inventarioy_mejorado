@@ -495,12 +495,22 @@ export default function Dashboard() {
             <InventarioYLogo size="lg" variant="image" />
             <SyncStatus />
           </div>
-          <button
-            onClick={() => setIsMobileMenuOpen(true)}
-            className="text-text-secondary hover:text-text"
-          >
-            <Menu className="h-6 w-6" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={handleLogout}
+              className="rounded-full p-2 text-danger/70 hover:text-danger hover:bg-danger/10 transition-colors"
+              title="Cerrar Sesión"
+              aria-label="Cerrar Sesión"
+            >
+              <LogOut className="h-5 w-5" />
+            </button>
+            <button
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="text-text-secondary hover:text-text"
+            >
+              <Menu className="h-6 w-6" />
+            </button>
+          </div>
         </header>
 
         <main id="main-content" className="flex-1 overflow-y-auto bg-transparent p-4 md:p-6 lg:p-8">

@@ -9,6 +9,8 @@ export type SyncOperation =
   | 'addProduct' | 'updateProduct' | 'deleteProduct'
   | 'addMovement'
   | 'addSale'
+  | 'addEmployee'
+  | 'addEmployee'
   | 'cancelTransit' | 'registerWasteFromTransit' | 'registerManualConsumption'
   | 'createPendingAccount' | 'deletePendingAccount'
   | 'markPendingAccountPaid'

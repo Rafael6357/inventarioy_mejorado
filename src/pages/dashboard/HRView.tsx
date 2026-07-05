@@ -354,20 +354,24 @@ export default function HRView() {
     try {
       let photoUrl = null;
       if (newEmployeePhoto) {
-        const fileName = `employee-${Date.now()}-${newEmployeePhoto.name.replace(/[^a-zA-Z0-9.]/g, '')}`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('hr-documents')
-          .upload(fileName, newEmployeePhoto);
-        
-        if (uploadError) {
-          console.error('Error uploading photo:', uploadError);
-          toast.error('Error al subir la foto');
-          return;
-        }
-        
-        if (uploadData) {
-          const { data: urlData } = supabase.storage.from('hr-documents').getPublicUrl(fileName);
-          photoUrl = urlData.publicUrl;
+        if (!navigator.onLine) {
+          toast.warning('Sin conexión — la foto se subirá cuando haya conexión');
+        } else {
+          const fileName = `employee-${Date.now()}-${newEmployeePhoto.name.replace(/[^a-zA-Z0-9.]/g, '')}`;
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('hr-documents')
+            .upload(fileName, newEmployeePhoto);
+          
+          if (uploadError) {
+            console.error('Error uploading photo:', uploadError);
+            toast.error('Error al subir la foto');
+            return;
+          }
+          
+          if (uploadData) {
+            const { data: urlData } = supabase.storage.from('hr-documents').getPublicUrl(fileName);
+            photoUrl = urlData.publicUrl;
+          }
         }
       }
 
