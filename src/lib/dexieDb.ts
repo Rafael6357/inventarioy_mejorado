@@ -18,7 +18,8 @@ export type SyncOperation =
   | 'justifyMovement'
   | 'updateAccessPinAttempts'
   | 'createDailyClosing'
-  | 'addRecipe' | 'updateRecipe' | 'deleteRecipe';
+  | 'addRecipe' | 'updateRecipe' | 'deleteRecipe'
+  | 'logAction';
 
 export interface SyncQueueItem {
   id?: number;

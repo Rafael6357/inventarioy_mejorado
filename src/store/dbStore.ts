@@ -2971,7 +2971,6 @@ deletePendingAccount: async (accountId: string) => {
   logAction: async (module: string, action: string, details: Record<string, any> = {}) => {
     const user = useAuthStore.getState().user;
     if (!user) return;
-    if (!navigator.onLine) return;
 
     const verifiedRole = get().verifiedRole;
     const verifiedRoleName = get().verifiedRoleName;
@@ -2979,6 +2978,12 @@ deletePendingAccount: async (accountId: string) => {
     const role = verifiedRole || activePin?.role || user.role || 'owner';
     const roleLabel = verifiedRole ? `${ROLE_LABELS[verifiedRole]}${verifiedRoleName ? `: ${verifiedRoleName}` : ''}` : (activePin ? `${ROLE_LABELS[activePin.role]}${activePin.pin_name ? `: ${activePin.pin_name}` : ''}` : (user.name || 'Dueño/a'));
     
+    if (!navigator.onLine) {
+      await addToSyncQueue({ operation: 'logAction', table: 'action_logs', payload: { module, action, details, role, roleLabel } });
+      get().refreshSyncQueueCount();
+      return;
+    }
+
     await supabase.from('action_logs').insert({
       user_id: user.id,
       role: role,
@@ -4122,6 +4127,68 @@ async function replayPendingSyncQueue(set: any, get: any) {
                 products: state.products.map((pr: any) =>
                   pr.id === newMovement.product_id
                     ? { ...pr, quantity: newQuantity, in_transit: newInTransit }
+                    : pr
+                ),
+              };
+            }
+          }
+          else if (newMovement.type === 'ENTRADA' || newMovement.type === 'AJUSTE') {
+            if (newMovement.warehouse_id) {
+              const pw = state.productWarehouse.find((pw: any) => pw.product_id === newMovement.product_id && pw.warehouse_id === newMovement.warehouse_id);
+              const currentQty = pw ? Number(pw.quantity) : 0;
+              let newQty = Math.max(0, currentQty + Number(newMovement.quantity));
+              newState = {
+                ...newState,
+                productWarehouse: state.productWarehouse.map((pw: any) =>
+                  pw.product_id === newMovement.product_id && pw.warehouse_id === newMovement.warehouse_id
+                    ? { ...pw, quantity: newQty }
+                    : pw
+                ),
+                products: state.products.map((pr: any) =>
+                  pr.id === newMovement.product_id
+                    ? { ...pr, quantity: Math.max(0, newQty) }
+                    : pr
+                ),
+              };
+            } else {
+              const product = state.products.find((pr: any) => pr.id === newMovement.product_id);
+              let newQuantity = Math.max(0, Number(product?.quantity || 0) + Number(newMovement.quantity));
+              newState = {
+                ...newState,
+                products: state.products.map((pr: any) =>
+                  pr.id === newMovement.product_id
+                    ? { ...pr, quantity: newQuantity }
+                    : pr
+                ),
+              };
+            }
+          }
+          else if (newMovement.type === 'MERMA') {
+            if (newMovement.warehouse_id) {
+              const pw = state.productWarehouse.find((pw: any) => pw.product_id === newMovement.product_id && pw.warehouse_id === newMovement.warehouse_id);
+              const currentQty = pw ? Number(pw.quantity) : 0;
+              let newQty = Math.max(0, currentQty - Number(newMovement.quantity));
+              newState = {
+                ...newState,
+                productWarehouse: state.productWarehouse.map((pw: any) =>
+                  pw.product_id === newMovement.product_id && pw.warehouse_id === newMovement.warehouse_id
+                    ? { ...pw, quantity: newQty }
+                    : pw
+                ),
+                products: state.products.map((pr: any) =>
+                  pr.id === newMovement.product_id
+                    ? { ...pr, quantity: Math.max(0, newQty) }
+                    : pr
+                ),
+              };
+            } else {
+              const product = state.products.find((pr: any) => pr.id === newMovement.product_id);
+              let newQuantity = Math.max(0, Number(product?.quantity || 0) - Number(newMovement.quantity));
+              newState = {
+                ...newState,
+                products: state.products.map((pr: any) =>
+                  pr.id === newMovement.product_id
+                    ? { ...pr, quantity: newQuantity }
                     : pr
                 ),
               };

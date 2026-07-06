@@ -246,6 +246,20 @@ class SyncEngine {
             if (ee) throw ee;
             break;
           }
+          case 'logAction': {
+            const { module, action, details, role, roleLabel } = item.payload;
+            const { error } = await supabase.from('action_logs').insert({
+              user_id: user.id,
+              role: role,
+              pin_role_label: roleLabel,
+              module,
+              action,
+              details,
+              created_at: new Date().toISOString(),
+            });
+            if (error) throw error;
+            break;
+          }
           case 'addRecipe': {
             const { recipe, ingredients } = item.payload;
             const { data: newRecipe, error: re } = await supabase.from('recipes').insert(recipe).select().single();

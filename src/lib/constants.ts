@@ -22,6 +22,7 @@ export const OPERATION_LABELS: Record<string, string> = {
   justifyMovement: 'Justificar movimiento',
   updateAccessPinAttempts: 'Actualizar intentos PIN',
   markPendingAccountPaid: 'Marcar cuenta pagada',
+  logAction: 'Registrar acción',
 };
 
 export const MODULE_LABELS: Record<string, string> = {
