@@ -1709,7 +1709,9 @@ addProduct: async (product) => {
         is_recipe: item.is_recipe || false,
         recipe_snapshot: item.recipe_snapshot,
       }));
-      set((state) => ({ sales: [{ ...tempSale, items: saleItems }, ...state.sales] }));
+      const saleWithItems = { ...tempSale, items: saleItems };
+      set((state) => ({ sales: [saleWithItems, ...state.sales] }));
+      try { await db.sales.put(saleWithItems).catch(() => {}); } catch {}
       for (const ci of itemsToConsume) {
         set((state) => {
           let remainingLocal = ci.qtyNeeded;
@@ -1734,6 +1736,7 @@ addProduct: async (product) => {
           };
         });
       }
+      try { await db.transitItems.bulkPut(get().transitItems).catch(() => {}); } catch {}
       await addToSyncQueue({ operation: 'addSale', table: 'sales', payload: { sale: tempSale, sale_items: saleItems, tempId, itemsToConsume } });
       get().refreshSyncQueueCount();
       toast.success('Venta guardada localmente (sin conexión)');

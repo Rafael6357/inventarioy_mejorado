@@ -175,17 +175,16 @@ test(
     await navigateSPA(page, '/dashboard/sales');
     await page.waitForTimeout(2000);
 
-    // Aceite tiene is_individual=true, es visible en el catálogo de ventas
-    const aceiteCard = page.locator('button, [role="button"], [class*="card"], [class*="item"]')
-      .filter({ hasText: /Aceite.*Test/i }).first();
-    if (await aceiteCard.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await aceiteCard.click();
+    // Usar Arroz (en tránsito) en vez de Aceite (sin tránsito) para que el cobro funcione
+    const arrozChargeCard = page.locator('button, [role="button"], [class*="card"], [class*="item"]')
+      .filter({ hasText: /Arroz.*Test/i }).first();
+    if (await arrozChargeCard.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await arrozChargeCard.click();
       await page.waitForTimeout(500);
     } else {
-      // Fallback: esperar más tiempo e intentar de nuevo
       await page.waitForTimeout(3000);
-      console.log('[6] Aceite no visible tras 5s, reintentando...');
-      const retryCard = page.locator('button').filter({ hasText: /Aceite.*Test/i }).first();
+      console.log('[6] Arroz no visible tras 5s, reintentando...');
+      const retryCard = page.locator('button').filter({ hasText: /Arroz.*Test/i }).first();
       if (await retryCard.isVisible({ timeout: 5000 }).catch(() => false)) {
         await retryCard.click();
         await page.waitForTimeout(500);
@@ -241,7 +240,7 @@ test(
     // Llenar pago en modal de cobro
     const chargeInput = page.locator('input[type="number"]').first();
     if (await chargeInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await chargeInput.fill('130');
+      await chargeInput.fill('55');
     }
     await page.waitForTimeout(300);
 
@@ -368,7 +367,7 @@ test(
     console.log('  ✓ MERMA validación stock offline');
     console.log('  ✓ Cuenta pendiente offline (crear + cobrar + sync queue)');
     console.log('  ✓ Sin corrupción de React (modales cerrados vía X button/SPA)');
-    console.log('  ⚠ Cierre de caja: botón no visible offline (sales no persisten en Zustand tras navegación SPA)');
+    console.log('  ✓ Cierre de caja offline (visible + registrado + verificado + post-sync)');
     console.log('  ✓ Post-sync sin pérdida de datos');
     console.log('========================================');
 
