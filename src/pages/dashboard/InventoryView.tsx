@@ -538,7 +538,7 @@ export default function InventoryView() {
                     
                     const availableStock = warehouseStock 
                       ? Number(warehouseStock.quantity)
-                      : 0;
+                      : Number(p.quantity);
                     
                     return (
                       <option key={p.id} value={p.id}>

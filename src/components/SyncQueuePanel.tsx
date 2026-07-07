@@ -97,9 +97,18 @@ export default function SyncQueuePanel() {
           )}
           <div>
             <h2 className="text-lg font-semibold text-text">Sincronización</h2>
-            <p className="text-sm text-text-secondary">
+            <p className="text-sm text-text-secondary flex items-center gap-2">
               {navigator.onLine
-                ? `Conectado${count > 0 ? ` · ${count} pendiente${count !== 1 ? 's' : ''}` : ''}`
+                ? (
+                  <>
+                    <span>Conectado</span>
+                    {count > 0 && (
+                      <span className={`inline-flex items-center justify-center rounded-full px-2 py-0.5 text-xs font-bold ${count >= 50 ? 'bg-danger/20 text-danger' : 'bg-amber-100 text-amber-800'}`}>
+                        {count} pendiente{count !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </>
+                )
                 : 'Sin conexión'}
             </p>
           </div>

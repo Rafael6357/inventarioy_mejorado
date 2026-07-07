@@ -15,7 +15,7 @@ export default function FilteredCenterView() {
   const getDisponible = (productId: string): number => {
     if (!currentWarehouseId || productWarehouse.length === 0) return Number(products.find(p => p.id === productId)?.quantity || 0);
     const pw = productWarehouse.find(p => p.product_id === productId && p.warehouse_id === currentWarehouseId);
-    return pw ? pw.quantity : 0;
+    return pw ? Number(pw.quantity) : Number(products.find(p => p.id === productId)?.quantity || 0);
   };
 
   const [searchTerm, setSearchTerm] = useState('');

@@ -27,7 +27,7 @@ export interface SyncQueueItem {
   table: string;
   payload: any;
   created_at: string;
-  status: 'pending' | 'syncing' | 'failed';
+  status: 'pending' | 'syncing' | 'failed' | 'abandoned';
   error?: string;
   retries: number;
 }

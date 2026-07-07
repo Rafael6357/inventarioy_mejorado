@@ -2,6 +2,7 @@ import { getPendingSyncItems, removeSyncItem, updateSyncItemStatus, addToSyncQue
 import type { SyncQueueItem } from './dexieDb';
 import { useDatabaseStore } from '../store/dbStore';
 import { supabase } from './supabase';
+import { toast } from 'sonner';
 
 type SyncEvent = 'start' | 'progress' | 'complete' | 'error' | 'idle' | 'synced' | 'duplicate';
 
@@ -70,25 +71,39 @@ class SyncEngine {
       this.processedItems = 0;
       this.emit('start', { total: this.totalItems });
 
-      for (const item of items) {
-        const success = await this.processItem(item);
-        if (success) {
-          await removeSyncItem(item.id!);
-          this.processedItems++;
-          this.emit('progress', {
-            processed: this.processedItems,
-            total: this.totalItems,
-            current: item.operation,
-          });
-        } else {
-          await updateSyncItemStatus(item.id!, 'failed', 'Error al sincronizar');
-          this.processedItems++;
-          this.emit('error', {
-            processed: this.processedItems,
-            total: this.totalItems,
-            current: item.operation,
-            error: 'Error al sincronizar',
-          });
+      if (this.totalItems > 20) {
+        toast.info(`Sincronizando ${this.totalItems} cambios pendientes...`, { id: 'sync-progress' });
+      }
+
+      const BATCH_SIZE = 20;
+      for (let batchStart = 0; batchStart < items.length; batchStart += BATCH_SIZE) {
+        const batch = items.slice(batchStart, batchStart + BATCH_SIZE);
+        for (const item of batch) {
+          const success = await this.processItem(item);
+          if (success) {
+            await removeSyncItem(item.id!);
+            this.processedItems++;
+            this.emit('progress', {
+              processed: this.processedItems,
+              total: this.totalItems,
+              current: item.operation,
+            });
+          } else {
+            await updateSyncItemStatus(item.id!, 'failed', 'Error al sincronizar');
+            this.processedItems++;
+            this.emit('error', {
+              processed: this.processedItems,
+              total: this.totalItems,
+              current: item.operation,
+              error: 'Error al sincronizar',
+            });
+          }
+        }
+        if (batchStart + BATCH_SIZE < items.length) {
+          if (this.totalItems > 20) {
+            toast.info(`Sincronizando ${this.processedItems}/${this.totalItems}...`, { id: 'sync-progress' });
+          }
+          await new Promise(r => setTimeout(r, 200));
         }
       }
 
@@ -120,7 +135,7 @@ class SyncEngine {
     const user = (await import('../store/authStore')).useAuthStore.getState().user;
     if (!user) return false;
 
-    const maxRetries = 3;
+    const maxRetries = 5;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         await updateSyncItemStatus(item.id!, 'syncing');
@@ -567,7 +582,10 @@ class SyncEngine {
           continue;
         }
         if (attempt >= maxRetries) {
-          console.error(`Sync falló (${item.id}):`, err);
+          console.error(`Sync abandonado (${item.id}) tras ${maxRetries + 1} intentos:`, err);
+          await updateSyncItemStatus(item.id!, 'abandoned', `Falló tras ${maxRetries + 1} intentos: ${err?.message || err}`);
+          const store = useDatabaseStore.getState();
+          store.refreshSyncQueueCount();
           return false;
         }
       }
@@ -591,11 +609,12 @@ class SyncEngine {
 
   async retryFailed() {
     const failedItems = await getFailedSyncItems();
-    if (failedItems.length === 0) return;
-    for (const item of failedItems) {
+    const retryable = failedItems.filter(f => f.status !== 'abandoned');
+    if (retryable.length === 0) return;
+    for (const item of retryable) {
       await updateSyncItemStatus(item.id!, 'pending', undefined);
     }
-    if (import.meta.env.DEV) console.log(`[Sync] Reintentando ${failedItems.length} items fallados`);
+    if (import.meta.env.DEV) console.log(`[Sync] Reintentando ${retryable.length} items fallados`);
     this.processQueue();
   }
 

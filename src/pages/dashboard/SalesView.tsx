@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
 import { useAuthStore } from '../../store/authStore';
-import { Plus, Minus, Trash2, ShoppingCart, CreditCard, Search, X, DollarSign, User, PlusCircle, Users, Loader2, Printer, AlertCircle, ChevronDown } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingCart, CreditCard, Search, X, DollarSign, User, PlusCircle, Users, Loader2, Printer, AlertCircle, ChevronDown, Info } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { NumberInput } from '../../components/ui/NumberInput';
@@ -48,7 +48,7 @@ function showPaymentClampWarning(raw: number, clamped: number) {
 
 export default function SalesView() {
   const { user } = useAuthStore();
-  const { products, recipes, employees, sales, dailyClosings, pendingAccounts, addSale, createDailyClosing, getDailyClosings, createPendingAccount, addItemsToPendingAccount, chargePendingAccount, getPendingAccounts, togglePendingAccountType, updatePendingAccountItems, logAction, forceRefreshData, syncQueueCount, refreshSyncQueueCount } = useDatabaseStore();
+  const { products, recipes, employees, sales, dailyClosings, pendingAccounts, transitItems, addSale, createDailyClosing, getDailyClosings, createPendingAccount, addItemsToPendingAccount, chargePendingAccount, getPendingAccounts, togglePendingAccountType, updatePendingAccountItems, logAction, forceRefreshData, syncQueueCount, refreshSyncQueueCount } = useDatabaseStore();
   
   const activeProducts = products.filter(p => p.is_active !== false);
 
@@ -252,6 +252,7 @@ export default function SalesView() {
   const [selectedAccountForCancel, setSelectedAccountForCancel] = useState<any>(null);
   const [showClosingWarning, setShowClosingWarning] = useState(false);
   const [closingWarningData, setClosingWarningData] = useState<{breakdown: number; expected: number} | null>(null);
+  const [infoRecipe, setInfoRecipe] = useState<any>(null);
 
   // Función helper para operaciones seguras que siempre limpian el estado
   const safeExecute = async (
@@ -493,6 +494,29 @@ export default function SalesView() {
         const product = products.find(p => p.id === ing.product_id);
         return sum + ((product?.cost || 0) * ing.quantity);
       }, 0);
+
+      // Calculate available portions based on transit ingredients
+      const transitMap = new Map<string, number>();
+      for (const t of transitItems) {
+        transitMap.set(t.product_id, (transitMap.get(t.product_id) || 0) + t.remaining);
+      }
+
+      const portionsPerIngredient = r.ingredients.map(ing => {
+        const available = transitMap.get(ing.product_id) || 0;
+        const product = products.find(p => p.id === ing.product_id);
+        return {
+          productId: ing.product_id,
+          productName: product?.name || 'Producto Eliminado',
+          needed: ing.quantity,
+          unit: ing.unit || product?.unit || '',
+          available,
+          maxPortions: Math.floor(available / ing.quantity),
+        };
+      });
+
+      const availablePortions = Math.min(...portionsPerIngredient.map(p => p.maxPortions));
+      const missingIngredients = portionsPerIngredient.filter(p => p.maxPortions === 0);
+
       return {
         id: r.id,
         name: r.name,
@@ -501,6 +525,8 @@ export default function SalesView() {
         cost,
         unit: 'porción',
         quantity: 999, // Recipes don't have direct stock, it depends on ingredients
+        availablePortions,
+        missingIngredients: missingIngredients.length > 0 ? missingIngredients : undefined,
         is_recipe: true,
         recipe_snapshot: {
           name: r.name,
@@ -1055,7 +1081,25 @@ setShowTicket(true);
                   ${product.price.toFixed(2)}
                 </p>
                 <p className="mt-1 text-xs text-text-secondary">
-                  {product.is_recipe ? 'Receta' : `En Tránsito: ${(product as { in_transit?: number }).in_transit || 0} ${product.unit}`}
+                  {product.is_recipe ? (
+                    <span className="flex items-center justify-center gap-1">
+                      {((product as any).availablePortions > 0) ? (
+                        `Rinde: ${(product as any).availablePortions} platos`
+                      ) : (
+                        <>
+                          Agotado
+                          <Info
+                            size={14}
+                            className="cursor-pointer text-amber-500 hover:text-amber-400 transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setInfoRecipe(product);
+                            }}
+                          />
+                        </>
+                      )}
+                    </span>
+                  ) : `En Tránsito: ${(product as { in_transit?: number }).in_transit || 0} ${product.unit}`}
                 </p>
               </button>
             ))}
@@ -1633,6 +1677,36 @@ setShowTicket(true);
                 </Button>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Popover de ingredientes faltantes para recetas agotadas */}
+      {infoRecipe && infoRecipe.missingIngredients && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" onClick={() => setInfoRecipe(null)}>
+          <div className="w-full max-w-sm rounded-2xl border border-border/50 bg-surface p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-text">Falta para "{infoRecipe.name}"</h3>
+              <button onClick={() => setInfoRecipe(null)} className="text-text-secondary hover:text-text transition-colors">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <ul className="space-y-3">
+              {infoRecipe.missingIngredients.map((mi: any) => (
+                <li key={mi.productId} className="flex items-start gap-2 text-sm border-b border-border/30 pb-2 last:border-0 last:pb-0">
+                  <AlertCircle className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <span className="font-medium text-text">{mi.productName}</span>
+                    <span className="text-text-secondary"> — 0 {mi.unit} en tránsito</span>
+                    <br />
+                    <span className="text-xs text-text-secondary">Requiere {mi.needed} {mi.unit} por plato</span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-4 text-xs text-text-secondary text-center">
+              Registre un "Movimiento de Salida" para estos productos y aparecerán en "Tránsito".
+            </p>
           </div>
         </div>
       )}

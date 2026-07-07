@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
 import { useAuthStore } from '../../store/authStore';
-import { ChefHat, Plus, Minus, Trash2, Search, UtensilsCrossed, AlertCircle, Pencil, X, Check, Printer } from 'lucide-react';
+import { ChefHat, Plus, Minus, Trash2, Search, UtensilsCrossed, AlertCircle, Pencil, X, Check, Printer, Repeat } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
@@ -69,6 +69,40 @@ export default function RecipesView() {
   const cancelEditPrice = () => {
     setEditingRecipeId(null);
     setEditingPrice(0);
+  };
+
+  // Swap ingredient state
+  const [swappingRecipe, setSwappingRecipe] = useState<{ recipeId: string; productId: string } | null>(null);
+  const [swapProductId, setSwapProductId] = useState('');
+  const [swapQuantity, setSwapQuantity] = useState(1);
+
+  const handleSwapIngredient = async (recipe: any) => {
+    if (!swapProductId) { toast.error('Selecciona un nuevo ingrediente'); return; }
+    if (swapQuantity <= 0) { toast.error('La cantidad debe ser mayor a 0'); return; }
+    const newProduct = products.find(p => p.id === swapProductId);
+    if (!newProduct) return;
+    const oldIngredient = recipe.ingredients.find((ing: any) => ing.product_id === swappingRecipe?.productId);
+    if (!oldIngredient) return;
+    const newIngredients = recipe.ingredients.map((ing: any) =>
+      ing.product_id === swappingRecipe?.productId
+        ? { product_id: swapProductId, quantity: swapQuantity, unit: newProduct.unit }
+        : ing
+    );
+    try {
+      await updateRecipe(recipe.id, { ingredients: newIngredients });
+      await useDatabaseStore.getState().logAction('recipes', 'ACTUALIZAR', {
+        recipe_id: recipe.id,
+        recipe_name: recipe.name,
+        old_ingredient: oldIngredient.product_id,
+        new_ingredient: swapProductId,
+      });
+      toast.success(`Ingrediente cambiado a ${newProduct.name}`);
+      setSwappingRecipe(null);
+      setSwapProductId('');
+      setSwapQuantity(1);
+    } catch (err: any) {
+      toast.error(err?.message || 'Error al cambiar ingrediente');
+    }
   };
 
   const saveEditPrice = async (recipeId: string) => {
@@ -485,10 +519,70 @@ export default function RecipesView() {
                       <div className="flex flex-wrap gap-2">
                         {recipe.ingredients.map(ing => {
                           const product = products.find(p => p.id === ing.product_id);
+                          const isSwapping = swappingRecipe?.recipeId === recipe.id && swappingRecipe?.productId === ing.product_id;
                           return (
-                            <span key={ing.product_id} className="inline-flex items-center rounded-full bg-surface-hover px-2.5 py-0.5 text-xs text-text-secondary">
-                              {ing.quantity} {ing.unit} {product?.name || 'Producto Eliminado'}
-                            </span>
+                            <div key={ing.product_id} className="inline-flex flex-col gap-1">
+                              <span className="inline-flex items-center rounded-full bg-surface-hover px-2.5 py-0.5 text-xs text-text-secondary gap-1">
+                                {ing.quantity} {ing.unit} {product?.name || 'Producto Eliminado'}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (isSwapping) {
+                                      setSwappingRecipe(null);
+                                      setSwapProductId('');
+                                      setSwapQuantity(1);
+                                    } else {
+                                      setSwappingRecipe({ recipeId: recipe.id, productId: ing.product_id });
+                                      setSwapProductId('');
+                                      setSwapQuantity(ing.quantity);
+                                    }
+                                  }}
+                                  className="ml-0.5 text-text-secondary hover:text-primary transition-colors"
+                                  title={isSwapping ? 'Cancelar' : 'Cambiar ingrediente'}
+                                >
+                                  <Repeat size={12} />
+                                </button>
+                              </span>
+                              {isSwapping && (
+                                <div className="flex items-center gap-1 flex-wrap pl-1">
+                                  <select
+                                    value={swapProductId}
+                                    onChange={(e) => setSwapProductId(e.target.value)}
+                                    className="text-xs rounded bg-surface border border-border px-1 py-0.5 text-text w-28"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <option value="">Producto...</option>
+                                    {activeProducts.filter(p => p.id !== ing.product_id).map(p => (
+                                      <option key={p.id} value={p.id}>{p.name}</option>
+                                    ))}
+                                  </select>
+                                  <NumberInput
+                                    value={swapQuantity}
+                                    onValueChange={(v) => setSwapQuantity(v)}
+                                    className="w-16 h-6 text-xs"
+                                    onClick={(e: any) => e.stopPropagation()}
+                                  />
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleSwapIngredient(recipe); }}
+                                    className="text-success hover:text-green-400 p-0.5"
+                                    title="Confirmar cambio"
+                                  >
+                                    <Check size={12} />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSwappingRecipe(null);
+                                      setSwapProductId('');
+                                      setSwapQuantity(1);
+                                    }}
+                                    className="text-text-secondary hover:text-text p-0.5"
+                                  >
+                                    <X size={12} />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           );
                         })}
                       </div>
