@@ -364,15 +364,21 @@ Además, lo invitamos a ver nuestro tutorial en YouTube donde explicamos paso a 
   };
 
   const processPaymentAction = async (profile: UserProfile, formAmount: string, formMethod: string, formReference: string, formNotes: string, formDate: string, formEl: HTMLFormElement) => {
-    const { error: paymentError } = await supabase.from('payments').insert({
-      user_id: profile.id,
-      admin_id: user?.id,
-      amount: Number(formAmount),
-      payment_method: formMethod || 'No especificado',
-      reference: formReference,
-      notes: formNotes,
-      payment_date: formDate || new Date().toISOString().split('T')[0],
-    });
+    const paymentAmount = Number(formAmount);
+
+    const { data: paymentData, error: paymentError } = await supabase
+      .from('payments')
+      .insert({
+        user_id: profile.id,
+        admin_id: user?.id,
+        amount: paymentAmount,
+        payment_method: formMethod || 'No especificado',
+        reference: formReference,
+        notes: formNotes,
+        payment_date: formDate || new Date().toISOString().split('T')[0],
+      })
+      .select('id')
+      .single();
 
     if (paymentError) {
       toast.error('Error al registrar el pago');
@@ -401,10 +407,14 @@ Además, lo invitamos a ver nuestro tutorial en YouTube donde explicamos paso a 
       .eq('id', profile.id);
 
     if (updateError) {
-      toast.error('Pago registrado pero error al activar suscripción');
-    } else {
-      toast.success(`Pago registrado y suscripción activada por ${subscriptionDays} días`);
+      if (paymentData) {
+        await supabase.from('payments').delete().eq('id', paymentData.id);
+      }
+      toast.error('Error al activar la suscripción. El pago fue revertido.');
+      return;
     }
+
+    toast.success(`Pago registrado y suscripción activada por ${subscriptionDays} días`);
 
     setSubscriptionDays(DEFAULT_SUBSCRIPTION_DAYS);
     formEl.reset();
@@ -426,6 +436,8 @@ Además, lo invitamos a ver nuestro tutorial en YouTube donde explicamos paso a 
       updates.valid_until = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     } else if (newStatus === 'trialing') {
       updates.valid_until = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    } else {
+      updates.valid_until = null;
     }
 
     const { error } = await supabase
