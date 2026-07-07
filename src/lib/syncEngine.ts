@@ -341,7 +341,8 @@ class SyncEngine {
                 reason: `Venta #${newSale.id.slice(0, 8)}`, status: 'NORMAL',
               }).maybeSingle();
             }
-            await store.logAction('sales', 'CREAR', { sale_id: (item.payload.sale && item.payload.sale.id) || (newSale && newSale.id) }).catch(() => {});
+            const itemsCount = item.payload.items?.length || (item.payload.sale?.items?.length) || 1;
+            await store.logAction('sales', 'CREAR', { items: itemsCount, type: item.payload.saleType || item.payload.sale_type || 'venta' }).catch(() => {});
             break;
           }
           case 'cancelTransit': {
@@ -437,7 +438,8 @@ class SyncEngine {
               .update({ is_active: false, updated_at: new Date().toISOString() })
               .eq('id', item.payload.id);
             if (error) throw error;
-            await store.logAction('inventory', 'ELIMINAR', { id: item.payload.id }).catch(() => {});
+            const prodName = item.payload.name || store.products.find(p => p.id === item.payload.id)?.name || 'Producto';
+            await store.logAction('inventory', 'ELIMINAR', { name: prodName }).catch(() => {});
             break;
           }
           case 'updateRecipe': {
@@ -456,14 +458,15 @@ class SyncEngine {
                 if (ie) throw ie;
               }
             }
-            await store.logAction('recipes', 'ACTUALIZAR', { id, name: item.payload.updates.name }).catch(() => {});
+            await store.logAction('recipes', 'ACTUALIZAR', { name: item.payload.updates.name || store.recipes.find(r => r.id === id)?.name || 'Receta' }).catch(() => {});
             break;
           }
           case 'deleteRecipe': {
             await supabase.from('recipe_ingredients').delete().eq('recipe_id', item.payload.id);
             const { error } = await supabase.from('recipes').delete().eq('id', item.payload.id);
             if (error) throw error;
-            await store.logAction('recipes', 'ELIMINAR', { id: item.payload.id }).catch(() => {});
+            const recipeName = item.payload.name || store.recipes.find(r => r.id === item.payload.id)?.name || 'Receta';
+            await store.logAction('recipes', 'ELIMINAR', { name: recipeName }).catch(() => {});
             break;
           }
           case 'deletePendingAccount': {
@@ -476,7 +479,8 @@ class SyncEngine {
               .update({ status: 'cancelled', updated_at: new Date().toISOString() })
               .eq('id', item.payload.accountId);
             if (error) throw error;
-            await store.logAction('accounts', 'ELIMINAR', { accountId: item.payload.accountId }).catch(() => {});
+            const customerName = item.payload.customer_name || store.pendingAccounts.find(a => a.id === item.payload.accountId)?.client_name || 'Cuenta';
+            await store.logAction('accounts', 'ELIMINAR', { customer: customerName }).catch(() => {});
             break;
           }
           case 'markPendingAccountPaid': {
@@ -484,7 +488,8 @@ class SyncEngine {
               .update({ status: 'paid', updated_at: new Date().toISOString() })
               .eq('id', item.payload.accountId);
             if (error) throw error;
-            await store.logAction('accounts', 'MARCAR_PAGADO', { accountId: item.payload.accountId }).catch(() => {});
+            const paidCustomer = store.pendingAccounts.find(a => a.id === item.payload.accountId)?.client_name || 'Cuenta';
+            await store.logAction('accounts', 'MARCAR_PAGADO', { customer: paidCustomer }).catch(() => {});
             break;
           }
           case 'addItemsToPendingAccount': {
@@ -538,7 +543,8 @@ class SyncEngine {
               .update({ ...updates, updated_at: new Date().toISOString() })
               .eq('id', accountId);
             if (error) throw error;
-            await store.logAction('accounts', 'ACTUALIZAR', { accountId }).catch(() => {});
+            const updatedCustomer = updates.customer_name || store.pendingAccounts.find(a => a.id === accountId)?.client_name || 'Cuenta';
+            await store.logAction('accounts', 'ACTUALIZAR', { customer: updatedCustomer }).catch(() => {});
             break;
           }
           case 'updateAccessPinAttempts': {

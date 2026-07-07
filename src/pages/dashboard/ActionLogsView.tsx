@@ -238,7 +238,7 @@ export default function ActionLogsView() {
     const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     const entries = Object.entries(details)
       .filter(([_, value]) => typeof value === 'string' ? !uuidPattern.test(value) : true);
-    if (entries.length === 0) return '-';
+    if (entries.length === 0) return '(IDs ocultos)';
     return entries.map(([key, value]) => {
       const displayKey = DETAIL_KEY_TRANSLATIONS[key] || key.replace(/_/g, ' ');
       return `${displayKey}: ${formatValue(value, key)}`;
