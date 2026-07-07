@@ -17,6 +17,8 @@ const MenuView = lazy(() => import('./pages/MenuView'));
 const AccessPage = lazy(() => import('./pages/AccessPage'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const Terms = lazy(() => import('./pages/Terms'));
+const Privacy = lazy(() => import('./pages/Privacy'));
 
 function initGlobalErrorHandlers() {
   window.onerror = (_event, _source, _lineno, _colno, error) => {
@@ -88,6 +90,8 @@ export default function App() {
           <Route path="/acceso/:businessCode" element={<AccessPage />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
           <Route path="/dashboard/*" element={<ErrorBoundary><Dashboard /></ErrorBoundary>} />
         </Routes>
       </Suspense>
