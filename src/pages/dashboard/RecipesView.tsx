@@ -90,11 +90,11 @@ export default function RecipesView() {
     );
     try {
       await updateRecipe(recipe.id, { ingredients: newIngredients });
+      const oldProduct = products.find(p => p.id === oldIngredient.product_id);
       await useDatabaseStore.getState().logAction('recipes', 'ACTUALIZAR', {
-        recipe_id: recipe.id,
         recipe_name: recipe.name,
-        old_ingredient: oldIngredient.product_id,
-        new_ingredient: swapProductId,
+        ingrediente_anterior: oldProduct?.name || 'Desconocido',
+        ingrediente_nuevo: newProduct.name,
       });
       toast.success(`Ingrediente cambiado a ${newProduct.name}`);
       setSwappingRecipe(null);

@@ -129,12 +129,19 @@ export async function cacheAllData(data: {
     ];
     for (const [name, items, table] of entries) {
       try {
-        const uid = userId || (items && items.length > 0 ? (items[0] as any)?.user_id : null);
-        if (uid) {
-          await table.where('user_id').equals(uid).delete();
-        }
-        if (items && items.length > 0) {
-          await table.bulkPut(items);
+        if (name === 'productWarehouse') {
+          if (items && items.length > 0) {
+            await table.clear();
+            await table.bulkPut(items);
+          }
+        } else {
+          const uid = userId || (items && items.length > 0 ? (items[0] as any)?.user_id : null);
+          if (uid) {
+            await table.where('user_id').equals(uid).delete();
+          }
+          if (items && items.length > 0) {
+            await table.bulkPut(items);
+          }
         }
       } catch (err) {
         console.warn(`[Dexie] Error caching ${name}:`, err);

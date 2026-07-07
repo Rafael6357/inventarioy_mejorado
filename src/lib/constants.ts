@@ -86,6 +86,8 @@ export const DETAIL_KEY_TRANSLATIONS: Record<string, string> = {
   new_price: 'Nuevo precio',
   selling_price: 'Precio de venta',
   ingredients_count: 'Ingredientes',
+  ingrediente_anterior: 'Ingrediente anterior',
+  ingrediente_nuevo: 'Nuevo ingrediente',
   doc_type: 'Tipo doc.',
   file_name: 'Archivo',
   doc_name: 'Documento',
