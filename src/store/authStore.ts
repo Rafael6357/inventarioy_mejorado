@@ -19,6 +19,21 @@ const checkRealInternetConnection = async (): Promise<boolean> => {
   }
 };
 
+const withTimeout = async <T>(promise: Promise<T> | any, timeoutMs: number = 10000): Promise<T> => {
+  try {
+    const result = await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), timeoutMs))
+    ]);
+    return result;
+  } catch (err: any) {
+    if (err.message === 'TIMEOUT') {
+      throw new Error('TIMEOUT');
+    }
+    throw err;
+  }
+};
+
 export interface User {
   id: string;
   email: string;
@@ -295,7 +310,10 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   fetchUser: async () => {
     logger.info('fetchUser llamado...');
     try {
-      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+      const { data: { user: authUser }, error: authError } = await withTimeout(
+        supabase.auth.getUser(),
+        10000
+      ) as any;
       
       if (authError) {
         logger.error('Error en getUser:', authError);
@@ -313,11 +331,14 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
       while (!profile && retries < maxRetries) {
         try {
-          const result = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', authUser.id)
-            .single();
+          const result: any = await withTimeout(
+            supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', authUser.id)
+              .single(),
+            10000
+          );
 
           if (result.error && (result.error as any).status === 406) {
             retries++;
@@ -336,9 +357,32 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       }
 
       if (!profile) {
-        logger.warn('No se pudo obtener el perfil después de retries');
-        set({ isLoading: false });
-        return false;
+        logger.warn('Perfil no encontrado, intentando auto-crear...');
+        const { data: createdProfile, error: createError } = await withTimeout(
+          supabase.from('profiles')
+            .upsert({
+              id: authUser.id,
+              email: authUser.email,
+              name: authUser.user_metadata?.name || '',
+              business_name: authUser.user_metadata?.business_name || '',
+              phone: authUser.user_metadata?.phone || '',
+              role: 'user',
+              subscription_status: 'trialing',
+              trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+              theme_preference: 'dark',
+            })
+            .select()
+            .single(),
+          10000
+        ) as any;
+
+        if (createError || !createdProfile) {
+          logger.error('Fallo al auto-crear perfil:', createError);
+          set({ isLoading: false });
+          return false;
+        }
+
+        profile = createdProfile;
       }
 
       const subscription = {
@@ -457,7 +501,8 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         });
 
         if (profileError) {
-          if (import.meta.env.DEV) logger.error('Error al crear perfil:', profileError);
+          logger.error('Error al crear perfil en registro:', profileError);
+          return { success: false, error: 'Error al crear el perfil. Intente de nuevo.' };
         }
 
         return { success: true };
