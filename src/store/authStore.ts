@@ -4,6 +4,7 @@ import { clearLocalData } from '../lib/dexieDb';
 import { useDatabaseStore } from './dbStore';
 import { logger } from '../lib/logger';
 import { syncEngine } from '../lib/syncEngine';
+import { setRealtimeUserId } from '../lib/realtimeSync';
 
 const checkRealInternetConnection = async (): Promise<boolean> => {
   try {
@@ -422,6 +423,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       }
       
       set({ user, isAuthenticated: true, isLoading: false });
+      setRealtimeUserId(user.id);
       return true;
     } catch (err) {
       logger.error('Error en fetchUser:', err);
@@ -539,7 +541,8 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   logout: async () => {
     logger.info('Logout llamado...');
-    syncEngine.stop(); // Detener el motor de sincronización inmediatamente
+    syncEngine.stop();
+    setRealtimeUserId(null);
     try {
       // Código SQLite eliminado
 
