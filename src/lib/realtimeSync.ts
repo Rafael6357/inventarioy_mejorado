@@ -324,7 +324,7 @@ export function startRealtimeSync() {
       if (status === 'SUBSCRIBED') {
         logger.info('Realtime suscrito correctamente');
       } else if (status === 'CHANNEL_ERROR') {
-        logger.error('Error en canal Realtime:', err);
+        logger.warn('Realtime desconectado (red o reposo prolongado de la PWA):', err);
         channel = null;
       } else if (status === 'CLOSED') {
         logger.info('Canal Realtime cerrado');

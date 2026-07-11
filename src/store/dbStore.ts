@@ -655,9 +655,30 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
 
     set({ isLoading: true });
 
-    // Offline: restaurar desde caché Dexie
+    // Offline sin internet: restaurar desde caché Dexie sin tocar Supabase
     if (!navigator.onLine) {
       logger.info('📥 Offline — restaurando desde caché local...');
+      await restoreFromCache(user.id);
+      set({ isLoading: false });
+      _isFetchingAll = false;
+      return;
+    }
+
+    // Verificar que realmente haya conectividad (navigator.onLine a veces miente)
+    const hasRealNet = await (async () => {
+      try {
+        const result = await Promise.race([
+          supabase.from('products').select('id').limit(1).maybeSingle(),
+          new Promise<any>((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000)),
+        ]);
+        return !result?.error;
+      } catch {
+        return false;
+      }
+    })();
+
+    if (!hasRealNet) {
+      logger.info('📥 navigator.onLine=true pero sin internet real — restaurando caché...');
       await restoreFromCache(user.id);
       set({ isLoading: false });
       _isFetchingAll = false;
@@ -667,8 +688,8 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
     // ── Grupo 1: Productos y Movimientos ──
-    let productsData: any[] = [];
-    let movementsData: any[] = [];
+    let productsData: any[] | null = null;
+    let movementsData: any[] | null = null;
 
     try {
       logger.info('📥 Cargando datos principales...');
@@ -685,8 +706,8 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     }
 
     // ── Grupo 2: Ventas y Recetas ──
-    let salesData: any[] = [];
-    let recipesData: any[] = [];
+    let salesData: any[] | null = null;
+    let recipesData: any[] | null = null;
 
     try {
       logger.info('📥 Cargando ventas y recetas...');
@@ -703,10 +724,10 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     }
 
     // ── Grupo 3: Empleados y RRHH ──
-    let employeesData: any[] = [];
-    let categoriesData: any[] = [];
-    let hrDocsData: any[] = [];
-    let departmentsData: any[] = [];
+    let employeesData: any[] | null = null;
+    let categoriesData: any[] | null = null;
+    let hrDocsData: any[] | null = null;
+    let departmentsData: any[] | null = null;
 
     try {
       logger.info('📥 Cargando empleados y RRHH...');
@@ -727,14 +748,14 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     }
 
     // ── Grupo 4: Tránsito, Cierres, Configuración ──
-    let transitItemsData: any[] = [];
-    let dailyClosingsData: any[] = [];
-    let pendingData: any[] = [];
-    let accessPinsData: any[] = [];
-    let actionLogsData: any[] = [];
+    let transitItemsData: any[] | null = null;
+    let dailyClosingsData: any[] | null = null;
+    let pendingData: any[] | null = null;
+    let accessPinsData: any[] | null = null;
+    let actionLogsData: any[] | null = null;
     let payrollConfigData: any = null;
-    let warehousesData: any[] = [];
-    let productWarehouseData: any[] = [];
+    let warehousesData: any[] | null = null;
+    let productWarehouseData: any[] | null = null;
 
     try {
       logger.info(' Cargando cierres y configuración (parte 1/2)...');
@@ -766,67 +787,72 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     }
 
     // ── Computar in_transit y commit final ──
-    const transitItems = transitItemsData;
+    // Usar los datos actuales del store como fallback para cada grupo que no se haya cargado
+    const currentState = get();
+    const effectiveTransitItems = transitItemsData ?? currentState.transitItems;
 
-    const productsWithTransit = productsData.map(p => {
-      const totalInTransit = transitItems
-        .filter(t => t.product_id === p.id)
-        .reduce((sum, t) => sum + t.remaining, 0);
+    const productsWithTransit = (productsData ?? currentState.products).map(p => {
+      const totalInTransit = effectiveTransitItems
+        .filter((t: any) => t.product_id === p.id)
+        .reduce((sum: number, t: any) => sum + Number(t.remaining), 0);
       return { ...p, in_transit: totalInTransit };
     });
 
-    const productWarehouseWithTransit = productWarehouseData.map((pw: any) => {
-      const transitForWarehouse = transitItems
+    const effectiveProductWarehouse = productWarehouseData ?? currentState.productWarehouse;
+    const productWarehouseWithTransit = effectiveProductWarehouse.map((pw: any) => {
+      const transitForWarehouse = effectiveTransitItems
         .filter((t: any) => t.product_id === pw.product_id && t.warehouse_id === pw.warehouse_id)
-        .reduce((sum: number, t: any) => sum + t.remaining, 0);
+        .reduce((sum: number, t: any) => sum + Number(t.remaining), 0);
       return { ...pw, in_transit: transitForWarehouse };
     });
 
     set({
       products: productsWithTransit,
-      movements: movementsData,
-      sales: salesData,
-      recipes: recipesData,
-      employees: employeesData,
-      categories: categoriesData,
-      transitItems,
-      dailyClosings: dailyClosingsData,
-      hrDocuments: hrDocsData,
-      departments: departmentsData,
-      payrollConfig: payrollConfigData,
-      pendingAccounts: pendingData,
-      accessPins: accessPinsData,
-      actionLogs: actionLogsData,
-      warehouses: warehousesData,
+      movements: movementsData ?? currentState.movements,
+      sales: salesData ?? currentState.sales,
+      recipes: recipesData ?? currentState.recipes,
+      employees: employeesData ?? currentState.employees,
+      categories: categoriesData ?? currentState.categories,
+      transitItems: effectiveTransitItems,
+      dailyClosings: dailyClosingsData ?? currentState.dailyClosings,
+      hrDocuments: hrDocsData ?? currentState.hrDocuments,
+      departments: departmentsData ?? currentState.departments,
+      payrollConfig: payrollConfigData !== null ? payrollConfigData : currentState.payrollConfig,
+      pendingAccounts: pendingData ?? currentState.pendingAccounts,
+      accessPins: accessPinsData ?? currentState.accessPins,
+      actionLogs: actionLogsData ?? currentState.actionLogs,
+      warehouses: warehousesData ?? currentState.warehouses,
       productWarehouse: productWarehouseWithTransit,
       isLoading: false,
     });
 
     logger.info('✅ Datos cargados completamente');
     localStorage.setItem('lastSyncedAt', new Date().toISOString());
+
+    // Cache solo los grupos que se cargaron exitosamente (no pisar Dexie con nulls)
     cacheAllData({
-      products: productsData,
-      movements: movementsData,
-      warehouses: warehousesData,
-      productWarehouse: productWarehouseWithTransit,
-      transitItems: transitItemsData,
-      sales: salesData,
-      recipes: recipesData,
-      pendingAccounts: pendingData,
-      dailyClosings: dailyClosingsData,
-      employees: employeesData,
-      categories: categoriesData,
-      accessPins: accessPinsData,
+      ...(productsData !== null && { products: productsData }),
+      ...(movementsData !== null && { movements: movementsData }),
+      ...(warehousesData !== null && { warehouses: warehousesData }),
+      ...(productWarehouseData !== null && { productWarehouse: productWarehouseWithTransit }),
+      ...(transitItemsData !== null && { transitItems: transitItemsData }),
+      ...(salesData !== null && { sales: salesData }),
+      ...(recipesData !== null && { recipes: recipesData }),
+      ...(pendingData !== null && { pendingAccounts: pendingData }),
+      ...(dailyClosingsData !== null && { dailyClosings: dailyClosingsData }),
+      ...(employeesData !== null && { employees: employeesData }),
+      ...(categoriesData !== null && { categories: categoriesData }),
+      ...(accessPinsData !== null && { accessPins: accessPinsData }),
     }, user.id);
 
     // Si no hay productos ni movimientos, restaurar desde caché
-    if (productsData.length === 0 && movementsData.length === 0) {
+    if ((productsData === null || productsData.length === 0) && (movementsData === null || movementsData.length === 0)) {
       logger.warn('⚠️ fetchAll no obtuvo productos ni movimientos — restaurando caché');
       await restoreFromCache(user.id);
     }
 
     // Auto-crear almacén "Almacén" para usuarios nuevos
-    if (warehousesData.length === 0) {
+    if (warehousesData === null || warehousesData.length === 0) {
       logger.info('⚠️ No hay warehouses — disparando fetchWarehouses para auto-crear el principal');
       await get().fetchWarehouses();
     } else if (!get().currentWarehouseId) {
