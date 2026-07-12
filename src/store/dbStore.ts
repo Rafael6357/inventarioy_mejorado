@@ -268,6 +268,7 @@ export interface DailyClosing {
   domicilio?: number;
   bar?: number;
   venta_rapida?: number;
+  sales_count?: number;
 }
 
 export interface HRDocument {
@@ -979,6 +980,8 @@ addProduct: async (product) => {
 
       await addToSyncQueue({ operation: 'addProduct', table: 'products', payload });
       get().refreshSyncQueueCount();
+      try { await db.products.put(productData).catch(() => {}); } catch {}
+      if (pwEntry) try { await db.productWarehouse.put(pwEntry).catch(() => {}); } catch {}
       if (!silent) {
         toast.success('Producto guardado localmente — se sincronizará al reconectar');
       }
@@ -1083,6 +1086,7 @@ addProduct: async (product) => {
       }));
       await addToSyncQueue({ operation: 'updateProduct', table: 'products', payload: { id, updates: capitalizedUpdates } });
       get().refreshSyncQueueCount();
+      try { await db.products.put({ ...get().products.find(p => p.id === id), ...updates, updated_at: new Date().toISOString() } as any).catch(() => {}); } catch {}
       toast.success('Producto actualizado localmente (sin conexión)');
       return;
     }
@@ -1116,6 +1120,8 @@ addProduct: async (product) => {
       }));
       await addToSyncQueue({ operation: 'deleteProduct', table: 'products', payload: { id } });
       get().refreshSyncQueueCount();
+      const productToDeactivate = get().products.find(p => p.id === id);
+      try { if (productToDeactivate) await db.products.put({ ...productToDeactivate, is_active: false }).catch(() => {}); } catch {}
       toast.success('Producto eliminado (sin conexión)');
       return;
     }
@@ -1266,6 +1272,12 @@ addProduct: async (product) => {
       await addToSyncQueue({ operation: 'addMovement', table: 'movements', payload: { ...movement, id: movementId, user_id: user.id, date: movementDate, created_at: offlineMovement.created_at, product_name: product.name } });
       get().refreshSyncQueueCount();
       toast.success('Movimiento guardado localmente (sin conexión)');
+      try {
+        await db.movements.put(offlineMovement).catch(() => {});
+        await db.products.bulkPut(get().products).catch(() => {});
+        await db.transitItems.bulkPut(get().transitItems).catch(() => {});
+        await db.productWarehouse.bulkPut(get().productWarehouse).catch(() => {});
+      } catch {}
     };
 
     if (!navigator.onLine) {
@@ -1489,6 +1501,7 @@ addProduct: async (product) => {
         payload: { id, justification },
       });
       get().refreshSyncQueueCount();
+      try { await db.movements.put(get().movements.find((m: any) => m.id === id) as any).catch(() => {}); } catch {}
       return;
     }
 
@@ -1881,6 +1894,10 @@ addProduct: async (product) => {
         });
       }
       get().refreshSyncQueueCount();
+      try {
+        await db.transitItems.bulkPut(get().transitItems).catch(() => {});
+        await db.products.bulkPut(get().products).catch(() => {});
+      } catch {}
       return { success: true };
     }
 
@@ -2037,6 +2054,12 @@ addProduct: async (product) => {
       await addToSyncQueue({ operation: 'cancelTransit', table: 'transit_items', payload: { transitItemId, quantity, reason, userId: user.id, productId: product.id, productName: product.name } });
       get().refreshSyncQueueCount();
       toast.success('Cancelación guardada localmente (sin conexión)');
+      try {
+        await db.transitItems.bulkPut(get().transitItems).catch(() => {});
+        await db.products.bulkPut(get().products).catch(() => {});
+        await db.productWarehouse.bulkPut(get().productWarehouse).catch(() => {});
+        await db.movements.put(localMovement as any).catch(() => {});
+      } catch {}
       return { success: true };
     }
 
@@ -2142,6 +2165,10 @@ addProduct: async (product) => {
       await addToSyncQueue({ operation: 'registerWasteFromTransit', table: 'transit_items', payload: { transitItemId, quantity, reason, userId: user.id, productId: product.id, productName: product.name } });
       get().refreshSyncQueueCount();
       toast.success('Merma guardada localmente (sin conexión)');
+      try {
+        await db.transitItems.bulkPut(get().transitItems).catch(() => {});
+        await db.products.bulkPut(get().products).catch(() => {});
+      } catch {}
       return { success: true };
     }
 
@@ -2229,6 +2256,10 @@ addProduct: async (product) => {
       await addToSyncQueue({ operation: 'registerManualConsumption', table: 'transit_items', payload: { transitItemId, quantity, note, userId: user.id, productId: product.id, productName: product.name } });
       get().refreshSyncQueueCount();
       toast.success('Consumo guardado localmente (sin conexión)');
+      try {
+        await db.transitItems.bulkPut(get().transitItems).catch(() => {});
+        await db.products.bulkPut(get().products).catch(() => {});
+      } catch {}
       return { success: true };
     }
 
@@ -2475,6 +2506,7 @@ addProduct: async (product) => {
         payload: { accountId, updates },
       });
       get().refreshSyncQueueCount();
+      try { await db.pendingAccounts.put(get().pendingAccounts.find((a: any) => a.id === accountId) as any).catch(() => {}); } catch {}
       return { success: true };
     }
 
@@ -3083,6 +3115,7 @@ deletePendingAccount: async (accountId: string) => {
         },
       });
 
+      try { await db.recipes.put(offlineRecipe).catch(() => {}); } catch {}
       toast.success('Receta guardada localmente (sin conexión)');
       return;
     }
@@ -3136,6 +3169,7 @@ deletePendingAccount: async (accountId: string) => {
         payload: { id, recipeName: get().recipes.find(r => r.id === id)?.name || updates.name || 'Receta', updates: { name: updates.name ? capitalize(updates.name) : undefined, selling_price: updates.selling_price, ingredients: updates.ingredients } },
       });
       get().refreshSyncQueueCount();
+      try { await db.recipes.put(get().recipes.find((r: any) => r.id === id) as any).catch(() => {}); } catch {}
       toast.success('Receta actualizada (sin conexión)');
       return;
     }
@@ -3183,6 +3217,7 @@ deletePendingAccount: async (accountId: string) => {
       set((state) => ({ recipes: state.recipes.filter(r => r.id !== id) }));
       await addToSyncQueue({ operation: 'deleteRecipe', table: 'recipes', payload: { id, name: recipeToDelete?.name || 'Receta' } });
       get().refreshSyncQueueCount();
+      try { await db.recipes.delete(id).catch(() => {}); } catch {}
       toast.success('Receta eliminada (sin conexión)');
       return;
     }
@@ -3217,6 +3252,7 @@ deletePendingAccount: async (accountId: string) => {
       set((state) => ({ employees: [tempEmployee, ...state.employees] }));
       await addToSyncQueue({ operation: 'addEmployee', table: 'employees', payload: { employee: tempEmployee } });
       get().refreshSyncQueueCount();
+      try { await db.employees.put(tempEmployee).catch(() => {}); } catch {}
       return;
     }
 
@@ -3818,7 +3854,7 @@ deletePendingAccount: async (accountId: string) => {
 
     if (!navigator.onLine) {
       const id = crypto.randomUUID();
-      const offlineClosing = { ...closing, id, user_id: user.id, created_at: new Date().toISOString() } as DailyClosing;
+      const offlineClosing = { ...closing, id, user_id: user.id, created_at: new Date().toISOString(), sales_count: closing.sales_count || 0 } as DailyClosing;
       set((state) => ({ dailyClosings: [offlineClosing, ...state.dailyClosings] }));
       await addToSyncQueue({ operation: 'createDailyClosing', table: 'daily_closings', payload: { ...closing, id, user_id: user.id, created_at: offlineClosing.created_at } });
       get().refreshSyncQueueCount();
@@ -3830,7 +3866,7 @@ deletePendingAccount: async (accountId: string) => {
       const { data, error } = await queryWithRetry(() =>
         supabase
           .from('daily_closings')
-          .insert({ ...closing, user_id: user.id })
+          .insert({ ...closing, user_id: user.id, sales_count: closing.sales_count || 0 })
           .select()
           .single()
       );

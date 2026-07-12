@@ -441,6 +441,7 @@ export default function SalesView() {
         cup_transfer: currencyBreakdown.cupTransfer,
         usd: currencyBreakdown.usd,
         eur: currencyBreakdown.eur,
+        sales_count: todaySales.length,
       });
       if (result.success) {
         await logAction('closings', 'CREAR', {

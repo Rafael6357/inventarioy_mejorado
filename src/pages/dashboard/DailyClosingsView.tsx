@@ -94,9 +94,10 @@ export default function DailyClosingsView() {
   }, [searchTerm, startDate, endDate, employeeFilter, sortOrder]);
 
   const getSalesForDate = (closingDate: string) => {
+    const dateStr = closingDate.split('T')[0];
     return sales.filter(s => {
       const saleDate = new Date(s.date).toISOString().split('T')[0];
-      return saleDate === closingDate;
+      return saleDate === dateStr;
     });
   };
 
@@ -407,7 +408,7 @@ export default function DailyClosingsView() {
                     <div className="flex items-center gap-2 mt-1">
                       <p className="text-xs text-text-secondary">
                         {closing.total_sales > 0 ? (
-                          `${getSalesForDate(closing.closing_date).length} ventas`
+                          `${closing.sales_count != null ? closing.sales_count : getSalesForDate(closing.closing_date).length} ventas`
                         ) : 'Sin ventas'}
                       </p>
                       {closing.created_by_name && (

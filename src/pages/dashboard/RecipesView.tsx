@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useDatabaseStore } from '../../store/dbStore';
 import { useAuthStore } from '../../store/authStore';
-import { ChefHat, Plus, Minus, Trash2, Search, UtensilsCrossed, AlertCircle, Pencil, X, Check, Printer, Repeat } from 'lucide-react';
+import { ChefHat, Plus, Minus, Trash2, Search, UtensilsCrossed, AlertCircle, Pencil, X, Check, Printer, Repeat, AlertTriangle } from 'lucide-react';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Button } from '../../components/ui/button';
@@ -37,7 +37,8 @@ export default function RecipesView() {
   const setSearchTerm = (v: string) => setFilters({ searchTerm: v });
   const [editingRecipeId, setEditingRecipeId] = useState<string | null>(null);
   const [editingPrice, setEditingPrice] = useState(0);
-  
+  const [recipeToDelete, setRecipeToDelete] = useState<{id: string, name: string} | null>(null);
+
   // Recipe Form State
   const [recipeName, setRecipeName] = useState('');
   const [selling_price, setSellingPrice] = useState(0);
@@ -69,6 +70,22 @@ export default function RecipesView() {
   const cancelEditPrice = () => {
     setEditingRecipeId(null);
     setEditingPrice(0);
+  };
+
+  const confirmDeleteRecipe = async () => {
+    if (recipeToDelete) {
+      try {
+        await deleteRecipe(recipeToDelete.id);
+        await logAction('recipes', 'ELIMINAR', {
+          recipe_name: recipeToDelete.name,
+          recipe_id: recipeToDelete.id
+        });
+        toast.success('Receta eliminada exitosamente');
+      } catch (err) {
+        toast.error((err as Error).message || 'Error al eliminar la receta');
+      }
+      setRecipeToDelete(null);
+    }
   };
 
   // Swap ingredient state
@@ -443,20 +460,7 @@ export default function RecipesView() {
                 return (
                   <div key={recipe.id} className="relative rounded-xl border border-border bg-bg p-4 transition-colors hover:border-primary/50">
                     <button 
-                      onClick={async () => {
-                        if(window.confirm('¿Seguro que deseas eliminar esta receta?')) {
-                          try {
-                            await deleteRecipe(recipe.id);
-                            await useDatabaseStore.getState().logAction('recipes', 'ELIMINAR', {
-                              recipe_name: recipe.name,
-                              recipe_id: recipe.id
-                            });
-                            toast.success('Receta eliminada exitosamente');
-                          } catch (err) {
-                            toast.error((err as Error).message || 'Error al eliminar la receta');
-                          }
-                        }
-                      }}
+                      onClick={() => setRecipeToDelete({ id: recipe.id, name: recipe.name })}
                       className="absolute right-4 top-4 text-text-secondary hover:text-danger transition-colors"
                       title="Eliminar receta"
                     >
@@ -593,6 +597,39 @@ export default function RecipesView() {
             )}
           </div>
         </div>
+
+      {recipeToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm modal-backdrop">
+          <div className="w-full max-w-md rounded-2xl border border-border/50 bg-surface p-6 shadow-2xl">
+            <div className="mb-6 flex flex-col items-center text-center">
+              <div className="mb-4 rounded-full bg-danger/10 p-4 text-danger">
+                <AlertTriangle className="h-8 w-8" />
+              </div>
+              <h2 className="text-xl font-bold text-text">¿Eliminar receta?</h2>
+              <p className="mt-2 text-sm text-text-secondary">
+                Está a punto de eliminar <span className="font-bold text-text">"{recipeToDelete.name}"</span>.
+                Esta acción no se puede deshacer.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <Button 
+                variant="outline" 
+                className="flex-1"
+                onClick={() => setRecipeToDelete(null)}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                className="flex-1 bg-danger text-white hover:bg-danger/90"
+                onClick={confirmDeleteRecipe}
+              >
+                Sí, eliminar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       </div>
     </div>
   );
