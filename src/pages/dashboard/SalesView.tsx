@@ -600,7 +600,7 @@ export default function SalesView() {
       ));
       return;
     }
-    const num = parseInt(value, 10);
+    const num = parseFloat(value);
     if (isNaN(num) || num < 1) {
       setCart(current => current.map(item =>
         item.product_id === product_id ? { ...item, quantity: 1 } : item
@@ -617,7 +617,7 @@ export default function SalesView() {
   };
 
   const handleQuantityBlur = (product_id: string, value: string) => {
-    const num = parseInt(value, 10);
+    const num = parseFloat(value);
     if (value === '' || isNaN(num) || num < 1) {
       setCart(current => current.map(item =>
         item.product_id === product_id ? { ...item, quantity: 1 } : item
@@ -1156,7 +1156,7 @@ setShowTicket(true);
                         type="number"
                         min="1"
                         max={getMaxQuantity(item)}
-                        step="1"
+                        step="any"
                         value={item.quantity}
                         onChange={(e) => handleQuantityChange(item.product_id, e.target.value)}
                         onBlur={(e) => handleQuantityBlur(item.product_id, e.target.value)}
