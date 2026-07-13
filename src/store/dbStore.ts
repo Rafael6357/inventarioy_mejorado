@@ -8,6 +8,7 @@ import { isDateClosed } from '../lib/dateUtils';
 import { calcularNomina } from '../utils/payrollCalculations';
 import { logger } from '../lib/logger';
 import { normalizeStr } from '../lib/utils';
+import { trackLocalCreation, untrackLocalCreation } from '../lib/realtimeGuard';
 
 let _isFetchingAll = false;
 
@@ -994,6 +995,7 @@ addProduct: async (product) => {
       return;
     }
 
+    trackLocalCreation(productId);
     try {
       const { data, error } = await queryWithRetry(() =>
         supabase
@@ -1058,6 +1060,8 @@ addProduct: async (product) => {
     } catch (error: any) {
       logger.error('Error en addProduct:', error);
       throw new Error(error.message || 'Error al crear el producto');
+    } finally {
+      untrackLocalCreation(productId);
     }
   },
 
@@ -1287,6 +1291,8 @@ addProduct: async (product) => {
       return;
     }
 
+    const movementId = crypto.randomUUID();
+    trackLocalCreation(movementId);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Sesión expirada. Por favor, inicia sesión nuevamente.');
@@ -1294,7 +1300,7 @@ addProduct: async (product) => {
       const { data: newMovement, error: movementError } = await queryWithRetry(() =>
         supabase
           .from('movements')
-          .insert({ ...movement, user_id: user.id, date: movementDate })
+          .insert({ ...movement, id: movementId, user_id: user.id, date: movementDate })
           .select()
           .single()
       );
@@ -1488,6 +1494,8 @@ addProduct: async (product) => {
       }
       logger.error('Error en addMovement:', error);
       throw new Error(error.message || 'Error al registrar el movimiento');
+    } finally {
+      untrackLocalCreation(movementId);
     }
   }),
 
@@ -1784,11 +1792,14 @@ addProduct: async (product) => {
       return { success: true };
     }
 
+    const saleId = crypto.randomUUID();
+    trackLocalCreation(saleId);
     try {
       const { data: newSale, error: saleError } = await queryWithRetry(() =>
         supabase
           .from('sales')
           .insert({ 
+            id: saleId,
             user_id: user.id, 
             employee_id: sale.employee_id,
             total_amount: sale.total_amount,
@@ -1847,6 +1858,8 @@ addProduct: async (product) => {
     } catch (error: any) {
       logger.error('Error en addSale:', error);
       return { success: false, error: error.message || 'Error al registrar la venta' };
+    } finally {
+      untrackLocalCreation(saleId);
     }
   },
 
@@ -2375,11 +2388,14 @@ addProduct: async (product) => {
       return { success: true, accountId: id };
     }
 
+    const accountId = crypto.randomUUID();
+    trackLocalCreation(accountId);
     try {
       const { data, error } = await queryWithRetry(() =>
         supabase
           .from('pending_accounts')
           .insert({
+            id: accountId,
             user_id: user.id,
             client_name: clientName,
             items: [],
@@ -2401,6 +2417,8 @@ addProduct: async (product) => {
     } catch (err: any) {
       logger.error('Error en createPendingAccount:', err);
       return { success: false, error: err.message || 'Error al crear la cuenta' };
+    } finally {
+      untrackLocalCreation(accountId);
     }
   },
 
@@ -3122,11 +3140,14 @@ deletePendingAccount: async (accountId: string) => {
       return;
     }
 
+    const recipeId = crypto.randomUUID();
+    trackLocalCreation(recipeId);
     try {
       const { data: newRecipe, error } = await queryWithRetry(() =>
         supabase
           .from('recipes')
           .insert({ 
+            id: recipeId,
             user_id: user.id, 
             name: capitalize(recipe.name), 
             selling_price: recipe.selling_price 
@@ -3158,6 +3179,8 @@ deletePendingAccount: async (accountId: string) => {
     } catch (error: any) {
       logger.error('Error en addRecipe:', error);
       throw new Error(error.message || 'Error al crear la receta');
+    } finally {
+      untrackLocalCreation(recipeId);
     }
   },
 
@@ -3258,11 +3281,13 @@ deletePendingAccount: async (accountId: string) => {
       return;
     }
 
+    const employeeId = crypto.randomUUID();
+    trackLocalCreation(employeeId);
     try {
       const { data, error } = await queryWithRetry(() =>
         supabase
           .from('employees')
-          .insert({ ...employee, name: capitalize(employee.name), user_id: user.id })
+          .insert({ ...employee, id: employeeId, name: capitalize(employee.name), user_id: user.id })
           .select()
           .single()
       );
@@ -3276,6 +3301,8 @@ deletePendingAccount: async (accountId: string) => {
     } catch (error: any) {
       logger.error('Error en addEmployee:', error);
       throw new Error(error.message || 'Error al agregar empleado');
+    } finally {
+      untrackLocalCreation(employeeId);
     }
   },
 

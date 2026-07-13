@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import { useDatabaseStore } from '../store/dbStore';
 import { db } from './dexieDb';
 import { logger } from './logger';
+import { isLocallyCreating } from './realtimeGuard';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 let channel: RealtimeChannel | null = null;
@@ -13,6 +14,7 @@ function handleProductChange(payload: any) {
   const { eventType, new: newRecord, old: oldRecord } = payload;
 
   if (eventType === 'INSERT' && newRecord?.id) {
+      if (isLocallyCreating(newRecord.id)) return;
     if (!store.products.find((p) => p.id === newRecord.id)) {
       useDatabaseStore.setState({ products: [newRecord, ...store.products] as any });
       db.products.put(newRecord).catch(() => {});
@@ -34,6 +36,7 @@ function handleMovementChange(payload: any) {
   const { eventType, new: newRecord, old: oldRecord } = payload;
 
   if (eventType === 'INSERT' && newRecord?.id) {
+      if (isLocallyCreating(newRecord.id)) return;
     if (!store.movements.find((m) => m.id === newRecord.id)) {
       useDatabaseStore.setState({ movements: [newRecord, ...store.movements] as any });
       db.movements.put(newRecord).catch(() => {});
@@ -55,6 +58,7 @@ function handleSaleChange(payload: any) {
   const { eventType, new: newRecord, old: oldRecord } = payload;
 
   if (eventType === 'INSERT' && newRecord?.id) {
+      if (isLocallyCreating(newRecord.id)) return;
     if (!store.sales.find((s) => s.id === newRecord.id)) {
       const saleWithItems = { ...newRecord, items: newRecord.sale_items || [] };
       useDatabaseStore.setState({ sales: [saleWithItems, ...store.sales] as any });
@@ -82,6 +86,7 @@ function handleTransitItemChange(payload: any) {
   let newTransitItems = [...store.transitItems];
 
   if (eventType === 'INSERT' && newRecord?.id) {
+      if (isLocallyCreating(newRecord.id)) return;
     if (!store.transitItems.find((t) => t.id === newRecord.id)) {
       newTransitItems = [newRecord, ...store.transitItems] as any;
       db.transitItems.put(newRecord).catch(() => {});
@@ -129,6 +134,7 @@ function handlePendingAccountChange(payload: any) {
   const { eventType, new: newRecord, old: oldRecord } = payload;
 
   if (eventType === 'INSERT' && newRecord?.id) {
+      if (isLocallyCreating(newRecord.id)) return;
     if (!store.pendingAccounts.find((a) => a.id === newRecord.id)) {
       useDatabaseStore.setState({ pendingAccounts: [newRecord, ...store.pendingAccounts] as any });
       db.pendingAccounts.put(newRecord).catch(() => {});
@@ -154,6 +160,7 @@ function handleRecipeChange(payload: any) {
   const { eventType, new: newRecord, old: oldRecord } = payload;
 
   if (eventType === 'INSERT' && newRecord?.id) {
+      if (isLocallyCreating(newRecord.id)) return;
     if (!store.recipes.find((r) => r.id === newRecord.id)) {
       const recipeWithIngredients = {
         ...newRecord,
@@ -189,6 +196,7 @@ function handleSaleItemChange(payload: any) {
   let updatedItems = [...(existingSale.items || [])];
 
   if (eventType === 'INSERT' && newRecord?.id) {
+      if (isLocallyCreating(newRecord.id)) return;
     if (!updatedItems.find((i: any) => i.id === newRecord.id)) {
       updatedItems.push(newRecord);
     }
@@ -217,6 +225,7 @@ function handleRecipeIngredientChange(payload: any) {
   let updatedIngredients = [...(existingRecipe.ingredients || [])];
 
   if (eventType === 'INSERT' && newRecord?.id) {
+      if (isLocallyCreating(newRecord.id)) return;
     if (!updatedIngredients.find((i: any) => i.id === newRecord.id)) {
       updatedIngredients.push(newRecord);
     }
@@ -240,6 +249,7 @@ function handleProductWarehouseChange(payload: any) {
   const { eventType, new: newRecord, old: oldRecord } = payload;
 
   if (eventType === 'INSERT' && newRecord?.id) {
+      if (isLocallyCreating(newRecord.id)) return;
     if (!store.productWarehouse.find((pw) => pw.id === newRecord.id)) {
       useDatabaseStore.setState({ productWarehouse: [...store.productWarehouse, newRecord] as any });
       db.productWarehouse.put(newRecord).catch(() => {});
