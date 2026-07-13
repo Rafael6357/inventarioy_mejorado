@@ -54,6 +54,16 @@ const customFetch: typeof fetch = async (url, options = {}) => {
                            error.message.includes('net::ERR_');
 
     const isTimeoutError = error.name === 'AbortError';
+    const isLockBroken = isTimeoutError && error.message && error.message.includes('Lock broken');
+
+    // IndexedDB lock roto por multi-pestaña → tratar como offline
+    if (isLockBroken) {
+      return new Response(JSON.stringify({ error: 'lock_broken' }), {
+        status: 503,
+        statusText: 'Service Unavailable',
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
     // Requests de auth con error de red en conexión flaky
     if (isAuthRequest && (isNetworkError || isTimeoutError)) {

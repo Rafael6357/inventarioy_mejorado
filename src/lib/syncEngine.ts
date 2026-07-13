@@ -120,6 +120,13 @@ class SyncEngine {
       if (remaining.length > 0) {
         setTimeout(() => this.processQueue(), 0);
       }
+    } catch (error: any) {
+      if (error?.name === 'AbortError' && error?.message?.includes('Lock broken')) {
+        console.warn('[Sync] Lock broken por multi-pestaña, se reintentará automáticamente');
+      } else {
+        console.error('[Sync] Error en processQueue:', error);
+        this.emit('error', { error });
+      }
     } finally {
       this.emit('complete');
       this.processing = false;
@@ -578,7 +585,10 @@ class SyncEngine {
           || err?.message?.includes('NetworkError')
           || err?.message?.includes('timeout');
 
-        if (!isOffline) {
+        const isLockBroken = err?.name === 'AbortError' && err?.message?.includes('Lock broken');
+        const isRetryable = isOffline || isLockBroken;
+
+        if (!isRetryable) {
           console.error(`Sync: error fatal no-reintentable en ${item.operation}:`, err?.message || err);
           return false;
         }

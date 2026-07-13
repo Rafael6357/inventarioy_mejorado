@@ -183,6 +183,20 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       return;
     }
     _isInitializing = true;
+
+    // Detección de multi-pestaña para evitar conflictos IndexedDB
+    if (typeof window !== 'undefined') {
+      const tabKey = 'inventarioy_tab_active';
+      const existing = localStorage.getItem(tabKey);
+      if (existing) {
+        const age = Date.now() - parseInt(existing, 10);
+        if (age < 3000) {
+          logger.warn('⚠️ Otra pestaña de InventarioY está activa — pueden ocurrir conflictos de sincronización');
+        }
+      }
+      localStorage.setItem(tabKey, String(Date.now()));
+    }
+
     logger.info('Inicializando autenticación...');
 
     const savedUserData = localStorage.getItem('inventarioy_user');
@@ -257,7 +271,19 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         });
       }
     } catch (err: any) {
-      if (err?.message === 'AuthTimeout') {
+      if (err?.name === 'AbortError' && err?.message?.includes('Lock broken')) {
+        logger.warn('AbortError por multi-pestaña en initialize, restaurando sesión guardada');
+        if (savedUserData) {
+          try {
+            const userData = JSON.parse(savedUserData);
+            set({ user: userData, isAuthenticated: true, isLoading: false });
+          } catch {
+            set({ isLoading: false });
+          }
+        } else {
+          set({ isLoading: false });
+        }
+      } else if (err?.message === 'AuthTimeout') {
         logger.warn('Timeout en getSession');
         if (savedUserData) {
           try {
