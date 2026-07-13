@@ -962,16 +962,17 @@ addProduct: async (product) => {
       }
 
       const payload: any = { product: productData };
+      let offlineMovement: Movement | null = null;
       if (pwEntry) {
         const movementId = crypto.randomUUID();
-        const offlineMovement: Movement = {
+        offlineMovement = {
           id: movementId, user_id: user.id, product_id: productId, type: 'ENTRADA',
           quantity: Number(product.quantity), unit: product.unit, date: now,
           cost: Number(product.cost), reason: 'Stock inicial (Registro de producto)',
           status: 'NORMAL', warehouse_id: mainWarehouse.id, created_at: now,
         };
         payload.movement = offlineMovement;
-        set((state) => ({ movements: [offlineMovement, ...state.movements] }));
+        set((state) => ({ movements: [offlineMovement!, ...state.movements] }));
         payload.productWarehouse = [{
           product_id: productId, warehouse_id: mainWarehouse.id,
           quantity: Number(product.quantity), in_transit: 0,
@@ -982,6 +983,7 @@ addProduct: async (product) => {
       get().refreshSyncQueueCount();
       try { await db.products.put(productData).catch(() => {}); } catch {}
       if (pwEntry) try { await db.productWarehouse.put(pwEntry).catch(() => {}); } catch {}
+      if (pwEntry && offlineMovement) try { await db.movements.put(offlineMovement).catch(() => {}); } catch {}
       if (!silent) {
         toast.success('Producto guardado localmente — se sincronizará al reconectar');
       }
@@ -4127,6 +4129,11 @@ async function replayPendingSyncQueue(set: any, get: any) {
             }
             return newState;
           });
+          try { await db.products.put(p.product).catch(() => {}); } catch {}
+          if (p.movement) try { await db.movements.put(p.movement).catch(() => {}); } catch {}
+          if (p.productWarehouse && Array.isArray(p.productWarehouse) && p.productWarehouse.length > 0) {
+            try { await db.productWarehouse.bulkPut(get().productWarehouse).catch(() => {}); } catch {}
+          }
         }
         break;
       case 'updateProduct':
@@ -4148,7 +4155,7 @@ async function replayPendingSyncQueue(set: any, get: any) {
           let newState = { ...state, movements: [newMovement, ...state.movements] };
 
           if (newMovement.type === 'SALIDA') {
-            const transitId = crypto.randomUUID();
+            const transitId = ('ti-' + (newMovement.id || '').replace(/-/g, '').substring(0, 14)) as string;
             const transitItem = {
               id: transitId,
               user_id: newMovement.user_id,
@@ -4261,6 +4268,13 @@ async function replayPendingSyncQueue(set: any, get: any) {
           }
           return newState;
         });
+        {
+          const isSalida = (p as any).type === 'SALIDA';
+          if (isSalida) {
+            try { await db.transitItems.bulkPut(get().transitItems).catch(() => {}); } catch {}
+            try { await db.products.bulkPut(get().products).catch(() => {}); } catch {}
+          }
+        }
         break;
       case 'addSale':
         if (p.sale) {
@@ -4292,6 +4306,7 @@ async function replayPendingSyncQueue(set: any, get: any) {
                 };
               });
             }
+            try { await db.transitItems.bulkPut(get().transitItems).catch(() => {}); } catch {}
           }
         }
         break;
@@ -4391,6 +4406,8 @@ async function replayPendingSyncQueue(set: any, get: any) {
             ),
           };
         });
+        try { await db.transitItems.bulkPut(get().transitItems).catch(() => {}); } catch {}
+        try { await db.products.bulkPut(get().products).catch(() => {}); } catch {}
         break;
       case 'registerWasteFromTransit':
         set((state: any) => {
@@ -4403,6 +4420,7 @@ async function replayPendingSyncQueue(set: any, get: any) {
             products: state.products.map((pr: any) => pr.id === p.productId ? { ...pr, in_transit: newInTransit } : pr),
           };
         });
+        try { await db.transitItems.bulkPut(get().transitItems).catch(() => {}); } catch {}
         break;
       case 'registerManualConsumption':
         set((state: any) => {
@@ -4416,6 +4434,7 @@ async function replayPendingSyncQueue(set: any, get: any) {
             products: state.products.map((pr: any) => pr.id === p.productId ? { ...pr, in_transit: newInTransit } : pr),
           };
         });
+        try { await db.transitItems.bulkPut(get().transitItems).catch(() => {}); } catch {}
         break;
       case 'updateAccessPinAttempts':
         set((state: any) => ({
