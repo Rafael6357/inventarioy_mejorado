@@ -38,6 +38,7 @@ export default function RecipesView() {
   const [editingRecipeId, setEditingRecipeId] = useState<string | null>(null);
   const [editingPrice, setEditingPrice] = useState(0);
   const [recipeToDelete, setRecipeToDelete] = useState<{id: string, name: string} | null>(null);
+  const [isSubmittingRecipe, setIsSubmittingRecipe] = useState(false);
 
   // Recipe Form State
   const [recipeName, setRecipeName] = useState('');
@@ -174,6 +175,7 @@ export default function RecipesView() {
   const handleCreateRecipe = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+    if (isSubmittingRecipe) return;
     if (ingredients.length === 0) {
       toast.error('La receta debe tener al menos un ingrediente.');
       return;
@@ -193,6 +195,7 @@ export default function RecipesView() {
     }
 
     try {
+      setIsSubmittingRecipe(true);
       const convertedIngredients = ingredients.map(ing => {
         const product = products.find(p => p.id === ing.product_id);
         const baseUnit = product ? normalizeUnit(product.unit) : 'u';
@@ -223,6 +226,8 @@ export default function RecipesView() {
       toast.success('Receta creada exitosamente');
     } catch (err) {
       toast.error((err as Error).message || 'Error al crear la receta');
+    } finally {
+      setIsSubmittingRecipe(false);
     }
   };
 
@@ -409,8 +414,8 @@ export default function RecipesView() {
               </div>
             </div>
 
-            <Button type="submit" className="px-8">
-              Guardar Receta
+            <Button type="submit" className="px-8" disabled={isSubmittingRecipe}>
+              {isSubmittingRecipe ? 'Guardando...' : 'Guardar Receta'}
             </Button>
           </form>
         </div>
