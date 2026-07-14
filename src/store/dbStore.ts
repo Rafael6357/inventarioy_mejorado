@@ -4163,7 +4163,14 @@ async function replayPendingSyncQueue(set: any, get: any) {
           } else {
             try { await db.products.put(p.product).catch(() => {}); } catch {}
           }
-          if (p.movement) try { await db.movements.put(p.movement).catch(() => {}); } catch {}
+          if (p.movement) {
+            const enrichedMovement = get().movements.find((m: any) => m.id === p.movement.id);
+            if (enrichedMovement) {
+              try { await db.movements.put(enrichedMovement).catch(() => {}); } catch {}
+            } else {
+              try { await db.movements.put(p.movement).catch(() => {}); } catch {}
+            }
+          }
           if (p.productWarehouse && Array.isArray(p.productWarehouse) && p.productWarehouse.length > 0) {
             try { await db.productWarehouse.bulkPut(get().productWarehouse).catch(() => {}); } catch {}
           }
@@ -4306,11 +4313,16 @@ async function replayPendingSyncQueue(set: any, get: any) {
           }
           return newState;
         });
+        // Después del replay, siempre persistir a Dexie para todos los tipos de movimiento
         {
-          const isSalida = (p as any).type === 'SALIDA';
-          if (isSalida) {
+          const mType = (p as any).type;
+          if (mType === 'SALIDA') {
             try { await db.transitItems.bulkPut(get().transitItems).catch(() => {}); } catch {}
-            try { await db.products.bulkPut(get().products).catch(() => {}); } catch {}
+          }
+          try { await db.products.bulkPut(get().products).catch(() => {}); } catch {}
+          try { await db.movements.bulkPut(get().movements).catch(() => {}); } catch {}
+          if ((p as any).warehouse_id) {
+            try { await db.productWarehouse.bulkPut(get().productWarehouse).catch(() => {}); } catch {}
           }
         }
         break;
