@@ -127,19 +127,20 @@ export async function cacheAllData(data: {
       ['categories', data.categories, db.categories],
       ['accessPins', data.accessPins, db.accessPins],
     ];
-    for (const [name, items, table] of entries) {
+     for (const [name, items, table] of entries) {
       try {
+        if (items === undefined) continue;
         if (name === 'productWarehouse') {
-          if (items && items.length > 0) {
+          if (items.length > 0) {
             await table.clear();
             await table.bulkPut(items);
           }
         } else {
-          const uid = userId || (items && items.length > 0 ? (items[0] as any)?.user_id : null);
+          const uid = userId || (items.length > 0 ? (items[0] as any)?.user_id : null);
           if (uid) {
             await table.where('user_id').equals(uid).delete();
           }
-          if (items && items.length > 0) {
+          if (items.length > 0) {
             await table.bulkPut(items);
           }
         }

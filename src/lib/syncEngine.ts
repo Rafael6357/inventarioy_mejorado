@@ -619,7 +619,7 @@ class SyncEngine {
   async processPending() {
     const count = await getSyncQueueCount();
     if (count > 0 && navigator.onLine) {
-      this.processQueue();
+      await this.processQueue();
     }
   }
 

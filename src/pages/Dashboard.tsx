@@ -156,10 +156,10 @@ export default function Dashboard() {
       fetchedUserId.current = user.id;
       (async () => {
         try {
+          await syncEngine.processPending();
           await fetchAll();
-          syncEngine.processPending();
         } catch (err) {
-          console.error('[Dashboard] Error en fetchAll:', err);
+          console.error('[Dashboard] Error en inicialización:', err);
         }
       })();
     }

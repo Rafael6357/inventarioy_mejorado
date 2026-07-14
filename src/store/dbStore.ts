@@ -4156,11 +4156,20 @@ async function replayPendingSyncQueue(set: any, get: any) {
             }
             return newState;
           });
-          try { await db.products.put(p.product).catch(() => {}); } catch {}
+          // Usar la versión actual del producto (con in_transit computado) en vez de la stale del sync queue
+          const enrichedProduct = get().products.find((x: any) => x.id === p.product.id);
+          if (enrichedProduct) {
+            try { await db.products.put(enrichedProduct).catch(() => {}); } catch {}
+          } else {
+            try { await db.products.put(p.product).catch(() => {}); } catch {}
+          }
           if (p.movement) try { await db.movements.put(p.movement).catch(() => {}); } catch {}
           if (p.productWarehouse && Array.isArray(p.productWarehouse) && p.productWarehouse.length > 0) {
             try { await db.productWarehouse.bulkPut(get().productWarehouse).catch(() => {}); } catch {}
           }
+          // También persistir transitItems para que no se pierdan al reabrir offline
+          try { await db.transitItems.bulkPut(get().transitItems).catch(() => {}); } catch {}
+          try { await db.products.bulkPut(get().products).catch(() => {}); } catch {}
         }
         break;
       case 'updateProduct':
@@ -4168,12 +4177,14 @@ async function replayPendingSyncQueue(set: any, get: any) {
           ...state,
           products: state.products.map((x: any) => x.id === p.id ? { ...x, ...p.updates } : x),
         }));
+        try { await db.products.bulkPut(get().products).catch(() => {}); } catch {}
         break;
       case 'deleteProduct':
         set((state: any) => ({
           ...state,
           products: state.products.map((x: any) => x.id === p.id ? { ...x, is_active: false } : x),
         }));
+        try { await db.products.bulkPut(get().products).catch(() => {}); } catch {}
         break;
       case 'addMovement':
         set((state: any) => {
@@ -4344,6 +4355,7 @@ async function replayPendingSyncQueue(set: any, get: any) {
             ...state,
             recipes: state.recipes.some((r: any) => r.id === recipeWithIngredients.id) ? state.recipes : [recipeWithIngredients, ...state.recipes],
           }));
+          try { await db.recipes.bulkPut(get().recipes).catch(() => {}); } catch {}
         }
         break;
       case 'updateRecipe':
@@ -4351,11 +4363,13 @@ async function replayPendingSyncQueue(set: any, get: any) {
           ...state,
           recipes: state.recipes.map((r: any) => r.id === p.id ? { ...r, ...p.updates } : r),
         }));
+        try { await db.recipes.bulkPut(get().recipes).catch(() => {}); } catch {}
         break;
       case 'deleteRecipe':
         set((state: any) => ({
           recipes: state.recipes.filter((r: any) => r.id !== p.id),
         }));
+        try { await db.recipes.delete(p.id).catch(() => {}); } catch {}
         break;
       case 'createPendingAccount':
         set((state: any) => ({
@@ -4368,6 +4382,7 @@ async function replayPendingSyncQueue(set: any, get: any) {
             m.id === p.id ? { ...m, status: 'JUSTIFICADO', justification: p.justification, justification_date: new Date().toISOString() } : m
           ),
         }));
+        try { await db.movements.bulkPut(get().movements).catch(() => {}); } catch {}
         break;
       case 'updatePendingAccount':
         set((state: any) => ({
@@ -4532,4 +4547,12 @@ async function restoreFromCache(userId: string) {
   });
 
   await replayPendingSyncQueue(useDatabaseStore.setState, useDatabaseStore.getState);
+
+  // Defensa: asegurar que transitItems no se perdieron durante el replay
+  const postReplayTransit = useDatabaseStore.getState().transitItems;
+  if (transitItems.length > 0 && postReplayTransit.length === 0) {
+    logger.warn('⚠️ replayPendingSyncQueue eliminó transitItems — restaurando...');
+    useDatabaseStore.setState({ transitItems });
+    try { await db.transitItems.bulkPut(transitItems).catch(() => {}); } catch {}
+  }
 }
