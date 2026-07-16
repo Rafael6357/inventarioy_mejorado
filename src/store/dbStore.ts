@@ -4551,12 +4551,27 @@ async function restoreFromCache(userId: string) {
     return { ...p, quantity: computedQty, in_transit: totalInTransit };
   });
 
-  // Enriquecer productWarehouse con in_transit calculado
+  // Recalcular productWarehouse.quantity desde movimientos con warehouse_id
+  const qtyPerWarehouse = new Map<string, number>();
+  for (const m of movements) {
+    if (!(m as any).warehouse_id) continue;
+    const key = `${m.product_id}::${(m as any).warehouse_id}`;
+    const current = qtyPerWarehouse.get(key) || 0;
+    if (m.type === 'ENTRADA') qtyPerWarehouse.set(key, current + Number(m.quantity));
+    else if (m.type === 'SALIDA' || m.type === 'MERMA') qtyPerWarehouse.set(key, current - Number(m.quantity));
+    else if (m.type === 'AJUSTE') qtyPerWarehouse.set(key, current + Number(m.quantity));
+  }
+
+  // Enriquecer productWarehouse con quantity + in_transit calculados
   const productWarehouseWithTransit = productWarehouse.map(pw => {
     const transitForWarehouse = transitItems
       .filter(t => t.product_id === pw.product_id && t.warehouse_id === pw.warehouse_id)
       .reduce((sum, t) => sum + t.remaining, 0);
-    return { ...pw, in_transit: transitForWarehouse };
+    const key = `${pw.product_id}::${pw.warehouse_id}`;
+    const computedQty = qtyPerWarehouse.has(key)
+      ? Math.max(0, qtyPerWarehouse.get(key)!)
+      : pw.quantity;
+    return { ...pw, quantity: computedQty, in_transit: transitForWarehouse };
   });
 
   // Restaurar currentWarehouseId desde main warehouse (o el primero disponible)
