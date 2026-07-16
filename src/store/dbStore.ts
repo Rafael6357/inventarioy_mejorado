@@ -4532,11 +4532,23 @@ async function restoreFromCache(userId: string) {
 
   const transitItems = transitAll.filter(t => t.remaining > 0);
 
+  // Recalcular quantity desde los movimientos (más fiable que el valor almacenado en Dexie)
+  const qtyFromMovements = new Map<string, number>();
+  for (const m of movements) {
+    const current = qtyFromMovements.get(m.product_id) || 0;
+    if (m.type === 'ENTRADA') qtyFromMovements.set(m.product_id, current + Number(m.quantity));
+    else if (m.type === 'SALIDA' || m.type === 'MERMA') qtyFromMovements.set(m.product_id, current - Number(m.quantity));
+    else if (m.type === 'AJUSTE') qtyFromMovements.set(m.product_id, current + Number(m.quantity));
+  }
+
   const productsWithTransit = products.map(p => {
     const totalInTransit = transitItems
       .filter(t => t.product_id === p.id)
       .reduce((sum, t) => sum + t.remaining, 0);
-    return { ...p, in_transit: totalInTransit };
+    const computedQty = qtyFromMovements.has(p.id)
+      ? Math.max(0, qtyFromMovements.get(p.id)!)
+      : p.quantity;
+    return { ...p, quantity: computedQty, in_transit: totalInTransit };
   });
 
   // Enriquecer productWarehouse con in_transit calculado
