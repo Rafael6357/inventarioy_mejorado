@@ -4502,6 +4502,16 @@ async function replayPendingSyncQueue(set: any, get: any) {
       logger.error(`[replayPendingSyncQueue] Error processing ${item.operation}:`, e);
     }
   }
+
+  // Persistencia consolidada al final del replay — garantiza que Dexie
+  // refleje el estado completo de Zustand después de procesar todos los items
+  try {
+    const finalState = get();
+    await db.transitItems.bulkPut(finalState.transitItems).catch(() => {});
+    await db.products.bulkPut(finalState.products).catch(() => {});
+    await db.movements.bulkPut(finalState.movements).catch(() => {});
+    await db.productWarehouse.bulkPut(finalState.productWarehouse).catch(() => {});
+  } catch {}
 }
 
 async function restoreFromCache(userId: string) {
