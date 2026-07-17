@@ -964,27 +964,29 @@ addProduct: async (product) => {
 
       const payload: any = { product: productData };
       let offlineMovement: Movement | null = null;
-      if (pwEntry) {
+      if (Number(product.quantity) > 0) {
         const movementId = crypto.randomUUID();
         offlineMovement = {
           id: movementId, user_id: user.id, product_id: productId, type: 'ENTRADA',
           quantity: Number(product.quantity), unit: product.unit, date: now,
           cost: Number(product.cost), reason: 'Stock inicial (Registro de producto)',
-          status: 'NORMAL', warehouse_id: mainWarehouse.id, created_at: now,
+          status: 'NORMAL', warehouse_id: mainWarehouse?.id || undefined, created_at: now,
         };
         payload.movement = offlineMovement;
         set((state) => ({ movements: [offlineMovement!, ...state.movements] }));
-        payload.productWarehouse = [{
-          product_id: productId, warehouse_id: mainWarehouse.id,
-          quantity: Number(product.quantity), in_transit: 0,
-        }];
+        if (mainWarehouse) {
+          payload.productWarehouse = [{
+            product_id: productId, warehouse_id: mainWarehouse.id,
+            quantity: Number(product.quantity), in_transit: 0,
+          }];
+        }
       }
 
       await addToSyncQueue({ operation: 'addProduct', table: 'products', payload });
       get().refreshSyncQueueCount();
       try { await db.products.put(productData).catch(() => {}); } catch {}
       if (pwEntry) try { await db.productWarehouse.put(pwEntry).catch(() => {}); } catch {}
-      if (pwEntry && offlineMovement) try { await db.movements.put(offlineMovement).catch(() => {}); } catch {}
+      if (offlineMovement) try { await db.movements.put(offlineMovement).catch(() => {}); } catch {}
       if (!silent) {
         toast.success('Producto guardado localmente — se sincronizará al reconectar');
       }
@@ -1414,6 +1416,13 @@ addProduct: async (product) => {
         }
 
         set((state) => ({ movements: [newMovement, ...state.movements] }));
+        try {
+          const s = get();
+          await db.movements.put(newMovement).catch(() => {});
+          await db.products.bulkPut(s.products).catch(() => {});
+          await db.transitItems.bulkPut(s.transitItems).catch(() => {});
+          await db.productWarehouse.bulkPut(s.productWarehouse).catch(() => {});
+        } catch {}
         return;
       }
 
@@ -1484,6 +1493,12 @@ addProduct: async (product) => {
       }
 
       set((state) => ({ movements: [newMovement, ...state.movements] }));
+      try {
+        const s = get();
+        await db.movements.put(newMovement).catch(() => {});
+        await db.products.bulkPut(s.products).catch(() => {});
+        await db.transitItems.bulkPut(s.transitItems).catch(() => {});
+      } catch {}
     } catch (error: any) {
       const errMsg = error?.message || '';
       const isNetworkErr = errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError') || errMsg.includes('net::ERR_') || errMsg.includes('TypeError');
@@ -1854,6 +1869,13 @@ addProduct: async (product) => {
 
       const saleWithItems = { ...newSale, items: saleItems };
       set((state) => ({ sales: [saleWithItems, ...state.sales] }));
+      try {
+        const s = get();
+        await db.sales.put(saleWithItems).catch(() => {});
+        await db.transitItems.bulkPut(s.transitItems).catch(() => {});
+        await db.movements.bulkPut(s.movements).catch(() => {});
+        await db.products.bulkPut(s.products).catch(() => {});
+      } catch {}
       return { success: true };
     } catch (error: any) {
       logger.error('Error en addSale:', error);
@@ -2011,6 +2033,13 @@ addProduct: async (product) => {
         };
       });
 
+      try {
+        const s = get();
+        await db.transitItems.bulkPut(s.transitItems).catch(() => {});
+        await db.movements.bulkPut(s.movements).catch(() => {});
+        await db.products.bulkPut(s.products).catch(() => {});
+      } catch {}
+
       return { success: true };
     } catch (error: any) {
       logger.error('Error en consumeFromTransit:', error);
@@ -2151,6 +2180,14 @@ addProduct: async (product) => {
       };
     });
 
+    try {
+      const s = get();
+      await db.transitItems.bulkPut(s.transitItems).catch(() => {});
+      await db.products.bulkPut(s.products).catch(() => {});
+      await db.movements.bulkPut(s.movements).catch(() => {});
+      await db.productWarehouse.bulkPut(s.productWarehouse).catch(() => {});
+    } catch {}
+
     return { success: true };
   },
 
@@ -2240,6 +2277,13 @@ addProduct: async (product) => {
         ),
       };
     });
+
+    try {
+      const s = get();
+      await db.transitItems.bulkPut(s.transitItems).catch(() => {});
+      await db.movements.bulkPut(s.movements).catch(() => {});
+      await db.products.bulkPut(s.products).catch(() => {});
+    } catch {}
 
     return { success: true };
   },
@@ -2343,6 +2387,13 @@ addProduct: async (product) => {
         ),
       };
     });
+
+    try {
+      const s = get();
+      await db.transitItems.bulkPut(s.transitItems).catch(() => {});
+      await db.movements.bulkPut(s.movements).catch(() => {});
+      await db.products.bulkPut(s.products).catch(() => {});
+    } catch {}
 
     return { success: true };
   },
