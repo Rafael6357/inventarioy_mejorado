@@ -145,7 +145,7 @@ export default function StockView() {
   const filteredProducts = useMemo(() => {
     const filtered = activeProducts.filter((product) => {
       const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            product.category.toLowerCase().includes(searchTerm.toLowerCase());
+                            (product.category || '').toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesCategory = categoryFilter === 'ALL' || product.category === categoryFilter;
       

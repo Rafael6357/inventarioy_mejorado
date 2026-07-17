@@ -40,7 +40,7 @@ export default function FilteredCenterView() {
       const lowerSearch = searchTerm.toLowerCase();
       result = result.filter(p => 
         p.name.toLowerCase().includes(lowerSearch) || 
-        p.category.toLowerCase().includes(lowerSearch) ||
+        (p.category || '').toLowerCase().includes(lowerSearch) ||
         p.description?.toLowerCase().includes(lowerSearch)
       );
     }

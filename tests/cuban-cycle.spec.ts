@@ -58,6 +58,16 @@ async function seedSupabase(page: Page) {
     }
     try { await fetch(`${supabaseUrl}/rest/v1/product_warehouse?product_id=in.(select:id from products where user_id=eq.${uid})`, { method: 'DELETE', headers: authHeaders }); } catch { }
     try { await fetch(`${supabaseUrl}/rest/v1/products?user_id=eq.${uid}`, { method: 'DELETE', headers: authHeaders }); } catch { }
+    // Clear Dexie sync queue to prevent accumulation from previous test runs
+    try {
+      const { db } = await import(/* @vite-ignore */ '/src/lib/dexieDb');
+      await db.syncQueue.clear();
+      await db.syncLog.clear();
+      await db.products.clear();
+      await db.productWarehouse.clear();
+      await db.movements.clear();
+      await db.transitItems.clear();
+    } catch {}
     const now = new Date().toISOString();
     const uuid = () => crypto.randomUUID();
     const p1Id = uuid(); const p2Id = uuid();

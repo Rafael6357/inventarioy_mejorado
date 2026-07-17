@@ -107,7 +107,7 @@ export default function MenuView() {
 
   const filteredItems = useMemo(() => {
     return menuItems.filter(item => {
-      const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = (item.name || '').toLowerCase().includes(searchTerm.toLowerCase());
       const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
       return matchesSearch && matchesCategory;
     });

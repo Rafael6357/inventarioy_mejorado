@@ -559,8 +559,8 @@ const handleWaste = async () => {
         <TransitActionModal
           type="cancel"
           item={cancelModal.item}
-          productName={getProduct(cancelModal.item.product_id)!.name}
-          productUnit={getProduct(cancelModal.item.product_id)!.unit}
+          productName={getProduct(cancelModal.item.product_id)?.name || ''}
+          productUnit={getProduct(cancelModal.item.product_id)?.unit || 'u'}
           quantity={cancelModal.quantity}
           unit={cancelModal.unit}
           reason={cancelModal.reason}
@@ -582,8 +582,8 @@ const handleWaste = async () => {
         <TransitActionModal
           type="waste"
           item={wasteModal.item}
-          productName={getProduct(wasteModal.item.product_id)!.name}
-          productUnit={getProduct(wasteModal.item.product_id)!.unit}
+          productName={getProduct(wasteModal.item.product_id)?.name || ''}
+          productUnit={getProduct(wasteModal.item.product_id)?.unit || 'u'}
           quantity={wasteModal.quantity}
           unit={wasteModal.unit}
           reason={wasteModal.reason}
@@ -605,8 +605,8 @@ const handleWaste = async () => {
         <TransitActionModal
           type="consumption"
           item={consumptionModal.item}
-          productName={getProduct(consumptionModal.item.product_id)!.name}
-          productUnit={getProduct(consumptionModal.item.product_id)!.unit}
+          productName={getProduct(consumptionModal.item.product_id)?.name || ''}
+          productUnit={getProduct(consumptionModal.item.product_id)?.unit || 'u'}
           quantity={consumptionModal.quantity}
           unit={consumptionModal.unit}
           reason={consumptionModal.note}
