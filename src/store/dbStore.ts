@@ -792,25 +792,53 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
     // Usar los datos actuales del store como fallback para cada grupo que no se haya cargado
     const currentState = get();
     const effectiveTransitItems = transitItemsData ?? currentState.transitItems;
+    const effectiveMovements = movementsData ?? currentState.movements;
+
+    // Recalcular quantity desde movements (más fiable que el valor Supabase/DB)
+    const qtyFromMovements = new Map<string, number>();
+    for (const m of effectiveMovements) {
+      const current = qtyFromMovements.get(m.product_id) || 0;
+      if (m.type === 'ENTRADA') qtyFromMovements.set(m.product_id, current + Number(m.quantity));
+      else if (m.type === 'SALIDA' || m.type === 'MERMA') qtyFromMovements.set(m.product_id, current - Number(m.quantity));
+      else if (m.type === 'AJUSTE') qtyFromMovements.set(m.product_id, current + Number(m.quantity));
+    }
 
     const productsWithTransit = (productsData ?? currentState.products).map(p => {
       const totalInTransit = effectiveTransitItems
         .filter((t: any) => t.product_id === p.id)
         .reduce((sum: number, t: any) => sum + Number(t.remaining), 0);
-      return { ...p, in_transit: totalInTransit };
+      const computedQty = qtyFromMovements.has(p.id)
+        ? Math.max(0, qtyFromMovements.get(p.id)!)
+        : p.quantity;
+      return { ...p, quantity: computedQty, in_transit: totalInTransit };
     });
+
+    // Recalcular productWarehouse.quantity desde movements con warehouse_id
+    const qtyPerWarehouse = new Map<string, number>();
+    for (const m of effectiveMovements) {
+      if (!(m as any).warehouse_id) continue;
+      const key = `${m.product_id}::${(m as any).warehouse_id}`;
+      const current = qtyPerWarehouse.get(key) || 0;
+      if (m.type === 'ENTRADA') qtyPerWarehouse.set(key, current + Number(m.quantity));
+      else if (m.type === 'SALIDA' || m.type === 'MERMA') qtyPerWarehouse.set(key, current - Number(m.quantity));
+      else if (m.type === 'AJUSTE') qtyPerWarehouse.set(key, current + Number(m.quantity));
+    }
 
     const effectiveProductWarehouse = productWarehouseData ?? currentState.productWarehouse;
     const productWarehouseWithTransit = effectiveProductWarehouse.map((pw: any) => {
       const transitForWarehouse = effectiveTransitItems
         .filter((t: any) => t.product_id === pw.product_id && t.warehouse_id === pw.warehouse_id)
         .reduce((sum: number, t: any) => sum + Number(t.remaining), 0);
-      return { ...pw, in_transit: transitForWarehouse };
+      const key = `${pw.product_id}::${pw.warehouse_id}`;
+      const computedQty = qtyPerWarehouse.has(key)
+        ? Math.max(0, qtyPerWarehouse.get(key)!)
+        : pw.quantity;
+      return { ...pw, quantity: computedQty, in_transit: transitForWarehouse };
     });
 
     set({
       products: productsWithTransit,
-      movements: movementsData ?? currentState.movements,
+      movements: effectiveMovements,
       sales: salesData ?? currentState.sales,
       recipes: recipesData ?? currentState.recipes,
       employees: employeesData ?? currentState.employees,
@@ -833,8 +861,8 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
 
     // Cache solo los grupos que se cargaron exitosamente (no pisar Dexie con nulls)
     cacheAllData({
-      ...(productsData !== null && { products: productsData }),
-      ...(movementsData !== null && { movements: movementsData }),
+      ...(productsData !== null && { products: productsWithTransit }),
+      ...(movementsData !== null && { movements: effectiveMovements }),
       ...(warehousesData !== null && { warehouses: warehousesData }),
       ...(productWarehouseData !== null && { productWarehouse: productWarehouseWithTransit }),
       ...(transitItemsData !== null && { transitItems: transitItemsData }),
