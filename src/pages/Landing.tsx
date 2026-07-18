@@ -59,7 +59,6 @@ export default function Landing() {
     const ctx = gsap.context(() => {
       const heroTl = gsap.timeline({ defaults: { ease: 'power3.out' } });
       heroTl.fromTo('.hero-fade', { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.5, stagger: 0.15 });
-      heroTl.from('.dashboard-mockup', { opacity: 0, y: 40, duration: 0.7, ease: 'expo.out' }, '-=0.15');
 
       document.querySelectorAll('.fade-up').forEach((el) => {
         ScrollTrigger.create({
