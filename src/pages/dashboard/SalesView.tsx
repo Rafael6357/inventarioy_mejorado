@@ -611,10 +611,8 @@ export default function SalesView() {
   };
 
   const handleQuantityChange = (product_id: string, value: string) => {
-    if (value === '') {
-      setCart(current => current.map(item =>
-        item.product_id === product_id ? { ...item, quantity: 1 } : item
-      ));
+    if (value === '' || value === '-' || value === '.' || value === ','
+        || value.endsWith('.') || value.endsWith(',')) {
       return;
     }
     const num = parseFloat(value);
@@ -1170,14 +1168,12 @@ setShowTicket(true);
                         <Minus className="h-3.5 w-3.5" />
                       </button>
                       <input
-                        type="number"
-                        min="0.01"
-                        max={getMaxQuantity(item)}
-                        step="any"
+                        type="text"
+                        inputMode="decimal"
                         value={item.quantity}
                         onChange={(e) => handleQuantityChange(item.product_id, e.target.value)}
                         onBlur={(e) => handleQuantityBlur(item.product_id, e.target.value)}
-                        className="w-14 text-center font-mono text-sm border border-border rounded px-1 py-0.5 bg-bg text-text focus:outline-none focus:ring-1 focus:ring-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        className="w-14 text-center font-mono text-sm border border-border rounded px-1 py-0.5 bg-bg text-text focus:outline-none focus:ring-1 focus:ring-primary"
                       />
                       <button 
                         onClick={() => updateQuantity(item.product_id, 1)}
