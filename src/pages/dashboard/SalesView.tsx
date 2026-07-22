@@ -607,7 +607,9 @@ export default function SalesView() {
     if (item.is_recipe) return 9999;
     const product = products.find(p => p.id === item.product_id);
     if (!product) return 1;
-    return Math.max(0.0001, Number(product.quantity) - Number(product.in_transit || 0));
+    const inTransit = Number(product.in_transit || 0);
+    const quantity = Number(product.quantity || 0);
+    return Math.max(0.0001, inTransit > 0 ? inTransit : quantity);
   };
 
   const handleQuantityChange = (product_id: string, value: string) => {
@@ -615,39 +617,35 @@ export default function SalesView() {
         || value.endsWith('.') || value.endsWith(',')) {
       return;
     }
-    const num = parseFloat(value);
-    if (isNaN(num) || num <= 0) {
-      setCart(current => current.map(item =>
-        item.product_id === product_id ? { ...item, quantity: 1 } : item
-      ));
-      return;
-    }
-    const item = cart.find(c => c.product_id === product_id);
-    if (!item) return;
-    const maxQty = getMaxQuantity(item);
-    const finalQty = Math.min(num, maxQty);
+    const num = parseFloat(value.replace(',', '.'));
+    if (isNaN(num) || num <= 0) return;
     setCart(current => current.map(c =>
-      c.product_id === product_id ? { ...c, quantity: finalQty } : c
+      c.product_id === product_id ? { ...c, quantity: num } : c
     ));
   };
 
   const handleQuantityBlur = (product_id: string, value: string) => {
-    const num = parseFloat(value);
+    const item = cart.find(c => c.product_id === product_id);
+    if (!item) return;
+    const step = getUnitStep(item.unit);
+    const num = parseFloat(value.replace(',', '.'));
     if (value === '' || isNaN(num) || num <= 0) {
-      setCart(current => current.map(item =>
-        item.product_id === product_id ? { ...item, quantity: 1 } : item
+      setCart(current => current.map(c =>
+        c.product_id === product_id ? { ...c, quantity: step } : c
       ));
       return;
     }
-    const item = cart.find(c => c.product_id === product_id);
-    if (!item) return;
     const maxQty = getMaxQuantity(item);
     if (num > maxQty) {
       toast.warning(`Stock máximo disponible: ${maxQty}`);
       setCart(current => current.map(c =>
         c.product_id === product_id ? { ...c, quantity: maxQty } : c
       ));
+      return;
     }
+    setCart(current => current.map(c =>
+      c.product_id === product_id ? { ...c, quantity: num } : c
+    ));
   };
 
   const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
