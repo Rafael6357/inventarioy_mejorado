@@ -152,6 +152,7 @@ export default function SalesView() {
   const [editingItem, setEditingItem] = useState<any>(null);
   const [showEditItemModal, setShowEditItemModal] = useState(false);
   const [editItemQuantity, setEditItemQuantity] = useState<number>(1);
+  const [rawInputValues, setRawInputValues] = useState<Record<string, string>>({});
 
   const toggleAccountExpansion = (accountId: string) => {
     setExpandedAccounts(prev => {
@@ -573,6 +574,11 @@ export default function SalesView() {
             : c
         );
       }
+      setRawInputValues(prev => {
+        const next = { ...prev };
+        delete next[item.id];
+        return next;
+      });
       return [...current, {
         product_id: item.id,
         name: item.name,
@@ -601,6 +607,11 @@ export default function SalesView() {
 
   const removeFromCart = (product_id: string) => {
     setCart(current => current.filter(item => item.product_id !== product_id));
+    setRawInputValues(prev => {
+      const next = { ...prev };
+      delete next[product_id];
+      return next;
+    });
   };
 
   const getMaxQuantity = (item: typeof cart[0]): number => {
@@ -613,18 +624,15 @@ export default function SalesView() {
   };
 
   const handleQuantityChange = (product_id: string, value: string) => {
-    if (value === '' || value === '-' || value === '.' || value === ','
-        || value.endsWith('.') || value.endsWith(',')) {
-      return;
-    }
-    const num = parseFloat(value.replace(',', '.'));
-    if (isNaN(num) || num <= 0) return;
-    setCart(current => current.map(c =>
-      c.product_id === product_id ? { ...c, quantity: num } : c
-    ));
+    setRawInputValues(prev => ({ ...prev, [product_id]: value }));
   };
 
   const handleQuantityBlur = (product_id: string, value: string) => {
+    setRawInputValues(prev => {
+      const next = { ...prev };
+      delete next[product_id];
+      return next;
+    });
     const item = cart.find(c => c.product_id === product_id);
     if (!item) return;
     const step = getUnitStep(item.unit);
@@ -1160,7 +1168,14 @@ setShowTicket(true);
                     
                     <div className="flex items-center gap-1">
                       <button 
-                        onClick={() => updateQuantity(item.product_id, -1)}
+                        onClick={() => {
+                          setRawInputValues(prev => {
+                            const next = { ...prev };
+                            delete next[item.product_id];
+                            return next;
+                          });
+                          updateQuantity(item.product_id, -1);
+                        }}
                         className="rounded-md bg-surface-hover p-1.5 text-text hover:bg-border transition-colors"
                       >
                         <Minus className="h-3.5 w-3.5" />
@@ -1168,13 +1183,20 @@ setShowTicket(true);
                       <input
                         type="text"
                         inputMode="decimal"
-                        value={item.quantity}
+                        value={rawInputValues[item.product_id] ?? item.quantity}
                         onChange={(e) => handleQuantityChange(item.product_id, e.target.value)}
                         onBlur={(e) => handleQuantityBlur(item.product_id, e.target.value)}
                         className="w-14 text-center font-mono text-sm border border-border rounded px-1 py-0.5 bg-bg text-text focus:outline-none focus:ring-1 focus:ring-primary"
                       />
                       <button 
-                        onClick={() => updateQuantity(item.product_id, 1)}
+                        onClick={() => {
+                          setRawInputValues(prev => {
+                            const next = { ...prev };
+                            delete next[item.product_id];
+                            return next;
+                          });
+                          updateQuantity(item.product_id, 1);
+                        }}
                         className="rounded-md bg-surface-hover p-1.5 text-text hover:bg-border transition-colors"
                       >
                         <Plus className="h-3.5 w-3.5" />
