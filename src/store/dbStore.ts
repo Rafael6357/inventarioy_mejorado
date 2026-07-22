@@ -4674,13 +4674,17 @@ async function restoreFromCache(userId: string) {
     isLoading: false,
   });
 
-  await replayPendingSyncQueue(useDatabaseStore.setState, useDatabaseStore.getState);
+  // Solo ejecutar replay del sync queue si hay conexión.
+  // Offline los datos de Dexie ya están en su estado final; el replay
+  // causaría doble consumo de transitItems y parpadeo a 0 en la UI.
+  if (navigator.onLine) {
+    await replayPendingSyncQueue(useDatabaseStore.setState, useDatabaseStore.getState);
 
-  // Defensa: asegurar que transitItems no se perdieron durante el replay
-  const postReplayTransit = useDatabaseStore.getState().transitItems;
-  if (transitItems.length > 0 && postReplayTransit.length === 0) {
-    logger.warn('⚠️ replayPendingSyncQueue eliminó transitItems — restaurando...');
-    useDatabaseStore.setState({ transitItems });
-    try { await db.transitItems.bulkPut(transitItems).catch(() => {}); } catch {}
+    const postReplayTransit = useDatabaseStore.getState().transitItems;
+    if (transitItems.length > 0 && postReplayTransit.length === 0) {
+      logger.warn('⚠️ replayPendingSyncQueue eliminó transitItems — restaurando...');
+      useDatabaseStore.setState({ transitItems });
+      try { await db.transitItems.bulkPut(transitItems).catch(() => {}); } catch {}
+    }
   }
 }

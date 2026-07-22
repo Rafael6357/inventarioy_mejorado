@@ -46,6 +46,19 @@ function showPaymentClampWarning(raw: number, clamped: number) {
   }
 }
 
+function getUnitStep(unit: string | undefined): number {
+  if (!unit) return 1;
+  const u = unit.trim().toLowerCase();
+  if (u === 'u' || u === 'und' || u === 'unidad' || u === 'unidades' || u === 'pz' || u === 'pza' || u === 'pzas' || u === 'pieza' || u === 'piezas') {
+    return 1;
+  }
+  return 0.01;
+}
+
+function getUnitMin(unit: string | undefined): number {
+  return getUnitStep(unit) === 1 ? 1 : 0.001;
+}
+
 export default function SalesView() {
   const { user } = useAuthStore();
   const { products, recipes, employees, sales, dailyClosings, pendingAccounts, transitItems, addSale, createDailyClosing, getDailyClosings, createPendingAccount, addItemsToPendingAccount, chargePendingAccount, getPendingAccounts, togglePendingAccountType, updatePendingAccountItems, logAction, forceRefreshData, syncQueueCount, refreshSyncQueueCount } = useDatabaseStore();
@@ -552,17 +565,18 @@ export default function SalesView() {
   const addToCart = (item: any) => {
     setCart(current => {
       const existing = current.find(c => c.product_id === item.id);
+      const step = getUnitStep(item.unit);
       if (existing) {
         return current.map(c => 
           c.product_id === item.id 
-            ? { ...c, quantity: c.quantity + 1 }
+            ? { ...c, quantity: c.quantity + step }
             : c
         );
       }
       return [...current, {
         product_id: item.id,
         name: item.name,
-        quantity: 1,
+        quantity: step,
         price: item.price,
         cost: item.cost,
         unit: item.unit,
@@ -575,7 +589,10 @@ export default function SalesView() {
   const updateQuantity = (product_id: string, delta: number) => {
     setCart(current => current.map(item => {
       if (item.product_id === product_id) {
-        const newQty = Math.max(1, item.quantity + delta);
+        const unitStep = getUnitStep(item.unit);
+        const minQty = getUnitMin(item.unit);
+        const effectiveDelta = Math.abs(delta) === 1 ? Math.sign(delta) * unitStep : delta;
+        const newQty = Math.max(minQty, item.quantity + effectiveDelta);
         return { ...item, quantity: newQty };
       }
       return item;
@@ -590,7 +607,7 @@ export default function SalesView() {
     if (item.is_recipe) return 9999;
     const product = products.find(p => p.id === item.product_id);
     if (!product) return 1;
-    return Math.max(1, Math.floor(Number(product.quantity) - Number(product.in_transit || 0)));
+    return Math.max(0.0001, Number(product.quantity) - Number(product.in_transit || 0));
   };
 
   const handleQuantityChange = (product_id: string, value: string) => {
@@ -2294,26 +2311,37 @@ setShowTicket(true);
             <p className="text-sm text-text-secondary mb-4">
               {editingItem?.name || editingItem?.product_name}
             </p>
-            <div className="space-y-4">
+              <div className="space-y-4">
               <div className="flex items-center justify-center gap-4">
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={() => setEditItemQuantity(Math.max(1, editItemQuantity - 1))}
+                  onClick={() => {
+                    const editingItemUnit = editingItem?.product_id ? products.find(p => p.id === editingItem.product_id)?.unit : undefined;
+                    const step = getUnitStep(editingItemUnit);
+                    setEditItemQuantity(Math.max(0.001, editItemQuantity - step));
+                  }}
                 >
                   <Minus className="h-4 w-4" />
                 </Button>
                 <Input
                   type="number"
-                  min="1"
+                  min="0.001"
                   value={editItemQuantity}
-                  onChange={(e) => setEditItemQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    setEditItemQuantity(isNaN(val) || val <= 0 ? 0.001 : val);
+                  }}
                   className="w-20 text-center text-lg"
                 />
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={() => setEditItemQuantity(editItemQuantity + 1)}
+                  onClick={() => {
+                    const editingItemUnit = editingItem?.product_id ? products.find(p => p.id === editingItem.product_id)?.unit : undefined;
+                    const step = getUnitStep(editingItemUnit);
+                    setEditItemQuantity(editItemQuantity + step);
+                  }}
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
