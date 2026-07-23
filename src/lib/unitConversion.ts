@@ -87,11 +87,11 @@ export function convertUnit(
   const fromType = getUnitType(fromUnit);
   const toType = getUnitType(toUnit);
 
-  if (fromType !== toType) {
-    throw new Error(`No se puede convertir de ${fromUnit} a ${toUnit}: unidades incompatibles`);
+  if (!fromType || !toType || fromType !== toType) {
+    return Number(value.toFixed(precision));
   }
 
-  const lookup = UNIT_CONVERSIONS[fromType!];
+  const lookup = UNIT_CONVERSIONS[fromType];
   const baseValue = value * lookup[fromUnit as keyof typeof lookup];
   const convertedValue = baseValue / lookup[toUnit as keyof typeof lookup];
 

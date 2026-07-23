@@ -640,8 +640,8 @@ export default function SalesView() {
     if (!item) return;
     const step = getUnitStep(item.unit, item.is_recipe);
     const numRaw = parseFloat(value.replace(',', '.'));
-    const num = item.displayUnit && item.displayUnit !== item.unit
-      ? convertUnit(numRaw, item.displayUnit, item.unit)
+    const num = item.displayUnit && normalizeUnit(item.displayUnit) !== normalizeUnit(item.unit)
+      ? convertUnit(numRaw, normalizeUnit(item.displayUnit), normalizeUnit(item.unit))
       : numRaw;
     if (value === '' || isNaN(numRaw) || numRaw <= 0) {
       setCart(current => current.map(c =>
@@ -1162,10 +1162,11 @@ setShowTicket(true);
             <div className="space-y-2">
               {cart.map(item => {
                 const baseUnit = normalizeUnit(item.unit);
+                const displayUnit = normalizeUnit(item.displayUnit || item.unit);
                 const unitType = getUnitType(baseUnit);
                 const compatibleUnits = unitType ? getCompatibleUnits(baseUnit).filter(u => u !== 'u' && u !== 'sac' && u !== 'lat') : [];
-                const displayQuant = item.displayUnit && item.displayUnit !== item.unit
-                  ? convertUnit(item.quantity, item.unit, item.displayUnit)
+                const displayQuant = baseUnit !== displayUnit && getUnitType(displayUnit)
+                  ? convertUnit(item.quantity, baseUnit, displayUnit)
                   : item.quantity;
                 return (
                 <div key={item.product_id} className="rounded-lg border border-border bg-bg p-2 sm:p-3 space-y-2">
@@ -1220,9 +1221,9 @@ setShowTicket(true);
                       
                       {compatibleUnits.length > 1 && (
                         <select
-                          value={item.displayUnit || item.unit}
+                          value={displayUnit}
                           onChange={(e) => {
-                            const newUnit = e.target.value;
+                            const newUnit = normalizeUnit(e.target.value);
                             setRawInputValues(prev => {
                               const next = { ...prev };
                               delete next[item.product_id];
