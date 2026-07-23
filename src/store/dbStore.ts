@@ -1940,14 +1940,14 @@ addProduct: async (product) => {
         return { success: false, error: 'No habia suficiente cantidad en transito' };
       }
       const consumedQty = consumptionItems.reduce((s, c) => s + c.quantity, 0);
+      const updatedTransitItems = state.transitItems
+        .map(t => {
+          const ci = consumptionItems.find(c => c.transitItemId === t.id);
+          if (ci) return { ...t, remaining: Math.max(0, t.remaining - ci.quantity), consumed: (t.consumed || 0) + ci.quantity };
+          return t;
+        });
       set((state) => ({
-        transitItems: state.transitItems
-          .map(t => {
-            const ci = consumptionItems.find(c => c.transitItemId === t.id);
-            if (ci) return { ...t, remaining: Math.max(0, t.remaining - ci.quantity), consumed: (t.consumed || 0) + ci.quantity };
-            return t;
-          })
-          .filter(t => t.remaining > 0),
+        transitItems: updatedTransitItems.filter(t => t.remaining > 0),
         products: state.products.map(p =>
           p.id === productId ? { ...p, in_transit: Math.max(0, Number(p.in_transit || 0) - consumedQty) } : p
         ),
@@ -1960,7 +1960,7 @@ addProduct: async (product) => {
       }
       get().refreshSyncQueueCount();
       try {
-        await db.transitItems.bulkPut(get().transitItems).catch(() => {});
+        await db.transitItems.bulkPut(updatedTransitItems).catch(() => {});
         await db.products.bulkPut(get().products).catch(() => {});
       } catch {}
       return { success: true };

@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { validateNumber, getNumberFromString, exportToExcel } from '../../lib/utils';
 import { isDateClosed } from '../../lib/dateUtils';
 import { syncEngine } from '../../lib/syncEngine';
+import { convertUnit, getCompatibleUnits, getUnitType, normalizeUnit, UNIT_LABELS, type UnitAbbrev } from '../../lib/unitConversion';
 import TicketView from './TicketView';
 
 type PaymentField = 'efectivo' | 'transferencia' | 'usd' | 'eur';
@@ -46,7 +47,8 @@ function showPaymentClampWarning(raw: number, clamped: number) {
   }
 }
 
-function getUnitStep(unit: string | undefined): number {
+function getUnitStep(unit: string | undefined, isRecipe?: boolean): number {
+  if (isRecipe) return 1;
   if (!unit) return 1;
   const u = unit.trim().toLowerCase();
   if (u === 'u' || u === 'und' || u === 'unidad' || u === 'unidades' || u === 'pz' || u === 'pza' || u === 'pzas' || u === 'pieza' || u === 'piezas') {
@@ -55,8 +57,8 @@ function getUnitStep(unit: string | undefined): number {
   return 0.01;
 }
 
-function getUnitMin(unit: string | undefined): number {
-  return getUnitStep(unit) === 1 ? 1 : 0.001;
+function getUnitMin(unit: string | undefined, isRecipe?: boolean): number {
+  return getUnitStep(unit, isRecipe) === 1 ? 1 : 0.001;
 }
 
 export default function SalesView() {
@@ -566,7 +568,7 @@ export default function SalesView() {
   const addToCart = (item: any) => {
     setCart(current => {
       const existing = current.find(c => c.product_id === item.id);
-      const step = getUnitStep(item.unit);
+      const step = getUnitStep(item.unit, item.is_recipe);
       if (existing) {
         return current.map(c => 
           c.product_id === item.id 
@@ -586,6 +588,7 @@ export default function SalesView() {
         price: item.price,
         cost: item.cost,
         unit: item.unit,
+        displayUnit: normalizeUnit(item.unit) || item.unit,
         is_recipe: item.is_recipe,
         recipe_snapshot: item.recipe_snapshot
       }];
@@ -595,8 +598,8 @@ export default function SalesView() {
   const updateQuantity = (product_id: string, delta: number) => {
     setCart(current => current.map(item => {
       if (item.product_id === product_id) {
-        const unitStep = getUnitStep(item.unit);
-        const minQty = getUnitMin(item.unit);
+        const unitStep = getUnitStep(item.unit, item.is_recipe);
+        const minQty = getUnitMin(item.unit, item.is_recipe);
         const effectiveDelta = Math.abs(delta) === 1 ? Math.sign(delta) * unitStep : delta;
         const newQty = Math.max(minQty, item.quantity + effectiveDelta);
         return { ...item, quantity: newQty };
@@ -635,24 +638,30 @@ export default function SalesView() {
     });
     const item = cart.find(c => c.product_id === product_id);
     if (!item) return;
-    const step = getUnitStep(item.unit);
-    const num = parseFloat(value.replace(',', '.'));
-    if (value === '' || isNaN(num) || num <= 0) {
+    const step = getUnitStep(item.unit, item.is_recipe);
+    const numRaw = parseFloat(value.replace(',', '.'));
+    const num = item.displayUnit && item.displayUnit !== item.unit
+      ? convertUnit(numRaw, item.displayUnit, item.unit)
+      : numRaw;
+    if (value === '' || isNaN(numRaw) || numRaw <= 0) {
       setCart(current => current.map(c =>
         c.product_id === product_id ? { ...c, quantity: step } : c
       ));
       return;
     }
+    const clamped = item.is_recipe ? Math.round(num) : num;
     const maxQty = getMaxQuantity(item);
-    if (num > maxQty) {
-      toast.warning(`Stock máximo disponible: ${maxQty}`);
+    const finalQty = clamped > maxQty ? maxQty : clamped;
+    if (clamped !== num || finalQty !== num || numRaw !== num) {
+      if (clamped !== num && item.is_recipe) toast.warning('Las recetas se venden en unidades enteras');
+      else if (finalQty !== num) toast.warning(`Stock máximo disponible: ${maxQty}`);
       setCart(current => current.map(c =>
-        c.product_id === product_id ? { ...c, quantity: maxQty } : c
+        c.product_id === product_id ? { ...c, quantity: Math.max(step, finalQty) } : c
       ));
       return;
     }
     setCart(current => current.map(c =>
-      c.product_id === product_id ? { ...c, quantity: num } : c
+      c.product_id === product_id ? { ...c, quantity: finalQty } : c
     ));
   };
 
@@ -1151,7 +1160,14 @@ setShowTicket(true);
             </div>
           ) : (
             <div className="space-y-2">
-              {cart.map(item => (
+              {cart.map(item => {
+                const baseUnit = normalizeUnit(item.unit);
+                const unitType = getUnitType(baseUnit);
+                const compatibleUnits = unitType ? getCompatibleUnits(baseUnit).filter(u => u !== 'u' && u !== 'sac' && u !== 'lat') : [];
+                const displayQuant = item.displayUnit && item.displayUnit !== item.unit
+                  ? convertUnit(item.quantity, item.unit, item.displayUnit)
+                  : item.quantity;
+                return (
                 <div key={item.product_id} className="rounded-lg border border-border bg-bg p-2 sm:p-3 space-y-2">
                   <div className="flex items-start justify-between gap-2">
                     <h4 className="font-medium text-text text-sm leading-tight flex-1 text-center" title={item.name}>{item.name}</h4>
@@ -1183,7 +1199,7 @@ setShowTicket(true);
                       <input
                         type="text"
                         inputMode="decimal"
-                        value={rawInputValues[item.product_id] ?? item.quantity}
+                        value={rawInputValues[item.product_id] ?? displayQuant}
                         onChange={(e) => handleQuantityChange(item.product_id, e.target.value)}
                         onBlur={(e) => handleQuantityBlur(item.product_id, e.target.value)}
                         className="w-14 text-center font-mono text-sm border border-border rounded px-1 py-0.5 bg-bg text-text focus:outline-none focus:ring-1 focus:ring-primary"
@@ -1201,6 +1217,28 @@ setShowTicket(true);
                       >
                         <Plus className="h-3.5 w-3.5" />
                       </button>
+                      
+                      {compatibleUnits.length > 1 && (
+                        <select
+                          value={item.displayUnit || item.unit}
+                          onChange={(e) => {
+                            const newUnit = e.target.value;
+                            setRawInputValues(prev => {
+                              const next = { ...prev };
+                              delete next[item.product_id];
+                              return next;
+                            });
+                            setCart(current => current.map(c =>
+                              c.product_id === item.product_id ? { ...c, displayUnit: newUnit } : c
+                            ));
+                          }}
+                          className="text-xs rounded border border-border bg-bg px-1 py-1 text-text-secondary hover:border-primary/50 focus:outline-none focus:border-primary"
+                        >
+                          {compatibleUnits.map(u => (
+                            <option key={u} value={u}>{UNIT_LABELS[u]}</option>
+                          ))}
+                        </select>
+                      )}
                     </div>
                     
                     <div className="text-right font-mono font-medium text-sm shrink-0">
@@ -1208,7 +1246,7 @@ setShowTicket(true);
                     </div>
                   </div>
                 </div>
-              ))}
+              );})}
             </div>
           )}
         </div>
@@ -2333,8 +2371,9 @@ setShowTicket(true);
                   variant="outline"
                   size="icon"
                   onClick={() => {
-                    const editingItemUnit = editingItem?.product_id ? products.find(p => p.id === editingItem.product_id)?.unit : undefined;
-                    const step = getUnitStep(editingItemUnit);
+                    const editingItemProduct = editingItem?.product_id ? products.find(p => p.id === editingItem.product_id) : undefined;
+                    const editingItemUnit = editingItemProduct?.unit;
+                    const step = getUnitStep(editingItemUnit, editingItemProduct?.is_recipe);
                     setEditItemQuantity(Math.max(0.001, editItemQuantity - step));
                   }}
                 >
@@ -2354,8 +2393,9 @@ setShowTicket(true);
                   variant="outline"
                   size="icon"
                   onClick={() => {
-                    const editingItemUnit = editingItem?.product_id ? products.find(p => p.id === editingItem.product_id)?.unit : undefined;
-                    const step = getUnitStep(editingItemUnit);
+                    const editingItemProduct = editingItem?.product_id ? products.find(p => p.id === editingItem.product_id) : undefined;
+                    const editingItemUnit = editingItemProduct?.unit;
+                    const step = getUnitStep(editingItemUnit, editingItemProduct?.is_recipe);
                     setEditItemQuantity(editItemQuantity + step);
                   }}
                 >
