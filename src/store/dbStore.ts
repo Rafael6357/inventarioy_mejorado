@@ -1946,7 +1946,7 @@ addProduct: async (product) => {
         return { success: false, error: 'No habia suficiente cantidad en transito' };
       }
       const consumedQty = consumptionItems.reduce((s, c) => s + c.quantity, 0);
-      const updatedTransitItems = state.transitItems
+      const updatedTransitItems = get().transitItems
         .map(t => {
           const ci = consumptionItems.find(c => c.transitItemId === t.id);
           if (ci) return { ...t, remaining: Math.max(0, t.remaining - ci.quantity), consumed: (t.consumed || 0) + ci.quantity };
