@@ -1817,8 +1817,7 @@ addProduct: async (product) => {
               remainingLocal -= toConsume;
               consumedLocal += toConsume;
               return { ...t, remaining: t.remaining - toConsume, consumed: (t.consumed || 0) + toConsume };
-            })
-            .filter(t => t.remaining > 0);
+            });
           const newInTransit = Math.max(0, Number(state.products.find(p => p.id === ci.productId)?.in_transit || 0) - consumedLocal);
           return {
             transitItems: updatedTransitItems,
@@ -1828,7 +1827,14 @@ addProduct: async (product) => {
           };
         });
       }
-      try { await db.transitItems.bulkPut(get().transitItems).catch(() => {}); } catch {}
+      const unfilteredTransitItems = get().transitItems;
+      set((state) => ({
+        transitItems: state.transitItems.filter(t => t.remaining > 0)
+      }));
+      try {
+        await db.transitItems.bulkPut(unfilteredTransitItems).catch(() => {});
+        await db.products.bulkPut(get().products).catch(() => {});
+      } catch {}
       await addToSyncQueue({ operation: 'addSale', table: 'sales', payload: { sale: tempSale, sale_items: saleItems, tempId, itemsToConsume } });
       get().refreshSyncQueueCount();
       toast.success('Venta guardada localmente (sin conexión)');
