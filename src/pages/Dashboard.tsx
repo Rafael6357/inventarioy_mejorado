@@ -426,7 +426,7 @@ export default function Dashboard() {
                   <item.icon className={`h-5 w-5 ${isActive ? 'text-primary drop-shadow-[0_0_8px_rgba(255,193,7,0.5)]' : 'text-text-secondary'}`} />
                   {item.name}
                   {isOfflineLimited && (
-                    <WifiOff className="h-3.5 w-3.5 text-warning ml-auto" title="Funciones limitadas sin conexión" aria-label="Funciones limitadas sin conexión" />
+                    <WifiOff className="h-3.5 w-3.5 text-warning ml-auto" aria-label="Funciones limitadas sin conexión" />
                   )}
                   {isExclusive && <Crown className="h-3 w-3 text-warning ml-auto" />}
                 </Link>

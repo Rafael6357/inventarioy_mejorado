@@ -14,6 +14,7 @@ export type SyncOperation =
   | 'cancelTransit' | 'registerWasteFromTransit' | 'registerManualConsumption'
   | 'createPendingAccount' | 'deletePendingAccount'
   | 'markPendingAccountPaid'
+  | 'chargePendingAccount'
   | 'addItemsToPendingAccount' | 'updatePendingAccountItems' | 'togglePendingAccountType' | 'updatePendingAccount'
   | 'justifyMovement'
   | 'updateAccessPinAttempts'

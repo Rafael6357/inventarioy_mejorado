@@ -300,15 +300,30 @@ class SyncEngine {
           case 'addSale': {
             const { sale: saleData, sale_items: saleItems } = item.payload;
             const { id: _tempId, ...saleInsert } = saleData;
-            const { data: newSale, error: se } = await supabase.from('sales').insert(saleInsert).select().single();
-            if (se) throw se;
+
+            const { data: existingSale } = await supabase
+              .from('sales').select('id').eq('id', _tempId).maybeSingle();
+
+            let saleId: string;
+            if (existingSale) {
+              saleId = existingSale.id;
+            } else {
+              const { data: newSale, error: se } = await supabase.from('sales').insert({ ...saleInsert, id: _tempId }).select('id').single();
+              if (se) throw se;
+              saleId = newSale.id;
+            }
+
             if (saleItems?.length) {
-              const itemsWithRealId = saleItems.map((si: any) => {
-                const { product_name, ...cleanSi } = si;
-                return { ...cleanSi, sale_id: newSale.id };
-              });
-              const { error: sie } = await supabase.from('sale_items').insert(itemsWithRealId);
-              if (sie) throw sie;
+              const { data: existingItems } = await supabase
+                .from('sale_items').select('id').eq('sale_id', saleId).limit(1);
+              if (!existingItems?.length) {
+                const itemsWithRealId = saleItems.map((si: any) => {
+                  const { product_name, ...cleanSi } = si;
+                  return { ...cleanSi, sale_id: saleId };
+                });
+                const { error: sie } = await supabase.from('sale_items').insert(itemsWithRealId);
+                if (sie) throw sie;
+              }
             }
             const consumptionItems = item.payload.itemsToConsume || [];
             for (const ci of consumptionItems) {
@@ -343,10 +358,11 @@ class SyncEngine {
                   in_transit: newInTransit 
                 }).eq('id', ci.productId);
               }
-              await supabase.from('movements').insert({
+              const { error: me } = await supabase.from('movements').insert({
                 user_id: saleInsert.user_id, product_id: ci.productId, type: 'SALIDA', quantity: ci.qtyNeeded, date: new Date().toISOString(),
-                reason: `Venta #${newSale.id.slice(0, 8)}`, status: 'NORMAL',
-              }).maybeSingle();
+                reason: `Venta #${saleId.slice(0, 8)}`, status: 'NORMAL',
+              });
+              if (me) throw me;
             }
             const itemsCount = item.payload.items?.length || (item.payload.sale?.items?.length) || 1;
             await store.logAction('sales', 'CREAR', { items: itemsCount, type: item.payload.saleType || item.payload.sale_type || 'venta' }).catch(() => {});
@@ -374,9 +390,10 @@ class SyncEngine {
                 await supabase.from('product_warehouse').update({ quantity: Number(existingPW.quantity) + quantity, updated_at: new Date().toISOString() }).eq('id', existingPW.id);
               }
             }
-            await supabase.from('movements').insert({
+            const { error: me2 } = await supabase.from('movements').insert({
               user_id: userId, product_id: productId, type: 'ENTRADA', quantity, date: new Date().toISOString(), reason: `Devolución de tránsito: ${reason}`, status: 'NORMAL',
-            }).maybeSingle();
+            });
+            if (me2) throw me2;
             await store.logAction('transit', 'CANCELAR_TRANSITO', { transitItemId: item.payload.transitItemId, productId: item.payload.productId, quantity: item.payload.quantity }).catch(() => {});
             break;
           }
@@ -390,9 +407,10 @@ class SyncEngine {
             const newInTransit = prod ? Math.max(0, Number(prod.in_transit || 0) - quantity) : 0;
             const { error: pe } = await supabase.from('products').update({ in_transit: newInTransit }).eq('id', productId);
             if (pe) throw pe;
-            await supabase.from('movements').insert({
+            const { error: me3 } = await supabase.from('movements').insert({
               user_id: userId, product_id: productId, type: 'MERMA', quantity, date: new Date().toISOString(), reason: `Merma en tránsito: ${reason}`, status: 'NORMAL',
-            }).maybeSingle();
+            });
+            if (me3) throw me3;
             await store.logAction('transit', 'MERMA_TRANSITO', { transitItemId: item.payload.transitItemId, productId: item.payload.productId, quantity: item.payload.quantity }).catch(() => {});
             break;
           }
@@ -408,9 +426,10 @@ class SyncEngine {
             const { error: pe } = await supabase.from('products').update({ in_transit: newInTransit }).eq('id', productId);
             if (pe) throw pe;
             const isGastoVariable = false;
-            await supabase.from('movements').insert({
+            const { error: me4 } = await supabase.from('movements').insert({
               user_id: userId, product_id: productId, type: 'SALIDA', quantity, date: new Date().toISOString(), reason: note ? `Consumo manual desde tránsito: ${note}` : 'Consumo manual desde tránsito', is_consumo_directo: !isGastoVariable, status: 'NORMAL',
-            }).maybeSingle();
+            });
+            if (me4) throw me4;
             await store.logAction('transit', 'CONSUMO_MANUAL', { transitItemId: item.payload.transitItemId, productId: item.payload.productId, quantity: item.payload.quantity }).catch(() => {});
             break;
           }

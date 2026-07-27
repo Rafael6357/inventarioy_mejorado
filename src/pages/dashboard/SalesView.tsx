@@ -491,6 +491,7 @@ export default function SalesView() {
     price: number;
     cost: number;
     unit: string;
+    displayUnit?: string;
     is_recipe?: boolean;
     recipe_snapshot?: {
       name: string;

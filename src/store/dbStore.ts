@@ -11,6 +11,7 @@ import { normalizeStr } from '../lib/utils';
 import { trackLocalCreation, untrackLocalCreation } from '../lib/realtimeGuard';
 
 let _isFetchingAll = false;
+let _isConsumingTransit = false;
 
 let _movementLock: Promise<void> = Promise.resolve();
 
@@ -697,7 +698,7 @@ export const useDatabaseStore = create<DatabaseState>()((set, get) => ({
       logger.info('📥 Cargando datos principales...');
       const [productsRes, movementsRes] = await Promise.all([
         queryWithRetry(() => supabase.from('products').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(limit)),
-        queryWithRetry(() => supabase.from('movements').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(limit)),
+        queryWithRetry(() => supabase.from('movements').select('*').eq('user_id', user.id).order('created_at', { ascending: false })),
       ]);
       productsData = productsRes.data || [];
       movementsData = movementsRes.data || [];
@@ -1808,7 +1809,7 @@ addProduct: async (product) => {
         set((state) => {
           let remainingLocal = ci.qtyNeeded;
           let consumedLocal = 0;
-          const updatedTransitItems = state.transitItems
+          const updatedTransitItems = [...state.transitItems]
             .sort((a, b) => new Date(a.sent_date).getTime() - new Date(b.sent_date).getTime())
             .map(t => {
               if (t.product_id !== ci.productId || t.remaining <= 0) return t;
@@ -1889,6 +1890,8 @@ addProduct: async (product) => {
 
       if (itemsError) {
         logger.error('Error adding sale items:', itemsError);
+        try { await supabase.from('sales').delete().eq('id', newSale.id); } catch {}
+        return { success: false, error: 'Error al registrar los ítems de la venta' };
       }
 
       for (const item of sale.items) {
@@ -1925,6 +1928,10 @@ addProduct: async (product) => {
 
     const product = get().products.find(p => p.id === productId);
     if (!product) return { success: false, error: 'Producto no encontrado' };
+
+    if (_isConsumingTransit) return { success: false, error: 'Ya hay un consumo en progreso, espere un momento' };
+    _isConsumingTransit = true;
+    try {
 
     let remaining = qtyNeeded;
     const transitItemsForProduct = get().transitItems
@@ -1973,7 +1980,11 @@ addProduct: async (product) => {
     }
 
     try {
-      const updatePromises: Promise<void>[] = [];
+      const totalAvailable = transitItemsForProduct.reduce((sum, item) => sum + item.remaining, 0);
+      if (totalAvailable < qtyNeeded) {
+        return { success: false, error: 'No habia suficiente cantidad en transito' };
+      }
+
       for (const item of transitItemsForProduct) {
         if (remaining <= 0) break;
 
@@ -1983,21 +1994,17 @@ addProduct: async (product) => {
         remaining -= toConsume;
         updatedItems.push({ id: item.id, newRemaining, newConsumed, toConsume });
 
-        updatePromises.push(
-          withTimeout(
-            Promise.resolve(
-              supabase
-                .from('transit_items')
-                .update({ remaining: newRemaining, consumed: newConsumed, updated_at: new Date().toISOString() })
-                .eq('id', item.id)
-            ),
-            10000
-          ).then(({ error }: any) => {
-            if (error) throw new Error('No se pudo actualizar el item en tránsito');
-          })
+        const { error: te } = await withTimeout(
+          Promise.resolve(
+            supabase
+              .from('transit_items')
+              .update({ remaining: newRemaining, consumed: newConsumed, updated_at: new Date().toISOString() })
+              .eq('id', item.id)
+          ),
+          10000
         );
+        if (te) throw new Error('No se pudo actualizar el item en tránsito');
       }
-      await Promise.all(updatePromises);
 
       if (remaining > 0) {
         return { success: false, error: 'No habia suficiente cantidad en transito' };
@@ -2078,6 +2085,9 @@ addProduct: async (product) => {
     } catch (error: any) {
       logger.error('Error en consumeFromTransit:', error);
       return { success: false, error: error.message || 'Error al consumir de tránsito' };
+    }
+    } finally {
+      _isConsumingTransit = false;
     }
   },
 
