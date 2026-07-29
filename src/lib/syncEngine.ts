@@ -1,4 +1,4 @@
-import { getPendingSyncItems, removeSyncItem, updateSyncItemStatus, addToSyncQueue, getSyncQueueCount, getFailedSyncItems } from './dexieDb';
+import { getPendingSyncItems, removeSyncItem, updateSyncItemStatus, addToSyncQueue, getSyncQueueCount, getFailedSyncItems, cleanSyncLog } from './dexieDb';
 import type { SyncQueueItem } from './dexieDb';
 import { useDatabaseStore } from '../store/dbStore';
 import { supabase } from './supabase';
@@ -108,16 +108,16 @@ class SyncEngine {
       }
 
       const syncedCount = this.processedItems;
-      const remaining = await getPendingSyncItems();
       const store = useDatabaseStore.getState();
       store.refreshSyncQueueCount();
       try {
         if (navigator.onLine) await store.fetchAll();
       } catch { }
-      if (remaining.length === 0 && syncedCount > 0) {
+      const remaining = await getSyncQueueCount();
+      if (remaining === 0 && syncedCount > 0) {
         this.emit('synced', { count: syncedCount, total: this.totalItems });
       }
-      if (remaining.length > 0) {
+      if (remaining > 0) {
         setTimeout(() => this.processQueue(), 0);
       }
     } catch (error: any) {
@@ -135,6 +135,7 @@ class SyncEngine {
     if (navigator.onLine) {
       setTimeout(() => this.retryFailed(), 1000);
     }
+    cleanSyncLog().catch(() => {});
   }
 
   private async processItem(item: SyncQueueItem): Promise<boolean> {

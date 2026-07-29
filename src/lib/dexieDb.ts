@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
+import { toast } from 'sonner';
 import type {
   Product, Movement, Warehouse, ProductWarehouse,
   TransitItem, Sale, Recipe, PendingAccount, DailyClosing,
@@ -210,13 +211,21 @@ export async function getCachedProductWarehouse(): Promise<ProductWarehouse[]> {
   return db.productWarehouse.toArray();
 }
 
-export function addToSyncQueue(item: Omit<SyncQueueItem, 'id' | 'created_at' | 'status' | 'retries'>) {
-  return db.syncQueue.add({
+export const MAX_QUEUE_SIZE = 4000;
+
+export async function addToSyncQueue(item: Omit<SyncQueueItem, 'id' | 'created_at' | 'status' | 'retries'>): Promise<boolean> {
+  const total = await db.syncQueue.where('status').equals('pending').or('status').equals('failed').count();
+  if (total >= MAX_QUEUE_SIZE) {
+    toast.error('Cola de sincronización llena. Conéctate a internet para sincronizar antes de continuar.');
+    return false;
+  }
+  await db.syncQueue.add({
     ...item,
     created_at: new Date().toISOString(),
     status: 'pending',
     retries: 0,
   });
+  return true;
 }
 
 export function getPendingSyncItems(): Promise<SyncQueueItem[]> {
@@ -239,6 +248,15 @@ export function getSyncQueueCount(): Promise<number> {
 
 export function getFailedSyncItems(): Promise<SyncQueueItem[]> {
   return db.syncQueue.where('status').equals('failed').toArray();
+}
+
+export async function cleanSyncLog(): Promise<void> {
+  const total = await db.syncLog.count();
+  if (total <= 500) return;
+  const idsToDelete = (await db.syncLog.orderBy('id').limit(total - 500).toArray()).map(i => i.id!);
+  if (idsToDelete.length > 0) {
+    await db.syncLog.bulkDelete(idsToDelete);
+  }
 }
 
 export default db;

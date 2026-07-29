@@ -472,6 +472,9 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
+            <div className="mb-3 px-3">
+              <SyncStatus />
+            </div>
             <div className="mb-2">
               <ThemeToggle />
             </div>
