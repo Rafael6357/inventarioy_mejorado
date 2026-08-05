@@ -4,7 +4,7 @@ const UNIT_CONVERSIONS = {
   weight: {
     g: 1,
     kg: 1000,
-    lb: 453.592,
+    lb: 454.545,
     oz: 28.3495,
     u: 1,
     sac: 1,
@@ -80,7 +80,7 @@ export function convertUnit(
   value: number,
   fromUnit: UnitAbbrev,
   toUnit: UnitAbbrev,
-  precision: number = 4
+  precision: number = 6
 ): number {
   if (fromUnit === toUnit) return Number(value.toFixed(precision));
 
