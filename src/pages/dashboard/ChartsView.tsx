@@ -91,7 +91,7 @@ export default function ChartsView() {
                     itemStyle={{ color: '#fff' }}
                     formatter={(value: any) => [`$${Number(value).toFixed(2)}`, 'Ventas']}
                   />
-                  <Line type="monotone" dataKey="total" stroke="#d4af37" strokeWidth={3} dot={{ fill: '#d4af37', strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                  <Line type="linear" dataKey="total" stroke="#d4af37" strokeWidth={3} dot={{ fill: '#d4af37', strokeWidth: 2 }} activeDot={{ r: 6 }} />
                 </LineChart>
               </ResponsiveContainer>
             )}
